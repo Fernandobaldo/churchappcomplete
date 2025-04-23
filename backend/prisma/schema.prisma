@@ -1,0 +1,110 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Church {
+  id       String   @id @default(cuid())
+  name     String
+  logoUrl  String?
+  branches Branch[]
+}
+
+model Branch {
+  id          String        @id @default(cuid())
+  name        String
+  churchId    String
+  church      Church        @relation(fields: [churchId], references: [id])
+  members     Member[]
+  Event       Event[]
+  Transaction Transaction[]
+  Devotional  Devotional[]
+  Notice      Notice[]
+}
+
+model Member {
+  id          String       @id @default(cuid())
+  name        String
+  email       String       @unique
+  password    String
+  role        Role         @default(MEMBER)
+  branchId    String
+  branch      Branch       @relation(fields: [branchId], references: [id])
+  permissions Permission[]
+}
+
+model Permission {
+  id       String @id @default(cuid())
+  type     String
+  memberId String
+  member   Member @relation(fields: [memberId], references: [id])
+}
+
+model Event {
+  id             String   @id @default(cuid())
+  title          String
+  description    String?
+  date           DateTime
+  location       String
+  branchId       String
+  branch         Branch   @relation(fields: [branchId], references: [id])
+  hasDonation    Boolean  @default(false)
+  donationLink   String?
+  donationReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Transaction {
+  id       String          @id @default(cuid())
+  title    String
+  amount   Float
+  type     TransactionType
+  category String?
+  branchId String
+  branch   Branch          @relation(fields: [branchId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum TransactionType {
+  ENTRY
+  EXIT
+}
+
+model Devotional {
+  id        String  @id @default(cuid())
+  title     String
+  content   String
+  published Boolean @default(false)
+  branchId  String
+  branch    Branch  @relation(fields: [branchId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Notice {
+  id       String   @id @default(cuid())
+  title    String
+  message  String
+  branchId String
+  branch   Branch   @relation(fields: [branchId], references: [id])
+  viewedBy String[] // list of member IDs that read it
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum Role {
+  MEMBER
+  COORDINATOR
+  ADMINFILIAL
+  ADMINGERAL
+}
