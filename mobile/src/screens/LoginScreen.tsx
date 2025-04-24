@@ -21,11 +21,12 @@ export default function LoginScreen() {
             const user = res.data.user
             setToken(token) // armazenar no Zustand
             setUser({ ...user, token })
-            navigation.navigate('Dashboard')
+            navigation.navigate('Main')
+            console.log('Token recebido:', res.data.token)
 
         } catch (err: any) {
+            console.log('Erro de login:', JSON.stringify(err, null, 2))
             console.log('Erro de login:', err?.response?.data || err.message)
-            console.log('Token recebido:', res.data.token)
             alert('Erro ao fazer login')
         }
     }

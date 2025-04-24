@@ -55,9 +55,9 @@ model Event {
   hasDonation    Boolean  @default(false)
   donationLink   String?
   donationReason String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  time           String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }
 
 model Transaction {
@@ -79,15 +79,15 @@ enum TransactionType {
 }
 
 model Devotional {
-  id        String  @id @default(cuid())
+  id        String   @id @default(cuid())
   title     String
+  passage   String
   content   String
-  published Boolean @default(false)
+  author    String
+  date      DateTime
   branchId  String
-  branch    Branch  @relation(fields: [branchId], references: [id])
-
+  branch    Branch   @relation(fields: [branchId], references: [id])
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 }
 
 model Notice {

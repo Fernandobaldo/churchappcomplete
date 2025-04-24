@@ -5,6 +5,7 @@ import { PrismaClient } from '@prisma/client'
 import { authRoutes } from './routes/authRoutes'
 import { membersRoutes } from './routes/members'
 import { eventsRoutes } from './routes/eventsRoutes'
+import { devotionalsRoutes } from './routes/devotionalsRoutes'
 
 
 const prisma = new PrismaClient()
@@ -37,6 +38,7 @@ app.decorate('authenticate', async function (request, reply) {
 app.register(authRoutes, { prefix: '/auth' })
 app.register(membersRoutes, { prefix: '/members' })
 app.register(eventsRoutes, { prefix: '/events' })
+app.register(devotionalsRoutes, { prefix: '/' })
 
 
 // Rota pública
@@ -44,6 +46,7 @@ app.get('/', async () => {
     return { status: 'Church App API running' }
 })
 
-app.listen({ port: 3333 }, () => {
-    console.log('✅ Server running at http://localhost:3333')
+app.listen({ port: 3333, host: '0.0.0.0' }, () => {
+    console.log('✅ Server running at http://0.0.0.0:3333')
 })
+
