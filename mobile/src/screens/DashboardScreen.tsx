@@ -28,7 +28,7 @@ export default function DashboardScreen() {
             <View style={styles.cardContainer}>
                 <DashboardTile title="Cultos" icon="church" onPress={() => navigation.navigate('Events')} />
                 <DashboardTile title="Eventos" icon="calendar-alt" onPress={() => navigation.navigate('Events')} />
-                <DashboardTile title="Devocionais" icon="bible" onPress={() => navigation.navigate('Contributions')} />
+                <DashboardTile title="Devocionais" icon="bible" onPress={() => navigation.navigate('Devotionals')} />
                 <DashboardTile title="Contribuições" icon="hand-holding-heart" onPress={() => navigation.navigate('Contributions')} />
 
 

@@ -1,11 +1,15 @@
 import React, { useState } from 'react'
-import { View, TextInput, Button, Text, StyleSheet, Switch } from 'react-native'
+import { View, TextInput, Button, Text, StyleSheet, Switch, Platform, Pressable } from 'react-native'
+import DateTimePicker from '@react-native-community/datetimepicker'
 import api from '../api/api'
 
 export default function AddEventScreen({ navigation }: any) {
     const [title, setTitle] = useState('')
-    const [date, setDate] = useState('')
-    const [time, setTime] = useState('')
+    const [date, setDate] = useState(new Date())
+    const [showDatePicker, setShowDatePicker] = useState(false)
+
+    const [time, setTime] = useState(new Date())
+    const [showTimePicker, setShowTimePicker] = useState(false)
 
     const [location, setLocation] = useState('')
     const [hasContribution, setHasContribution] = useState(false)
@@ -13,39 +17,69 @@ export default function AddEventScreen({ navigation }: any) {
     const [paymentLink, setPaymentLink] = useState('')
 
     const handleSubmit = async () => {
-        console.log('Tentando criar evento...')
+        const dateString = date.toISOString().split('T')[0]
+        const timeString = time.toTimeString().slice(0, 5) // Ex: 19:30
+
         try {
-        await api.post('/events', {
-            title,
-            date,
-            time,
-            location,
-            hasDonation: hasContribution,
-            donationReason: contributionReason,
-            donationLink: paymentLink,
-        })
-        navigation.goBack()
-    } catch (err: any) {
-            console.error('Erro ao criar evento:', err?.response?.data || err.message)
-            alert('Erro ao criar evento')
+            await api.post('/events', {
+                title,
+                date: dateString,
+                time: timeString,
+                location,
+                hasDonation:hasContribution,
+                contributionReason,
+                paymentLink,
+            })
+
+            navigation.goBack()
+        }  catch (err: any) {
+            console.log('Erro ao salvar evento:', JSON.stringify(err.response?.data || err.message, null, 2))
+            alert('Erro ao salvar evento')
         }
     }
 
     return (
         <View style={styles.container}>
             <Text>Título</Text>
-            <TextInput style={styles.input} onChangeText={setTitle} value={title} />
+            <TextInput style={styles.input} value={title} onChangeText={setTitle} />
 
-            <Text>Data (ISO ou YYYY-MM-DDTHH:mm)</Text>
-            {/*<TextInput style={styles.input} onChangeText={setDate} value={date} />*/}
-            <TextInput placeholder="Data (YYYY-MM-DD)" value={date} onChangeText={setDate} style={styles.input} />
+            <Text>Data</Text>
+            <Pressable onPress={() => setShowDatePicker(true)} style={styles.input}>
+                <Text>{date.toLocaleDateString()}</Text>
+            </Pressable>
+            {showDatePicker && (
+                <DateTimePicker
+                    value={date}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={(event, selectedDate) => {
+                        const currentDate = selectedDate || date
+                        setShowDatePicker(Platform.OS === 'ios') // no iOS permanece
+                        setDate(currentDate)
+                    }}
+                />
+            )}
 
-            <Text>Time</Text>
-
-            <TextInput placeholder="Hora (HH:MM)" value={time} onChangeText={setTime} style={styles.input} />
+            <Text>Hora</Text>
+            <Pressable onPress={() => setShowTimePicker(true)} style={styles.input}>
+                <Text>{time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
+            </Pressable>
+            {showTimePicker && (
+                <DateTimePicker
+                    value={time}
+                    mode="time"
+                    is24Hour={true}
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={(event, selectedTime) => {
+                        const currentTime = selectedTime || time
+                        setShowTimePicker(Platform.OS === 'ios')
+                        setTime(currentTime)
+                    }}
+                />
+            )}
 
             <Text>Local</Text>
-            <TextInput style={styles.input} onChangeText={setLocation} value={location} />
+            <TextInput style={styles.input} value={location} onChangeText={setLocation} />
 
             <View style={styles.switchRow}>
                 <Text>Contribuição habilitada?</Text>
@@ -55,10 +89,10 @@ export default function AddEventScreen({ navigation }: any) {
             {hasContribution && (
                 <>
                     <Text>Motivo da contribuição</Text>
-                    <TextInput style={styles.input} onChangeText={setContributionReason} value={contributionReason} />
+                    <TextInput style={styles.input} value={contributionReason} onChangeText={setContributionReason} />
 
                     <Text>Link de pagamento</Text>
-                    <TextInput style={styles.input} onChangeText={setPaymentLink} value={paymentLink} />
+                    <TextInput style={styles.input} value={paymentLink} onChangeText={setPaymentLink} />
                 </>
             )}
 
@@ -69,6 +103,17 @@ export default function AddEventScreen({ navigation }: any) {
 
 const styles = StyleSheet.create({
     container: { flex: 1, padding: 20 },
-    input: { borderWidth: 1, padding: 10, marginBottom: 12 },
-    switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginVertical: 10 },
+    input: {
+        borderWidth: 1,
+        borderColor: '#ccc',
+        padding: 10,
+        marginBottom: 12,
+        borderRadius: 8,
+    },
+    switchRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginVertical: 10,
+    },
 })

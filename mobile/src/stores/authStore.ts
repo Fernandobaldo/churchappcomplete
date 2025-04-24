@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { persist, createJSONStorage } from 'zustand/middleware'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 
 type User = {
@@ -29,7 +29,7 @@ export const useAuthStore = create<AuthStore>()(
         }),
         {
             name: 'auth-storage',
-            storage: AsyncStorage,
+            storage: createJSONStorage(() => AsyncStorage), // ✅ CORREÇÃO
         }
     )
 )

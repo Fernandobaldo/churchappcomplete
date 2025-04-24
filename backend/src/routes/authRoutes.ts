@@ -58,6 +58,6 @@ export async function authRoutes(app: FastifyInstance) {
             { sub: user.id, expiresIn: '7d' }
         )
 
-        return { token }
+        return { token, user }
     })
 }
