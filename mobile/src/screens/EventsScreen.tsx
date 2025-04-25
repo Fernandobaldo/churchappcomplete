@@ -12,7 +12,8 @@ export default function EventsScreen() {
 
     const navigation = useNavigation()
     const user = useAuthStore((s) => s.user)
-    const permissions = user?.permissions || []
+    const permissions = user?.permissions?.map((p) => p.type) || []
+
 
     const fetchEvents = useCallback(async () => {
         try {
@@ -46,11 +47,6 @@ console.log((data))
             <View style={styles.header}>
                 <FontAwesome5 name="church" size={24} color="white" style={{ marginRight: 8 }} />
                 <Text style={styles.headerTitle}>Eventos e Cultos</Text>
-                {permissions.includes('event_manage') && (
-                    <TouchableOpacity style={styles.plusCircle} onPress={() => navigation.navigate('AddEvent')}>
-                        <FontAwesome5 name="plus" size={20} color="white" />
-                    </TouchableOpacity>
-                )}
             </View>
 
             <View style={styles.tabs}>

@@ -15,15 +15,16 @@ model Church {
 }
 
 model Branch {
-  id          String        @id @default(cuid())
-  name        String
-  churchId    String
-  church      Church        @relation(fields: [churchId], references: [id])
-  members     Member[]
-  Event       Event[]
-  Transaction Transaction[]
-  Devotional  Devotional[]
-  Notice      Notice[]
+  id           String         @id @default(cuid())
+  name         String
+  churchId     String
+  church       Church         @relation(fields: [churchId], references: [id])
+  members      Member[]
+  Event        Event[]
+  Transaction  Transaction[]
+  Devotional   Devotional[]
+  Notice       Notice[]
+  Contribution Contribution[]
 }
 
 model Member {
@@ -48,7 +49,8 @@ model Event {
   id             String   @id @default(cuid())
   title          String
   description    String?
-  date           DateTime
+  startDate      DateTime
+  endDate        DateTime
   location       String
   branchId       String
   branch         Branch   @relation(fields: [branchId], references: [id])
@@ -100,6 +102,26 @@ model Notice {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model Contribution {
+  id          String           @id @default(cuid())
+  title       String
+  description String?
+  value       Float
+  date        DateTime
+  type        ContributionType
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id])
+}
+
+enum ContributionType {
+  OFERTA
+  DIZIMO
+  OUTRO
 }
 
 enum Role {

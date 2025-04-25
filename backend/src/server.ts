@@ -6,6 +6,8 @@ import { authRoutes } from './routes/authRoutes'
 import { membersRoutes } from './routes/members'
 import { eventsRoutes } from './routes/eventsRoutes'
 import { devotionalsRoutes } from './routes/devotionalsRoutes'
+import { contributionsRoutes } from './routes/contributionsRoutes'
+
 
 
 const prisma = new PrismaClient()
@@ -39,6 +41,8 @@ app.register(authRoutes, { prefix: '/auth' })
 app.register(membersRoutes, { prefix: '/members' })
 app.register(eventsRoutes, { prefix: '/events' })
 app.register(devotionalsRoutes, { prefix: '/' })
+app.register(contributionsRoutes, { prefix: '/contributions' })
+
 
 
 // Rota pública

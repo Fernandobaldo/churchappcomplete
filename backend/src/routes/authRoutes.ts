@@ -12,9 +12,11 @@ export async function authRoutes(app: FastifyInstance) {
             email: z.string().email(),
             password: z.string().min(6),
             branchId: z.string(),
+            role: z.string(),
+            permissions: z.array(z.string()).optional()
         })
 
-        const { name, email, password, branchId } = bodySchema.parse(request.body)
+        const { name, email, password, branchId, role, permissions } = bodySchema.parse(request.body)
 
         const hashedPassword = await bcrypt.hash(password, 10)
 
@@ -23,13 +25,37 @@ export async function authRoutes(app: FastifyInstance) {
                 name,
                 email,
                 password: hashedPassword,
-                role: 'MEMBER',
+                role,
                 branchId,
             },
         })
 
-        return reply.send({ user })
+        // conecta as permissões existentes
+        if (permissions.length > 0) {
+            const allPermissions = await prisma.permission.findMany({
+                where: {
+                    code: { in: permissions }
+                }
+            })
+
+            await prisma.member.update({
+                where: { id: user.id, },
+                data: {
+                    permissions: {
+                        connect: allPermissions.map(p => ({ id: p.id }))
+                    }
+                }
+            })
+        }
+
+        const userWithPermissions = await prisma.member.findUnique({
+            where: { id: user.id },
+            include: { permissions: true },
+        })
+
+        return reply.send({ user: userWithPermissions })
     })
+
 
     app.post('/login', async (request, reply) => {
         const bodySchema = z.object({
@@ -39,9 +65,12 @@ export async function authRoutes(app: FastifyInstance) {
 
         const { email, password } = bodySchema.parse(request.body)
 
-        const user = await prisma.member.findUnique({ where: { email } })
+        const user = await prisma.member.findUnique({
+            where: { email },
+            include: { permissions: true },
+        })
 
-        const senhaValida = await bcrypt.compare(password, user.password)
+
 
 
         if (!user || !(await bcrypt.compare(password, user.password))) {
