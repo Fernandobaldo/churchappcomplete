@@ -23,8 +23,8 @@ export default function EventsScreen() {
             const data = res.data || []
 console.log((data))
             const filtered = tab === 'proximos'
-                ? data.filter((e) => new Date(e.date) >= now)
-                : data.filter((e) => new Date(e.date) < now)
+                ? data.filter((e) => new Date(e.startDate) >= now)
+                : data.filter((e) => new Date(e.startDate) < now)
 
             // Só atualiza se os dados realmente mudarem
             setEvents((prev) => {
@@ -63,12 +63,12 @@ console.log((data))
                 keyExtractor={(item) => item.id}
                 renderItem={({ item }) => (
                     <View style={styles.card}>
-                        <Text style={styles.dateLabel}>{new Date(item.date).toLocaleDateString()}</Text>
+                        <Text style={styles.dateLabel}>{new Date(item.startDate).toLocaleDateString()}</Text>
                         <View style={styles.eventBox}>
                             <View style={{ flex: 1 }}>
                                 <Text style={styles.title}>{item.title}</Text>
                                 <Text style={styles.subtitle}>
-                                    {new Date(item.date).toLocaleDateString()} • {item.time}
+                                    {new Date(item.startDate).toLocaleDateString()} • {item.time}
                                 </Text>
                                 <Text style={styles.subtitle}>{item.location}</Text>
                             </View>

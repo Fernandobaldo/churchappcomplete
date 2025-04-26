@@ -10,7 +10,7 @@ export default function ContributionsScreen() {
     const [contributions, setContributions] = useState([])
     const navigation = useNavigation()
     const user = useAuthStore((s) => s.user)
-    const permissions = user?.permissions || []
+    const permissions = user?.permissions?.map((p) => p.type) || []
 
     const fetchContributions = useCallback(async () => {
         try {
