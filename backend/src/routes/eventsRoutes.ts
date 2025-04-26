@@ -36,7 +36,7 @@ export async function eventsRoutes(app: FastifyInstance) {
             data: {
                 title,
                 description,
-                date: new Date(startDate), // você pode manter esse campo como startDate
+                startDate: new Date(startDate), // você pode manter esse campo como startDate
                 endDate: new Date(endDate),
                 time,
                 location,
@@ -58,7 +58,7 @@ export async function eventsRoutes(app: FastifyInstance) {
                 branchId: user.branchId,
             },
             orderBy: {
-                date: 'asc',
+                startDate: 'asc',
             },
         })
 
