@@ -52,7 +52,7 @@ export default function ContributionsScreen() {
             />
 
             {permissions.includes('contribution_manage') && (
-                <TouchableOpacity style={styles.fab} onPress={() => navigation.navigate('AddContribution')}>
+                <TouchableOpacity style={styles.fab} onPress={() => navigation.navigate('AddContributions')}>
                     <Ionicons name="add" size={24} color="white" />
                     <Text style={styles.fabText}>Adicionar</Text>
                 </TouchableOpacity>

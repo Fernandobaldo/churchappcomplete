@@ -49,4 +49,16 @@ export async function contributionsRoutes(app: FastifyInstance) {
 
         return reply.send(contributions)
     })
+
+    // Listar tipos de contribuição disponíveis
+    app.get('/types', { preHandler: [app.authenticate] }, async (request, reply) => {
+        const types = [
+            { label: 'Dízimo', value: 'DIZIMO' },
+            { label: 'Oferta', value: 'OFERTA' },
+            { label: 'Outro', value: 'OUTRO' },
+        ]
+
+        return reply.send(types)
+    })
+
 }

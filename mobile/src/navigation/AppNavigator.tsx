@@ -21,6 +21,8 @@ import MemberRegistrationScreen from '../screens/MemberRegistrationScreen'
 import InviteLinkScreen from '../screens/InviteLinkScreen'
 import TabNavigator from './TabNavigator'
 import MoreScreen from '../screens/MoreScreen'
+import AddContributions from '../screens/AddContributionsScreen'
+
 
 
 const Stack = createNativeStackNavigator()
@@ -50,6 +52,8 @@ export default function AppNavigator() {
                 <Stack.Screen name="InviteLink" component={InviteLinkScreen} />
                 <Stack.Screen name="Main" component={TabNavigator} />
                 <Stack.Screen name="More" component={MoreScreen} />
+                <Stack.Screen name="AddContributions" component={AddContributions} />
+
 
             </Stack.Navigator>
         </NavigationContainer>
