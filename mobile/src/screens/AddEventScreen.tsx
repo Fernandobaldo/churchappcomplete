@@ -16,6 +16,7 @@ import {
 import DateTimePicker from '@react-native-community/datetimepicker'
 import api from '../api/api'
 import { useNavigation } from '@react-navigation/native'
+import Toast from 'react-native-toast-message'
 
 export default function AddEventScreen() {
     const navigation = useNavigation()
@@ -51,6 +52,14 @@ export default function AddEventScreen() {
                 donationReason,
                 paymentLink,
             })
+
+            Toast.show({
+                type: 'success',
+                text1: 'Evento criado!',
+                text2: 'Seu evento foi adicionado com sucesso. 🎉',
+            })
+
+
             navigation.goBack()
         } catch (res) {
             console.error('Erro ao salvar evento:', res.data)
@@ -170,8 +179,8 @@ export default function AddEventScreen() {
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#fff' },
     form: { padding: 20 },
-    title: { fontSize: 22, fontWeight: 'bold', marginBottom: 20 },
-    label: { marginTop: 16, marginBottom: 6, fontWeight: '600' },
+    title: { fontSize: 22, fontWeight: 'bold', marginBottom: 30, marginTop: 45 },
+    label: { marginTop: 16, marginBottom: 2, fontWeight: '600' },
     input: {
         borderWidth: 1,
         borderColor: '#ccc',

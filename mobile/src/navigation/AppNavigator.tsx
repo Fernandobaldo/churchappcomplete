@@ -30,7 +30,7 @@ const Stack = createNativeStackNavigator()
 export default function AppNavigator() {
     return (
         <NavigationContainer>
-            <Stack.Navigator initialRouteName="Login" screenOptions={{ headerShown: false }}>
+            <Stack.Navigator initialRouteName="Login" screenOptions={{animation: 'slide_from_right', headerShown: false }}>
                 <Stack.Screen name="Login" component={LoginScreen} />
                 <Stack.Screen name="Members" component={MembersScreen} />
                 <Stack.Screen name="Dashboard" component={DashboardScreen} />
@@ -41,7 +41,11 @@ export default function AppNavigator() {
                 <Stack.Screen name="Contributions" component={ContributionsScreen} />
                 <Stack.Screen name="ContributionDetail" component={ContributionDetailScreen} />
                 <Stack.Screen name="Devotionals" component={DevotionalsScreen} />
-                <Stack.Screen name="DevotionalDetail" component={DevotionalDetailScreen} />
+                <Stack.Screen
+                    name="DevotionalDetails"
+                    component={DevotionalDetailScreen}
+                    options={{ title: 'Detalhes do Devocional'}}
+                />
                 <Stack.Screen name="AddDevotional" component={AddDevotionalScreen} />
                 <Stack.Screen name="Notices" component={NoticesScreen} />
                 <Stack.Screen name="AddNotice" component={AddNoticeScreen} />

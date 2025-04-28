@@ -28,14 +28,16 @@ model Branch {
 }
 
 model Member {
-  id          String       @id @default(cuid())
-  name        String
-  email       String       @unique
-  password    String
-  role        Role         @default(MEMBER)
-  branchId    String
-  branch      Branch       @relation(fields: [branchId], references: [id])
-  permissions Permission[]
+  id             String           @id @default(cuid())
+  name           String
+  email          String           @unique
+  password       String
+  role           Role             @default(MEMBER)
+  branchId       String
+  branch         Branch           @relation(fields: [branchId], references: [id])
+  permissions    Permission[]
+  Devotional     Devotional[]
+  DevotionalLike DevotionalLike[]
 }
 
 model Permission {
@@ -81,15 +83,30 @@ enum TransactionType {
 }
 
 model Devotional {
-  id        String   @id @default(cuid())
+  id        String           @id @default(cuid())
   title     String
   passage   String
-  content   String
-  author    String
-  date      DateTime
-  branchId  String
-  branch    Branch   @relation(fields: [branchId], references: [id])
-  createdAt DateTime @default(now())
+  content   String?
+  date      DateTime         @default(now())
+  authorId  String
+  author    Member           @relation(fields: [authorId], references: [id])
+  likes     DevotionalLike[]
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  Branch    Branch?          @relation(fields: [branchId], references: [id])
+  branchId  String?
+}
+
+model DevotionalLike {
+  id           String   @id @default(cuid())
+  devotionalId String
+  userId       String
+  createdAt    DateTime @default(now())
+
+  devotional Devotional @relation(fields: [devotionalId], references: [id])
+  user       Member     @relation(fields: [userId], references: [id])
+
+  @@unique([devotionalId, userId])
 }
 
 model Notice {
