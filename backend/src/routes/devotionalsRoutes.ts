@@ -1,34 +1,42 @@
-import { FastifyInstance } from 'fastify'
-import { PrismaClient } from '@prisma/client'
-import { z } from 'zod'
-
-const prisma = new PrismaClient()
+import { FastifyInstance } from 'fastify';
+import { z } from 'zod';
+import { prisma } from '../lib/prisma';
+import { checkRole } from '../middlewares/checkRole';
+import { checkPermission } from '../middlewares/checkPermission';
 
 export async function devotionalsRoutes(app: FastifyInstance) {
     app.get('/devotionals', { preHandler: [app.authenticate] }, async (request, reply) => {
-        const user = request.user
+        const user = request.user;
 
         const devotionals = await prisma.devotional.findMany({
             where: {
                 branchId: user.branchId,
             },
+            include: {
+                author: true,
+                likes: true,
+            },
             orderBy: {
                 date: 'desc',
             },
-            include: {
-                author: {
-                    select: {
-                        id: true,
-                        name: true,  // 👈 seleciona o nome do autor
-                    },
-                },
-                Branch: true,
-            },
-        })
+        });
 
-        return reply.send(devotionals)
-    })
-    app.post('/devotionals', { preHandler: [app.authenticate] }, async (request, reply) => {
+        const result = devotionals.map(dev => ({
+            ...dev,
+            likesCount: dev.likes.length,
+            liked: dev.likes.some(like => like.userId === user.sub),
+        }));
+
+        return reply.send(result);
+    });
+
+    app.post('/devotionals', {
+        preHandler: [
+            app.authenticate,
+            checkRole(['ADMINGERAL', 'ADMINFILIAL', 'COORDINATOR']),
+            checkPermission(['devotional_manage'])
+        ]
+    }, async (request, reply) => {
         const bodySchema = z.object({
             title: z.string(),
             passage: z.string(),
@@ -36,11 +44,10 @@ export async function devotionalsRoutes(app: FastifyInstance) {
         });
 
         const { title, passage, content } = bodySchema.parse(request.body);
-
         const user = request.user;
 
         if (!user.branchId) {
-            return reply.code(400).send({ message: 'User is not linked to a branch.' });
+            return reply.code(400).send({ message: 'Usuário não vinculado a uma filial.' });
         }
 
         const devotional = await prisma.devotional.create({
@@ -48,59 +55,49 @@ export async function devotionalsRoutes(app: FastifyInstance) {
                 title,
                 passage,
                 content,
-                authorId: user.sub,    // ID do Member logado
-                branchId: user.branchId, // ID da Branch do Member logado
+                authorId: user.sub,
+                branchId: user.branchId,
             },
-            include: {
-                author: true,
-                Branch: true,
-            }
         });
 
         return reply.code(201).send(devotional);
     });
 
-
     app.post('/devotionals/:id/like', { preHandler: [app.authenticate] }, async (request, reply) => {
-        const devotionalId = request.params.id;
+        const paramsSchema = z.object({
+            id: z.string().cuid(),
+        });
+
+        const { id } = paramsSchema.parse(request.params);
         const userId = request.user.sub;
 
-        // Verificar se já existe o like
-        const existingLike = await prisma.devotionalLike.findFirst({
-            where: {
-                devotionalId,
-                userId,
-            },
-        });
-
-        if (existingLike) {
-            // Já curtiu, podemos retornar sucesso direto
-            return reply.code(200).send({ message: 'Você já curtiu este devocional.' });
+        try {
+            await prisma.devotionalLike.create({
+                data: {
+                    devotionalId: id,
+                    userId,
+                },
+            });
+        } catch (err) {
+            return reply.code(400).send({ message: 'Você já curtiu esse devocional.' });
         }
 
-        // Se não curtiu ainda, cria o like
-        await prisma.devotionalLike.create({
-            data: {
-                devotionalId,
-                userId,
-            },
-        });
-
-        return reply.code(201).send();
+        return reply.send({ success: true });
     });
 
     app.delete('/devotionals/:id/unlike', { preHandler: [app.authenticate] }, async (request, reply) => {
-        const devotionalId = request.params.id
-        const userId = request.user.sub
+        const paramsSchema = z.object({ id: z.string().cuid() });
+
+        const { id } = paramsSchema.parse(request.params);
+        const userId = request.user.sub;
 
         await prisma.devotionalLike.deleteMany({
-            where: { devotionalId, userId }
-        })
+            where: {
+                devotionalId: id,
+                userId,
+            },
+        });
 
-        return reply.code(200).send({ success: true })
-    })
-
-
-
-
+        return reply.send({ success: true });
+    });
 }

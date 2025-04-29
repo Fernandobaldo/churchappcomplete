@@ -17,6 +17,7 @@ model Church {
 model Branch {
   id           String         @id @default(cuid())
   name         String
+  pastorName   String
   churchId     String
   church       Church         @relation(fields: [churchId], references: [id])
   members      Member[]

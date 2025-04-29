@@ -1,56 +1,35 @@
-import Fastify from 'fastify'
-import cors from '@fastify/cors'
-import jwt from '@fastify/jwt'
-import { PrismaClient } from '@prisma/client'
-import { authRoutes } from './routes/authRoutes'
-import { membersRoutes } from './routes/members'
-import { eventsRoutes } from './routes/eventsRoutes'
-import { devotionalsRoutes } from './routes/devotionalsRoutes'
-import { contributionsRoutes } from './routes/contributionsRoutes'
+import fastify, { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import fastifyJwt from '@fastify/jwt';
+import fastifyCors from '@fastify/cors';
+import { prisma } from './lib/prisma.js';
+import { registerRoutes } from './routes/index.js';
 
+const app = fastify({ logger: true });
 
+app.register(fastifyCors, { origin: true });
 
-const prisma = new PrismaClient()
-const app = Fastify()
+app.register(fastifyJwt, {
+    secret: 'churchapp-secret-key',
+});
 
-app.register(cors, {
-    origin: true,
-})
-
-app.register(jwt, {
-    secret: process.env.JWT_SECRET || 'supersecret',
-})
-
-// Tipagem do decorator
-declare module 'fastify' {
-    interface FastifyInstance {
-        authenticate: any
-    }
-}
-
-app.decorate('authenticate', async function (request, reply) {
+app.decorate('authenticate', async function (
+    request: FastifyRequest,
+    reply: FastifyReply
+) {
     try {
-        await request.jwtVerify()
+        await request.jwtVerify();
     } catch (err) {
-        reply.code(401).send({ message: 'Unauthorized' })
+        return reply.send(err);
     }
-})
+});
 
-// Rotas protegidas
-app.register(authRoutes, { prefix: '/auth' })
-app.register(membersRoutes, { prefix: '/members' })
-app.register(eventsRoutes, { prefix: '/events' })
-app.register(devotionalsRoutes, { prefix: '/' })
-app.register(contributionsRoutes, { prefix: '/contributions' })
+// Registra todas rotas de forma organizada
+await registerRoutes(app);
 
-
-
-// Rota pública
-app.get('/', async () => {
-    return { status: 'Church App API running' }
-})
-
-app.listen({ port: 3333, host: '0.0.0.0' }, () => {
-    console.log('✅ Server running at http://0.0.0.0:3333')
-})
-
+app.listen({ port: 3333, host: '0.0.0.0' }, (err, address) => {
+    if (err) {
+        app.log.error(err);
+        process.exit(1);
+    }
+    console.log(`🚀 Server running at ${address}`);
+});
