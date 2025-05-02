@@ -20,6 +20,7 @@
     "date-fns": "^4.1.0",
     "expo": "~52.0.46",
     "expo-status-bar": "~2.0.1",
+    "jwt-decode": "^4.0.0",
     "react": "18.3.1",
     "react-native": "0.76.9",
     "react-native-chart-kit": "^6.12.0",
@@ -35,6 +36,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
+    "@types/jwt-decode": "^3.1.0",
     "@types/react": "~18.3.12",
     "typescript": "^5.3.3"
   },

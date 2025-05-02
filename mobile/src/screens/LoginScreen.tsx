@@ -2,11 +2,12 @@ import React, { useState } from 'react'
 import { View, Text, TextInput, Button, StyleSheet } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import { useAuthStore } from '../stores/authStore'
-import api, {setToken} from "../api/api";
+import api, { setToken } from "../api/api"
+
 
 export default function LoginScreen() {
     const navigation = useNavigation()
-    const setUser = useAuthStore((s) => s.setUser)
+    const setUserFromToken = useAuthStore((s) => s.setUserFromToken)
 
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
@@ -18,12 +19,11 @@ export default function LoginScreen() {
                 password,
             })
             const token = res.data.token
-            const user = res.data.user
-            setToken(token) // armazenar no Zustand
-            setUser({ ...user, token })
-            navigation.navigate('Main')
-            console.log('Token recebido:', res.data.token)
 
+            setToken(token)
+            setUserFromToken(token)
+
+            navigation.navigate('Main')
         } catch (err: any) {
             console.log('Erro de login:', JSON.stringify(err, null, 2))
             console.log('Erro de login:', err?.response?.data || err.message)

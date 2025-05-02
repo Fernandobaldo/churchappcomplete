@@ -22,6 +22,8 @@ import InviteLinkScreen from '../screens/InviteLinkScreen'
 import TabNavigator from './TabNavigator'
 import MoreScreen from '../screens/MoreScreen'
 import AddContributions from '../screens/AddContributionsScreen'
+import ProfileScreen from '../screens/ProfileScreen'
+
 
 
 
@@ -57,6 +59,10 @@ export default function AppNavigator() {
                 <Stack.Screen name="Main" component={TabNavigator} />
                 <Stack.Screen name="More" component={MoreScreen} />
                 <Stack.Screen name="AddContributions" component={AddContributions} />
+                <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
+
+
+
 
 
             </Stack.Navigator>

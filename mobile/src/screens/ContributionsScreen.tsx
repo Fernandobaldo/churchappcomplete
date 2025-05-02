@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react'
-import { View, Text, TouchableOpacity, FlatList, StyleSheet } from 'react-native'
+import {View, Text, TouchableOpacity, FlatList, StyleSheet, ActivityIndicator} from 'react-native'
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5'
 import { Ionicons } from '@expo/vector-icons'
 import api from '../api/api'
@@ -12,6 +12,9 @@ export default function ContributionsScreen() {
     const user = useAuthStore((s) => s.user)
     const permissions = user?.permissions?.map((p) => p.type) || []
 
+    const [loading, setLoading] = useState(true)
+    const [refreshing, setRefreshing] = useState(false)
+
     const fetchContributions = useCallback(async () => {
         try {
             const res = await api.get('/contributions')
@@ -23,7 +26,33 @@ export default function ContributionsScreen() {
 
     useEffect(() => {
         fetchContributions()
+        const loadContributions = async () => {
+            setLoading(true)
+            await fetchContributions()
+            setLoading(false)
+        }
+        loadContributions()
     }, [fetchContributions])
+
+    const handleRefresh = async () => {
+        setRefreshing(true)
+        await fetchContributions()
+        setRefreshing(false)
+    }
+
+    if (loading) {
+        return (
+            <View style={styles.centered}>
+                <ActivityIndicator size="large" color="#3366FF" />
+            </View>
+        )
+    }
+
+    const canManageContributions =
+        user.role === 'ADMINGERAL' ||
+        user.role === 'ADMINFILIAL' ||
+        user.permissions?.some((p: any) => p.type === 'contribution_manage')
+
 
     return (
         <View style={styles.container}>
@@ -49,9 +78,17 @@ export default function ContributionsScreen() {
                     </View>
                 )}
                 contentContainerStyle={{ paddingBottom: 80 }}
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                ListEmptyComponent={
+                    <View style={styles.centered}>
+                        <Text style={styles.emptyText}>Nenhuma contribuição encontrada 🙏</Text>
+                    </View>
+                }
+
             />
 
-            {permissions.includes('contribution_manage') && (
+            {canManageContributions && (
                 <TouchableOpacity style={styles.fab} onPress={() => navigation.navigate('AddContributions')}>
                     <Ionicons name="add" size={24} color="white" />
                     <Text style={styles.fabText}>Adicionar</Text>
@@ -62,6 +99,8 @@ export default function ContributionsScreen() {
 }
 
 const styles = StyleSheet.create({
+    centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    emptyText: { fontSize: 16, color: '#666', marginBottom: 20, marginTop: 50 },
     container: { flex: 1, backgroundColor: '#fff' },
     header: {
         backgroundColor: '#3366FF',

@@ -1,11 +1,15 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import {PrismaClient} from "@prisma/client";
+import { createBranchSchema } from '../schemas/branchSchemas.js';
 const prisma = new PrismaClient()
 
 
 export async function branchesRoutes(app: FastifyInstance) {
-    app.post('/branches', { preHandler: [app.authenticate] }, async (request, reply) => {
+    app.post('/', {
+        preHandler: [app.authenticate],
+            schema: createBranchSchema},
+        async (request, reply) => {
         const bodySchema = z.object({
             name: z.string(),
             pastorName: z.string(),

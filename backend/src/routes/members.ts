@@ -13,40 +13,55 @@ export async function membersRoutes(app: FastifyInstance) {
             select: {
                 id: true,
                 name: true,
+                branchId: true,
                 email: true,
                 role: true,
-                permissions: true,
+                permissions: {
+                    select: {
+                        type: true,
+                    },
+                }
             },
         })
 
         return members
     })
 
-    app.post('/:id/permissions', {preHandler: [app.authenticate]}, async (request, reply) => {
-        const paramsSchema = z.object({
-            id: z.string().cuid(),
-        })
+    app.get('/me', { preHandler: [app.authenticate] }, async (request, reply) => {
+        const userId = request.user.sub;
 
-        const bodySchema = z.object({
-            permissions: z.array(z.string()),
-        })
+        const user = await prisma.member.findUnique({
+            where: { id: userId },
+            include: {
+                permissions: true,
+                branch: {
+                    include: {
+                        church: true,
+                    },
+                },
+            },
+        });
 
-        const {id} = paramsSchema.parse(request.params)
-        const {permissions} = bodySchema.parse(request.body)
+        if (!user) {
+            return reply.code(404).send({ message: 'Usuário não encontrado' });
+        }
 
-        // Remove permissões anteriores (opcional)
-        await prisma.permission.deleteMany({
-            where: {memberId: id},
-        })
+        return {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            permissions: user.permissions.map((p) => ({ type: p.type })),
+            branch: {
+                id: user.branch.id,
+                name: user.branch.name,
+            },
+            church: {
+                id: user.branch.church.id,
+                name: user.branch.church.name,
+                logoUrl: user.branch.church.logoUrl,
+            },
+        };
+    });
 
-        // Cria novas permissões
-        await prisma.permission.createMany({
-            data: permissions.map((type) => ({
-                memberId: id,
-                type,
-            })),
-        })
-
-        return reply.send({success: true})
-    })
 }

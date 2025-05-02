@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "@prisma/client": "^6.7.0",
     "axios": "^1.8.4",
     "nativewind": "^4.1.23",
     "react-native-chart-kit": "^6.12.0",

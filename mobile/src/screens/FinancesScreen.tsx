@@ -34,6 +34,8 @@ export default function FinancesScreen() {
         { key: 2, amount: summary.exits, svg: { fill: '#F44336' }, label: 'Gastos' },
     ]
 
+
+
     return (
         <View style={styles.container}>
             <Text style={styles.header}>Resumo Financeiro</Text>

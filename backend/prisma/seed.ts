@@ -4,6 +4,10 @@ import bcrypt from 'bcryptjs';
 const prisma = new PrismaClient();
 
 async function main() {
+    await prisma.permission.deleteMany(); // Remove todas as permissões
+    await prisma.member.deleteMany();     // Remove todos os membros
+    await prisma.branch.deleteMany();     // Remove todas as filiais
+    await prisma.church.deleteMany();     // Remove todas as igrejas
     console.log('🌱 Iniciando seed...');
 
     // Cria Church
@@ -14,7 +18,7 @@ async function main() {
         },
     });
 
-    // Cria Branch (sede)
+    // Cria Branch
     const branch = await prisma.branch.create({
         data: {
             name: 'Sede Principal',
@@ -33,6 +37,19 @@ async function main() {
             password: hashedPassword,
             role: 'ADMINGERAL',
             branchId: branch.id,
+        },
+    });
+
+    // Permissões a vincular
+    const defaultPermissions = ['devotional_manage', 'members_view', 'events_manage'];
+
+    // Cria e vincula permissões diretamente
+    await prisma.member.update({
+        where: { id: admin.id },
+        data: {
+            permissions: {
+                create: defaultPermissions.map((type) => ({ type })),
+            },
         },
     });
 

@@ -7,6 +7,10 @@ import NoticesScreen from '../screens/NoticesScreen'
 import { Ionicons } from '@expo/vector-icons'
 import MoreScreen from "../screens/MoreScreen";
 
+
+
+
+
 const Tab = createBottomTabNavigator()
 
 export default function TabNavigator() {
@@ -32,6 +36,7 @@ export default function TabNavigator() {
             <Tab.Screen name="Events" component={EventsScreen} />
             <Tab.Screen name="Contributions" component={ContributionsScreen} />
             <Tab.Screen name="Mais" component={MoreScreen} />
+
         </Tab.Navigator>
     )
 }

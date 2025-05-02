@@ -3,9 +3,11 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { checkRole } from '../middlewares/checkRole';
 import { checkPermission } from '../middlewares/checkPermission';
+import { createDevotionalSchema } from '../schemas/devotionalSchemas.js';
+import {createEventSchema} from "../schemas";
 
 export async function devotionalsRoutes(app: FastifyInstance) {
-    app.get('/devotionals', { preHandler: [app.authenticate] }, async (request, reply) => {
+    app.get('/', { preHandler: [app.authenticate] }, async (request, reply) => {
         const user = request.user;
 
         const devotionals = await prisma.devotional.findMany({
@@ -30,12 +32,14 @@ export async function devotionalsRoutes(app: FastifyInstance) {
         return reply.send(result);
     });
 
-    app.post('/devotionals', {
+    app.post('/', {
+        schema: createEventSchema,
         preHandler: [
             app.authenticate,
             checkRole(['ADMINGERAL', 'ADMINFILIAL', 'COORDINATOR']),
-            checkPermission(['devotional_manage'])
-        ]
+            checkPermission(['events_manage']),
+        ],
+        schema: createDevotionalSchema
     }, async (request, reply) => {
         const bodySchema = z.object({
             title: z.string(),
@@ -63,7 +67,7 @@ export async function devotionalsRoutes(app: FastifyInstance) {
         return reply.code(201).send(devotional);
     });
 
-    app.post('/devotionals/:id/like', { preHandler: [app.authenticate] }, async (request, reply) => {
+    app.post('/:id/like', { preHandler: [app.authenticate] }, async (request, reply) => {
         const paramsSchema = z.object({
             id: z.string().cuid(),
         });
@@ -85,7 +89,7 @@ export async function devotionalsRoutes(app: FastifyInstance) {
         return reply.send({ success: true });
     });
 
-    app.delete('/devotionals/:id/unlike', { preHandler: [app.authenticate] }, async (request, reply) => {
+    app.delete('/:id/unlike', { preHandler: [app.authenticate] }, async (request, reply) => {
         const paramsSchema = z.object({ id: z.string().cuid() });
 
         const { id } = paramsSchema.parse(request.params);

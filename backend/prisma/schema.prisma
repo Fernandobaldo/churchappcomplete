@@ -46,6 +46,8 @@ model Permission {
   type     String
   memberId String
   member   Member @relation(fields: [memberId], references: [id])
+
+  @@unique([type, memberId])
 }
 
 model Event {

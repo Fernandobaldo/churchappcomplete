@@ -10,7 +10,7 @@ export default function MoreScreen() {
     const permissions = user?.permissions?.map((p) => p.type) || []
 
     const generalOptions = [
-        { label: 'Meu Perfil', icon: <Ionicons name="person-outline" size={20} />, screen: 'Profile' },
+        { label: 'Meu Perfil', icon: <Ionicons name="person-outline" size={20} />, screen: 'ProfileScreen' },
         { label: 'Minhas Contribuições', icon: <Ionicons name="heart-outline" size={20} />, screen: 'MyContributions' },
         { label: 'Estudos Bíblicos / Devocional', icon: <Ionicons name="book-outline" size={20} />, screen: 'Devotionals' },
         { label: 'Configurações do App', icon: <Ionicons name="settings-outline" size={20} />, screen: 'AppSettings' },

@@ -70,7 +70,7 @@ export default function AddContributionScreen() {
             await api.post('/contributions', {
                 title,
                 description,
-                date: date.toISOString().split('T')[0],
+                date: date.toISOString(),
                 type,
                 value: parseFloat(value.replace(',', '.')),
             })
@@ -223,7 +223,7 @@ export default function AddContributionScreen() {
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#fff' },
     form: { padding: 20, flexGrow: 1 },
-    title: { fontSize: 22, fontWeight: 'bold', marginBottom: 20 },
+    title: { fontSize: 22, fontWeight: 'bold', marginBottom: 20, marginTop: 50 },
     label: { marginTop: 16, marginBottom: 6, fontWeight: '600' },
     input: {
         borderWidth: 1,

@@ -5,9 +5,14 @@ import { Ionicons } from '@expo/vector-icons'
 import api from '../api/api'
 import DevotionalCard from '../components/DevotionalCard'
 import FontAwesome5 from "@expo/vector-icons/FontAwesome5";
+import {useAuthStore} from "../stores/authStore";
 
 export default function FeedDevotionalsScreen() {
     const navigation = useNavigation()
+    const user = useAuthStore((s) => s.user)
+    const permissions = user?.permissions?.map((p) => p.type) || []
+
+
 
     const [devotionals, setDevotionals] = useState([])
     const [loading, setLoading] = useState(true)
@@ -45,19 +50,11 @@ export default function FeedDevotionalsScreen() {
         )
     }
 
-    if (devotionals.length === 0) {
-        return (
-            <View style={styles.centered}>
-                <Text style={styles.emptyText}>Nenhum devocional encontrado 🙏</Text>
-                <TouchableOpacity
-                    style={styles.addButton}
-                    onPress={() => navigation.navigate('AddDevotional')}
-                >
-                    <Ionicons name="add" size={32} color="#fff" />
-                </TouchableOpacity>
-            </View>
-        )
-    }
+    const canManageDevotionals =
+        user.role === 'ADMINGERAL' ||
+        user.role === 'ADMINFILIAL' ||
+        user.permissions?.some((p: any) => p.type === 'devotional_manage')
+
 
     return (
         <View style={styles.container}>
@@ -76,15 +73,23 @@ export default function FeedDevotionalsScreen() {
                 keyExtractor={(item) => item.id}
                 refreshing={refreshing}
                 onRefresh={handleRefresh}
+                ListEmptyComponent={
+                    <View style={styles.centered}>
+                        <Text style={styles.emptyText}>Nenhum devocional encontrado 🙏</Text>
+                    </View>
+                }
             />
 
             {/* Botão Flutuante de Adicionar */}
+            {canManageDevotionals && (
             <TouchableOpacity
-                style={styles.addButton}
+                style={styles.fab}
                 onPress={() => navigation.navigate('AddDevotional')}
             >
-                <Ionicons name="add" size={32} color="#fff" />
+                <Ionicons name="add" size={24} color="white" />
+                <Text style={styles.fabText}>Adicionar</Text>
             </TouchableOpacity>
+                )}
         </View>
     )
 }
@@ -102,17 +107,23 @@ const styles = StyleSheet.create({
     },
     headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#fff' },
     list: { padding: 16, paddingBottom: 100 }, // espaço extra para botão flutuante
-    addButton: {
+    fab: {
         position: 'absolute',
         right: 20,
-        bottom: 30,
+        marginBottom: 50,
+        bottom: 20,
         backgroundColor: '#3366FF',
+        paddingVertical: 12,
+        paddingHorizontal: 18,
         borderRadius: 30,
-        width: 60,
-        height: 60,
-        justifyContent: 'center',
+        flexDirection: 'row',
         alignItems: 'center',
-        elevation: 5,
+        gap: 6,
+        shadowColor: '#000',
+        shadowOpacity: 0.2,
+        shadowOffset: { width: 0, height: 2 },
+        shadowRadius: 4,
+        elevation: 6,
     },
     container: { flex: 1},
     headertop: {
@@ -129,5 +140,9 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: 'bold',
         flex: 1
-    }
+    },
+    fabText: {
+        color: '#fff',
+        fontWeight: 'bold',
+    },
     })

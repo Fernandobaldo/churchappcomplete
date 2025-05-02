@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react'
-import { View, Text, TouchableOpacity, FlatList, StyleSheet } from 'react-native'
+import {View, Text, TouchableOpacity, FlatList, StyleSheet, ActivityIndicator} from 'react-native'
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5'
 import { Ionicons } from '@expo/vector-icons'
 import api from '../api/api'
@@ -9,6 +9,8 @@ import { useAuthStore } from '../stores/authStore'
 export default function EventsScreen() {
     const [tab, setTab] = useState<'proximos' | 'passados'>('proximos')
     const [events, setEvents] = useState([])
+    const [loading, setLoading] = useState(true)
+    const [refreshing, setRefreshing] = useState(false)
 
     const navigation = useNavigation()
     const user = useAuthStore((s) => s.user)
@@ -40,7 +42,32 @@ console.log((data))
 
     useEffect(() => {
         fetchEvents()
+        const loadEvents = async () => {
+            setLoading(true)
+            await fetchEvents()
+            setLoading(false)
+        }
+        loadEvents()
     }, [fetchEvents])
+
+    if (loading) {
+        return (
+            <View style={styles.centered}>
+                <ActivityIndicator size="large" color="#3366FF" />
+            </View>
+        )
+    }
+
+    const handleRefresh = async () => {
+        setRefreshing(true)
+        await fetchEvents()
+        setRefreshing(false)
+    }
+
+    const canManageEvents =
+        user.role === 'ADMINGERAL' ||
+        user.role === 'ADMINFILIAL' ||
+        user.permissions?.some((p: any) => p.type === 'events_manage')
 
     return (
         <View style={styles.container}>
@@ -76,9 +103,17 @@ console.log((data))
                     </View>
                 )}
                 contentContainerStyle={{ paddingBottom: 80 }}
+                keyExtractor={(item) => item.id}
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                ListEmptyComponent={
+                    <View style={styles.centered}>
+                        <Text style={styles.emptyText}>Nenhum evento encontrado 🙏</Text>
+                    </View>
+                }
             />
 
-            {permissions.includes('event_manage') && (
+            {canManageEvents && (
                 <TouchableOpacity style={styles.fab} onPress={() => navigation.navigate('AddEvent')}>
                     <Ionicons name="add" size={24} color="white" />
                     <Text style={styles.fabText}>Adicionar</Text>
@@ -90,6 +125,8 @@ console.log((data))
 
 
 const styles = StyleSheet.create({
+    centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    emptyText: { fontSize: 16, color: '#666', marginBottom: 20, marginTop: 50},
     container: { flex: 1, backgroundColor: '#fff' },
     header: {
         backgroundColor: '#3366FF',

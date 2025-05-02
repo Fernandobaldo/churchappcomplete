@@ -59,7 +59,7 @@ export default function AddDevotionalScreen() {
                 title,
                 passage,
                 content,
-                date: date.toISOString().split('T')[0],
+
             })
 
             Toast.show({
