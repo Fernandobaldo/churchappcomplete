@@ -16,9 +16,24 @@ export async function registerRoute(app: FastifyInstance) {
             branchId: z.string().optional(),
             role: z.nativeEnum(Role).optional(),
             permissions: z.array(z.string()).optional(),
+            birthDate: z.string().optional(), // ISO format
+            phone: z.string().optional(),
+            address: z.string().optional(),
+            avatarUrl: z.string().url().optional(),
         });
 
-        const { name, email, password, branchId, role, permissions } = bodySchema.parse(request.body);
+        const {
+            name,
+            email,
+            password,
+            branchId,
+            role,
+            permissions,
+            birthDate,
+            phone,
+            address,
+            avatarUrl,
+        } = bodySchema.parse(request.body);
         const hashedPassword = await bcrypt.hash(password, 10);
 
         let finalRole = role;
@@ -35,6 +50,10 @@ export async function registerRoute(app: FastifyInstance) {
                 password: hashedPassword,
                 role: finalRole,
                 branchId,
+                birthDate: birthDate ? new Date(birthDate) : undefined,
+                phone,
+                address,
+                avatarUrl,
             },
         });
 
@@ -79,8 +98,19 @@ export async function registerRoute(app: FastifyInstance) {
                 email: userWithPermissions?.email,
                 role: userWithPermissions?.role,
                 branchId: userWithPermissions?.branchId,
+                birthDate: userWithPermissions?.birthDate,
+                phone: userWithPermissions?.phone,
+                address: userWithPermissions?.address,
+                avatarUrl: userWithPermissions?.avatarUrl,
                 permissions: userWithPermissions?.permissions.map((p) => ({ type: p.type })) || [],
             },
         });
     });
+    app.get('/types', async (request, reply) => {
+        return [
+            { label: 'Admin Geral', value: 'ADMINGERAL' },
+            { label: 'Admin Congregação', value: 'ADMINFILIAL' },
+            { label: 'Membro', value: 'MEMBER' },
+        ]
+    })
 }

@@ -2,31 +2,50 @@ import React, { useEffect, useState } from 'react'
 
 import { View, Text, StyleSheet, Image, TouchableOpacity, ActivityIndicator } from 'react-native'
 
-import { useNavigation } from '@react-navigation/native'
+import {useNavigation, useRoute} from '@react-navigation/native'
 import PageHeader from '../components/PageHeader'
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5'
 import { Ionicons } from '@expo/vector-icons'
 import api from '../api/api'
 
+import { useAuthStore } from '../stores/authStore'
+
 export default function ProfileScreen() {
+    const route = useRoute()
+    const { memberId } = route.params || {}
+    const isOwnProfile = !memberId
+    const [refreshing, setRefreshing] = useState(false)
+    const user = useAuthStore((s) => s.user)
+
+
     const [profile, setProfile] = useState<any>(null)
     const [loading, setLoading] = useState(true)
     const navigation = useNavigation()
 
     useEffect(() => {
-        const fetchProfile = async () => {
+        async function fetchProfile() {
             try {
-                const res = await api.get('/members/me')
-                setProfile(res.data)
-            } catch (error) {
-                console.error('Erro ao carregar perfil:', error)
+                if (isOwnProfile) {
+                    const res = await api.get('/members/me')
+                    setProfile(res.data)
+                } else {
+                    const res = await api.get(`/members/${memberId}`)
+                    setProfile(res.data)
+                }
+            } catch (err) {
+                console.error('Erro ao carregar perfil:', err)
             } finally {
                 setLoading(false)
             }
         }
-
         fetchProfile()
-    }, [])
+    }, [memberId])
+    // const handleRefresh = async () => {
+    //     setRefreshing(true)
+    //     await ProfileScreen()
+    //     setRefreshing(false)
+    // }
+
 
     if (loading) {
         return (
@@ -37,50 +56,83 @@ export default function ProfileScreen() {
     }
 
     const canManagePermissions =
-        profile.role === 'ADMINGERAL' ||
-        profile.role === 'ADMINFILIAL' ||
-        profile.permissions?.some((p: any) => p.type === 'members_manage')
+        user?.role === 'ADMINGERAL' ||
+        user?.role === 'ADMINFILIAL' ||
+        user?.permissions?.some((p: any) => p.type === 'permission_manage')
+
+    const formatRole = (role: string) => {
+        if (!role) return 'Nenhum'
+        return role
+            .replace('ADMINFILIAL', 'Admin Filial')
+            .replace('ADMINGERAL', 'Admin Geral')
+            .replace('COORDINATOR', 'Coordenador')
+            .replace('MEMBER', 'Membro')
+    }
+
+    const formatPermission = (permissions: { type: string }[] = []) => {
+        if (!permissions || !Array.isArray(permissions)) return 'Nenhuma'
+
+        return Array.from(new Set(permissions.map((p) => p.type)))
+            .map((type) =>
+                type
+                    .replace('events_manage', 'Editar eventos')
+                    .replace('contribution_manage', 'Editar contribuição')
+                    .replace('finance_manage', 'Editar finanças')
+                    .replace('permission_manage', 'Gerenciar permissões')
+                    .replace('devotional_manage', 'Editar devocional')
+                    .replace('notice_manage', 'Gerenciar avisos')
+                    .replace('member_manage', 'Gerenciar membros')
+
+
+            )
+            .join(', ')
+    }
 
     return (
         <View style={styles.container}>
             <PageHeader
-                title="Meu Perfil"
+                title={memberId ? 'Perfil do Membro' : 'Meu Perfil'}
                 Icon={FontAwesome5}
                 iconName="user"
-                rightButtonIcon={<Ionicons name="settings-outline" size={24} color="white" />}
+                rightButtonIcon={
+                    !memberId ? <Ionicons name="settings-outline" size={24} color="white" /> : undefined
+            }
                 onRightButtonPress={() => {
-                    console.log('Abrir configurações')
+                    navigation.navigate('EditProfileScreen')
                 }}
             />
             <View style={styles.card}>
                 <Image
-                    source={{ uri: 'https://via.placeholder.com/150' }}
+                    source={{ uri: profile.avatarUrl || 'https://via.placeholder.com/150' }}
                     style={styles.avatar}
+                    defaultSource={require('../../assets/worshipImage.png')} //
                 />
                 <Text style={styles.name}>{profile.name}</Text>
-                <Text style={styles.email}>{profile.email}</Text>
+                <Text style={styles.email}>{profile.birthDate}</Text>
 
                 <View style={styles.divider} />
 
                 <View style={styles.infoRow}>
                     <Text style={styles.label}>Congregação</Text>
-                    <Text style={styles.value}>{profile.church?.name}</Text>
+                    <Text style={styles.value}>{profile.branch.church?.name}</Text>
                 </View>
                 <View style={styles.infoRow}>
                     <Text style={styles.label}>Cargo</Text>
-                    <Text style={styles.value}>{formatRole(profile.role)}</Text>
+                    <Text style={styles.value}> {formatRole(profile.role) || 'Nenhum'}</Text>
                 </View>
+                {canManagePermissions && (
                 <View style={styles.infoRow}>
                 <Text style={styles.label}>Permissões:</Text>
-                <Text style={styles.valuePermission}>
-                    {formatPermission(profile.permissions?.map((p: any) => p.type).join(', ') )|| 'Nenhuma'}
+                <Text style={styles.valuePermission}> {formatPermission(profile.permissions) || 'Nenhum'}
                 </Text>
                 </View>
-
+                )}
+                {/*refreshing={refreshing}*/}
+                {/*onRefresh={handleRefresh}*/}
                 {canManagePermissions && (
                     <TouchableOpacity
                         style={styles.button}
-                        onPress={() => navigation.navigate('ManagePermissions', { memberId: profile.id })}
+                        onPress={() => navigation.navigate('EditMemberPermissions', { memberId: profile.id })}
                     >
                         <Text style={styles.buttonText}>Gerenciar Permissões</Text>
                     </TouchableOpacity>
@@ -90,19 +142,7 @@ export default function ProfileScreen() {
     )
 }
 
-function formatRole(role: string) {
-    return role.replace('ADMINFILIAL', 'AdminFilial')
-        .replace('ADMINGERAL', 'AdminGeral')
-        .replace('COORDINATOR', 'Coordenador')
-        .replace('MEMBER', 'Membro')
-}
 
-function formatPermission(permission: string) {
-    return permission.replace('members_view', 'Ver membros')
-        .replace('events_manage', 'Editar eventos')
-        .replace('contribution_manage', 'Editar contribuição')
-        .replace('finances_manage', 'Editar finanças')
-}
 
 
 const styles = StyleSheet.create({
@@ -167,7 +207,7 @@ const styles = StyleSheet.create({
         color: '#222',
     },
     valuePermission: {
-        marginLeft: 100,
+        marginLeft: 50,
         textAlign: 'right',
         flexWrap: 'wrap',
         flex: 1,

@@ -1,7 +1,6 @@
 import { NavigationContainer } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import LoginScreen from '../screens/LoginScreen'
-import MembersScreen from '../screens/MembersScreen'
 import DashboardScreen from '../screens/DashboardScreen'
 import EventsScreen from '../screens/EventsScreen'
 import AddEventScreen from '../screens/AddEventScreen'
@@ -23,6 +22,8 @@ import TabNavigator from './TabNavigator'
 import MoreScreen from '../screens/MoreScreen'
 import AddContributions from '../screens/AddContributionsScreen'
 import ProfileScreen from '../screens/ProfileScreen'
+import MembersListScreen from '../screens/MembersListScreen'
+import EditProfileScreen from '../screens/EditProfileScreen'
 
 
 
@@ -34,7 +35,6 @@ export default function AppNavigator() {
         <NavigationContainer>
             <Stack.Navigator initialRouteName="Login" screenOptions={{animation: 'slide_from_right', headerShown: false }}>
                 <Stack.Screen name="Login" component={LoginScreen} />
-                <Stack.Screen name="Members" component={MembersScreen} />
                 <Stack.Screen name="Dashboard" component={DashboardScreen} />
                 <Stack.Screen name="Events" component={EventsScreen} />
                 <Stack.Screen name="AddEvent" component={AddEventScreen} />
@@ -54,12 +54,16 @@ export default function AppNavigator() {
                 <Stack.Screen name="Permissions" component={PermissionsScreen} />
                 <Stack.Screen name="ManagePermissions" component={ManagePermissionsScreen} />
                 <Stack.Screen name="EditMemberPermissions" component={EditMemberPermissionsScreen} />
-                <Stack.Screen name="RegisterMember" component={MemberRegistrationScreen} />
+                <Stack.Screen name="MemberRegistrationScreen" component={MemberRegistrationScreen} />
                 <Stack.Screen name="InviteLink" component={InviteLinkScreen} />
                 <Stack.Screen name="Main" component={TabNavigator} />
                 <Stack.Screen name="More" component={MoreScreen} />
                 <Stack.Screen name="AddContributions" component={AddContributions} />
                 <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
+                <Stack.Screen name="MembersListScreen" component={MembersListScreen} />
+                <Stack.Screen name="EditProfileScreen" component={EditProfileScreen} />
+
+
 
 
 

@@ -49,11 +49,11 @@ export default function FeedDevotionalsScreen() {
             </View>
         )
     }
-
     const canManageDevotionals =
         user.role === 'ADMINGERAL' ||
         user.role === 'ADMINFILIAL' ||
         user.permissions?.some((p: any) => p.type === 'devotional_manage')
+
 
 
     return (

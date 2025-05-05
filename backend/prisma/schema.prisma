@@ -33,6 +33,10 @@ model Member {
   name           String
   email          String           @unique
   password       String
+  birthDate      DateTime? // Novo campo
+  phone          String? // Novo campo
+  address        String? // Novo campo
+  avatarUrl      String? // Novo campo
   role           Role             @default(MEMBER)
   branchId       String
   branch         Branch           @relation(fields: [branchId], references: [id])

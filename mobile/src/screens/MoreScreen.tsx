@@ -14,6 +14,7 @@ export default function MoreScreen() {
         { label: 'Minhas Contribuições', icon: <Ionicons name="heart-outline" size={20} />, screen: 'MyContributions' },
         { label: 'Estudos Bíblicos / Devocional', icon: <Ionicons name="book-outline" size={20} />, screen: 'Devotionals' },
         { label: 'Configurações do App', icon: <Ionicons name="settings-outline" size={20} />, screen: 'AppSettings' },
+        { label: 'Membros', icon: <Ionicons name="settings-outline" size={20} />, screen: 'MembersListScreen' },
     ]
 
     const adminOptions = [
@@ -23,9 +24,17 @@ export default function MoreScreen() {
         { label: 'Painel Administrativo', icon: <MaterialIcons name="admin-panel-settings" size={20} />, screen: 'AdminPanel', permission: 'admin_access' },
         { label: 'Convites e Cadastro de Membros', icon: <FontAwesome5 name="user-plus" size={18} />, screen: 'InviteLink', permission: 'member_invite' },
         { label: 'Permissões e Hierarquias', icon: <Feather name="lock" size={20} />, screen: 'Permissions', permission: 'permission_manage' },
+
+
+
     ]
 
-    const hasAdminPermission = adminOptions.some(opt => permissions.includes(opt.permission!))
+    const hasAccess = (required: string) =>
+        user?.role === 'ADMINGERAL' ||
+        user?.role === 'ADMINFILIAL' ||
+        permissions.includes(required)
+
+    const filteredAdminOptions = adminOptions.filter(opt => hasAccess(opt.permission))
 
     const handleNavigate = (screen: string) => {
         navigation.navigate(screen as never)
@@ -33,7 +42,6 @@ export default function MoreScreen() {
 
     return (
         <View style={styles.container}>
-            {/* Seção geral */}
             {generalOptions.map((item, idx) => (
                 <TouchableOpacity key={idx} style={styles.row} onPress={() => handleNavigate(item.screen)}>
                     <View style={styles.icon}>{item.icon}</View>
@@ -42,30 +50,26 @@ export default function MoreScreen() {
                 </TouchableOpacity>
             ))}
 
-            {/* Seção para líderes e administradores */}
-            {hasAdminPermission && (
+            {filteredAdminOptions.length > 0 && (
                 <>
                     <Text style={styles.sectionHeader}>Para líderes e administradores</Text>
-                    {adminOptions.map((item, idx) => {
-                        if (!permissions.includes(item.permission!)) return null
-                        return (
-                            <TouchableOpacity key={idx} style={styles.row} onPress={() => handleNavigate(item.screen)}>
-                                <View style={styles.icon}>{item.icon}</View>
-                                <Text style={styles.label}>{item.label}</Text>
-                                <Ionicons name="chevron-forward" size={18} color="#ccc" />
-                            </TouchableOpacity>
-                        )
-                    })}
+                    {filteredAdminOptions.map((item, idx) => (
+                        <TouchableOpacity key={idx} style={styles.row} onPress={() => handleNavigate(item.screen)}>
+                            <View style={styles.icon}>{item.icon}</View>
+                            <Text style={styles.label}>{item.label}</Text>
+                            <Ionicons name="chevron-forward" size={18} color="#ccc" />
+                        </TouchableOpacity>
+                    ))}
                 </>
             )}
 
-            {/* Sair da conta */}
             <TouchableOpacity style={styles.logoutRow} onPress={() => navigation.navigate('Login')}>
                 <Text style={styles.logoutText}>Sair da conta</Text>
             </TouchableOpacity>
         </View>
     )
 }
+
 
 const styles = StyleSheet.create({
     container: {

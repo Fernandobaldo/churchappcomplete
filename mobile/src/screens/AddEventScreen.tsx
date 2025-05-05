@@ -1,58 +1,66 @@
 import React, { useState } from 'react'
 import {
     View,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    Switch,
     StyleSheet,
-    KeyboardAvoidingView,
-    TouchableWithoutFeedback,
-    Keyboard,
-    Platform,
-    Modal,
-    Pressable,
 } from 'react-native'
-import DateTimePicker from '@react-native-community/datetimepicker'
 import api from '../api/api'
 import { useNavigation } from '@react-navigation/native'
 import Toast from 'react-native-toast-message'
+import FontAwesome5 from '@expo/vector-icons/FontAwesome5'
+import PageHeader from "../components/PageHeader";
+import MemberForm from "../components/FormsComponent";
 
 export default function AddEventScreen() {
     const navigation = useNavigation()
-    const [title, setTitle] = useState('')
-    const [location, setLocation] = useState('')
-    const [description, setDescription] = useState('')
-    const [hasDonation, setHasDonation] = useState(false)
-    const [donationReason, setDonationReason] = useState('')
-    const [paymentLink, setPaymentLink] = useState('')
 
-    const [startDate, setStartDate] = useState<Date | null>(null)
-    const [endDate, setEndDate] = useState<Date | null>(null)
-    const [time, setTime] = useState(new Date())
+    const [form, setForm] = useState({
+        title: '',
+        startDate: '',
+        endDate: '',
+        time: '',
+        description: '',
+        location: '',
+        hasDonation: ''
+    })
 
-    const [showStartPicker, setShowStartPicker] = useState(false)
-    const [showEndPicker, setShowEndPicker] = useState(false)
+    const fields = [
+        { key: 'title', label: 'Titulo do evento', type: 'string' },
+        { key: 'startDate', label: 'Data de início', type: 'date' },
+        { key: 'endDate', label: 'Data do término', type: 'date' },
+        { key: 'time', label: 'Horario', type: 'string' },
+        { key: 'description', label: 'Descrição', type: 'string' },
+        { key: 'location', label: 'Localização', type: 'string' },
+        { key: 'hasDonation', label: 'Contribuição habilitada', type: 'toggle' },
+        {
+            key: 'donationReason',
+            label: 'Motivo da contribuição',
+            placeholder: 'Apoio Missionário',
+            type: 'string',
+            dependsOn: 'hasDonation',
+        },
+        {
+            key: 'paymentLink',
+            label: 'Link do pagamento',
+            placeholder: 'https://exemplo.com/pagamento',
+            type: 'string',
+            dependsOn: 'hasDonation',
+        },
+    ]
 
-    const handleTimeChange = (event, selected) => {
-        if (selected) setTime(selected)
+    const convertToISO = (dateStr: string) => {
+        if (!dateStr) return null
+        const [day, month, year] = dateStr.split('/')
+        return new Date(+year, +month - 1, +day).toISOString()
     }
 
     const handleSave = async () => {
-        if (!startDate || !endDate) return alert('Selecione data de início e término')
+
         try {
             const res = await api.post('/events', {
-                title,
-                location,
-                description,
-                startDate: startDate.toISOString(),
-                endDate: endDate.toISOString(),
-                time: time.toTimeString().slice(0, 5),
-                hasDonation,
-                donationReason,
-                paymentLink,
+                ...form,
+                startDate: convertToISO(form.startDate),
+                endDate: form.endDate ? convertToISO(form.endDate) : undefined, // ou null, se o backend aceitar
             })
-
             Toast.show({
                 type: 'success',
                 text1: 'Evento criado!',
@@ -62,117 +70,31 @@ export default function AddEventScreen() {
 
             navigation.goBack()
         } catch (res) {
+            Toast.show({
+                type: 'error',
+                text1: 'Erro ao salvar evento',
+                text2: 'Houve um erro ao salvar o evento',
+            })
             console.error('Erro ao salvar evento:', res.data)
         }
     }
 
     return (
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.container}>
-            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-                <View style={styles.form}>
-                    <Text style={styles.title}>Adicionar / Editar Evento</Text>
 
-                    <Text style={styles.label}>Título do evento</Text>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Digite o título"
-                        value={title}
-                        onChangeText={setTitle}
-                    />
-
-                    <Text style={styles.label}>Data de início</Text>
-                    <TouchableOpacity onPress={() => setShowStartPicker(true)} style={styles.input}>
-                        <Text>{startDate ? startDate.toLocaleDateString() : 'Selecionar data de início'}</Text>
-                    </TouchableOpacity>
-                    {showStartPicker && (
-                        <DateTimePicker
-                            value={startDate || new Date()}
-                            mode="date"
-                            display="default"
-                            onChange={(event, selected) => {
-                                setShowStartPicker(false)
-                                if (selected) setStartDate(selected)
-                            }}
-                        />
-                    )}
-
-                    <Text style={styles.label}>Data de término</Text>
-                    <TouchableOpacity onPress={() => setShowEndPicker(true)} style={styles.input}>
-                        <Text>{endDate ? endDate.toLocaleDateString() : 'Selecionar data de término'}</Text>
-                    </TouchableOpacity>
-                    {showEndPicker && (
-                        <DateTimePicker
-                            value={endDate || new Date()}
-                            mode="date"
-                            display="default"
-                            onChange={(event, selected) => {
-                                setShowEndPicker(false)
-                                if (selected) setEndDate(selected)
-                            }}
-                        />
-                    )}
-
-                    <Text style={styles.label}>Hora</Text>
-                    <DateTimePicker
-                        value={time}
-                        mode="time"
-                        display="default"
-                        onChange={handleTimeChange}
-                    />
-
-                    <Text style={styles.label}>Local</Text>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Digite o local"
-                        value={location}
-                        onChangeText={setLocation}
-                    />
-
-                    <Text style={styles.label}>Descrição</Text>
-                    <TextInput
-                        style={[styles.input, { height: 80 }]}
-                        placeholder="Informações adicionais sobre o evento"
-                        value={description}
-                        onChangeText={setDescription}
-                        multiline
-                    />
-
-                    <View style={styles.switchRow}>
-                        <Text style={styles.label}>Contribuição habilitada</Text>
-                        <Switch value={hasDonation} onValueChange={setHasDonation} />
-                    </View>
-
-                    {hasDonation && (
-                        <>
-                            <Text style={styles.label}>Motivo da contribuição</Text>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Apoio Missionário"
-                                value={donationReason}
-                                onChangeText={setDonationReason}
-                            />
-
-                            <Text style={styles.label}>Link do pagamento</Text>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="https://exemplo.com/pagamento"
-                                value={paymentLink}
-                                onChangeText={setPaymentLink}
-                            />
-                        </>
-                    )}
-
-                    <View style={styles.buttonRow}>
-                        <TouchableOpacity style={styles.cancelButton} onPress={() => navigation.goBack()}>
-                            <Text style={styles.cancelText}>Cancelar</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-                            <Text style={styles.saveText}>Salvar</Text>
-                        </TouchableOpacity>
-                    </View>
+        <View style={styles.container}>
+            <PageHeader
+                title="Editar Perfil"
+                Icon={FontAwesome5}
+                iconName="user"
+            />
+            <MemberForm
+                form={form}
+                setForm={setForm}
+                fields={fields}
+                onSubmit={handleSave}
+                submitLabel="Salvar alterações"
+            />
                 </View>
-            </TouchableWithoutFeedback>
-        </KeyboardAvoidingView>
     )
 }
 

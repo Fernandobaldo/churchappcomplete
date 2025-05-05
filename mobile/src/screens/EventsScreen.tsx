@@ -23,7 +23,6 @@ export default function EventsScreen() {
             const now = new Date()
 
             const data = res.data || []
-console.log((data))
             const filtered = tab === 'proximos'
                 ? data.filter((e) => new Date(e.startDate) >= now)
                 : data.filter((e) => new Date(e.startDate) < now)

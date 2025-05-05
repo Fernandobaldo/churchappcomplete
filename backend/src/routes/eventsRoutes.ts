@@ -26,7 +26,7 @@ export async function eventsRoutes(app: FastifyInstance) {
             schema: createEventSchema,
             preHandler: [
                 app.authenticate,
-                checkRole(['ADMINGERAL', 'ADMINFILIAL', 'COORDINATOR']),
+                checkRole(['ADMINGERAL', 'ADMINFILIAL', 'COORDINATOR']) ||
                 checkPermission(['events_manage']),
             ],
         },
@@ -35,7 +35,7 @@ export async function eventsRoutes(app: FastifyInstance) {
                 title: z.string(),
                 description: z.string().optional(),
                 startDate: z.string(),
-                endDate: z.string(),
+                endDate: z.string().nullable().optional(),
                 time: z.string(),
                 location: z.string(),
                 hasDonation: z.boolean().optional(),
