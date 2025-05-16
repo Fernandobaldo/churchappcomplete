@@ -55,20 +55,21 @@ model Permission {
 }
 
 model Event {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   title          String
   description    String?
   startDate      DateTime
-  endDate        DateTime
+  endDate        DateTime?
   location       String
   branchId       String
-  branch         Branch   @relation(fields: [branchId], references: [id])
-  hasDonation    Boolean  @default(false)
+  branch         Branch    @relation(fields: [branchId], references: [id])
+  hasDonation    Boolean   @default(false)
   donationLink   String?
   donationReason String?
+  imageUrl       String?
   time           String
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 }
 
 model Transaction {

@@ -101,24 +101,46 @@ export default function FormsComponent({
                 }
 
                 if (field.type === 'image') {
-                    return (
-                        <View key={field.key} style={{ alignItems: 'center' }}>
-                            <Text style={styles.label}>{field.label}</Text>
-                            {form[field.key] ? (
-                                <Image source={{ uri: form[field.key] }} style={styles.imagePreview} />
-                            ) : (
-                                <View style={styles.imagePlaceholder}>
-                                    <Text style={{ color: '#888' }}>Nenhuma imagem</Text>
-                                </View>
-                            )}
-                            <TouchableOpacity
-                                style={styles.buttonSmall}
-                                onPress={() => handleSelectImage(field.key)}
-                            >
-                                <Text style={styles.buttonText}>Selecionar Imagem</Text>
-                            </TouchableOpacity>
-                        </View>
-                    )
+                    if (field.key === 'avatar') {
+                        return (
+                            <View key={field.key} style={{alignItems: 'center'}}>
+                                <Text style={styles.label}>{field.label}</Text>
+                                {form[field.key] ? (
+                                    <Image source={{uri: form[field.key]}} style={styles.imagePreview}/>
+                                ) : (
+                                    <View style={styles.imagePlaceholder}>
+                                        <Text style={{color: '#888'}}>Nenhuma imagem</Text>
+                                    </View>
+                                )}
+                                <TouchableOpacity
+                                    style={styles.buttonSmall}
+                                    onPress={() => handleSelectImage(field.key)}
+                                >
+                                    <Text style={styles.buttonText}>Selecionar Imagem</Text>
+                                </TouchableOpacity>
+                            </View>
+                        )
+                    }
+                    if (field.key === 'imageUrl') {
+                        return (
+                            <View key={field.key} style={{alignItems: 'center'}}>
+                                <Text style={styles.label}>{field.label}</Text>
+                                {form[field.key] ? (
+                                    <Image source={{uri: form[field.key]}} style={styles.imagePreview}/>
+                                ) : (
+                                    <View style={styles.imagePlaceholder}>
+                                        <Text style={{color: '#888'}}>Nenhuma imagem</Text>
+                                    </View>
+                                )}
+                                <TouchableOpacity
+                                    style={styles.buttonSmall}
+                                    onPress={() => handleSelectImage(field.key)}
+                                >
+                                    <Text style={styles.buttonText}>Selecionar Imagem</Text>
+                                </TouchableOpacity>
+                            </View>
+                        )
+                    }
                 }
 
                 if (field.dependsOn && !form[field.dependsOn]) return null
@@ -244,19 +266,20 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
     imagePreview: {
-        width: 120,
-        height: 120,
-        borderRadius: 60,
+        width: '100%',
+        height: 160,
+        borderRadius: 12,
         marginTop: 10,
     },
     imagePlaceholder: {
-        width: 120,
-        height: 120,
-        borderRadius: 60,
         backgroundColor: '#eee',
         justifyContent: 'center',
         alignItems: 'center',
         marginTop: 10,
+        width: '100%',
+        height: 160,
+        resizeMode: 'cover',
+        borderRadius: 12,
     },
     inputDescription: {
         height: 80,

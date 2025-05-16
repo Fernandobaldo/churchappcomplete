@@ -6,6 +6,7 @@ import api from '../api/api'
 import { useNavigation } from '@react-navigation/native'
 import { useAuthStore } from '../stores/authStore'
 
+
 export default function EventsScreen() {
     const [tab, setTab] = useState<'proximos' | 'passados'>('proximos')
     const [events, setEvents] = useState([])
@@ -90,7 +91,11 @@ export default function EventsScreen() {
                 renderItem={({ item }) => (
                     <View style={styles.card}>
                         <Text style={styles.dateLabel}>{new Date(item.startDate).toLocaleDateString()}</Text>
-                        <View style={styles.eventBox}>
+                        <TouchableOpacity
+                            style={styles.eventBox}
+                            onPress={() => navigation.navigate('EventDetails', { id: item.id })}
+                            activeOpacity={0.8}
+                        >
                             <View style={{ flex: 1 }}>
                                 <Text style={styles.title}>{item.title}</Text>
                                 <Text style={styles.subtitle}>
@@ -98,11 +103,11 @@ export default function EventsScreen() {
                                 </Text>
                                 <Text style={styles.subtitle}>{item.location}</Text>
                             </View>
-                        </View>
+                        </TouchableOpacity>
                     </View>
+
                 )}
                 contentContainerStyle={{ paddingBottom: 80 }}
-                keyExtractor={(item) => item.id}
                 refreshing={refreshing}
                 onRefresh={handleRefresh}
                 ListEmptyComponent={

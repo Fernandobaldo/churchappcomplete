@@ -24,6 +24,7 @@ interface Member {
     role: string
     avatarUrl?: string
     branchId: string
+
 }
 
 export default function MembersListScreen() {

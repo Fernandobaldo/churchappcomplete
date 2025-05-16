@@ -3,6 +3,8 @@ import { useAuthStore } from '../stores/authStore'
 
 const api = axios.create({
     baseURL: 'http://192.168.1.13:3333',
+    //10.22.1.23
+    //192.168.1.13
     // timeout: 10000, // adiciona timeout maior
 })
 

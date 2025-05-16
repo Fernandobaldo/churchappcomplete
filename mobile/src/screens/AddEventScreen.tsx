@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import {
     View,
-    StyleSheet,
+    StyleSheet, Platform, Keyboard, KeyboardAvoidingView, TouchableWithoutFeedback, ScrollView,
 } from 'react-native'
 import api from '../api/api'
 import { useNavigation } from '@react-navigation/native'
@@ -9,6 +9,7 @@ import Toast from 'react-native-toast-message'
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5'
 import PageHeader from "../components/PageHeader";
 import MemberForm from "../components/FormsComponent";
+import {format, isValid, parse} from 'date-fns'
 
 export default function AddEventScreen() {
     const navigation = useNavigation()
@@ -20,7 +21,7 @@ export default function AddEventScreen() {
         time: '',
         description: '',
         location: '',
-        hasDonation: ''
+        hasDonation: false
     })
 
     const fields = [
@@ -45,22 +46,39 @@ export default function AddEventScreen() {
             type: 'string',
             dependsOn: 'hasDonation',
         },
+        {
+            key: 'imageUrl',
+            label: 'Banner do evento',
+            placeholder: 'https://exemplo.com/banner.jpg',
+            type: 'image',
+        }
     ]
 
-    const convertToISO = (dateStr: string) => {
-        if (!dateStr) return null
-        const [day, month, year] = dateStr.split('/')
-        return new Date(+year, +month - 1, +day).toISOString()
+
+    const convertToFormattedDate = (dateStr: string) => {
+        if (!dateStr) return undefined;
+
+        const parsedDate = parse(dateStr, 'dd/MM/yyyy', new Date());
+        if (!isValid(parsedDate)) {
+            console.error('Data inválida enviada:', dateStr);
+            return undefined;
+        }
+
+        return format(parsedDate, 'dd-MM-yyyy');
     }
 
     const handleSave = async () => {
-
+        const payload = {
+            ...form,
+            startDate: convertToFormattedDate(form.startDate),
+            endDate: convertToFormattedDate(form.startDate),
+        };
         try {
-            const res = await api.post('/events', {
-                ...form,
-                startDate: convertToISO(form.startDate),
-                endDate: form.endDate ? convertToISO(form.endDate) : undefined, // ou null, se o backend aceitar
-            })
+
+            console.log('Payload a ser enviado:', payload); // <-- VERIFIQUE AQUI
+
+            await api.post('/events', payload);
+
             Toast.show({
                 type: 'success',
                 text1: 'Evento criado!',
@@ -80,12 +98,14 @@ export default function AddEventScreen() {
     }
 
     return (
-
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+                <ScrollView contentContainerStyle={styles.form}>
         <View style={styles.container}>
             <PageHeader
-                title="Editar Perfil"
+                title="Criar Evento"
                 Icon={FontAwesome5}
-                iconName="user"
+                iconName="calendar"
             />
             <MemberForm
                 form={form}
@@ -95,12 +115,16 @@ export default function AddEventScreen() {
                 submitLabel="Salvar alterações"
             />
                 </View>
+                </ScrollView>
+            </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
     )
 }
 
 const styles = StyleSheet.create({
+    form: {  flexGrow: 1 },
     container: { flex: 1, backgroundColor: '#fff' },
-    form: { padding: 20 },
+
     title: { fontSize: 22, fontWeight: 'bold', marginBottom: 30, marginTop: 45 },
     label: { marginTop: 16, marginBottom: 2, fontWeight: '600' },
     input: {

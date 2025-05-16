@@ -24,6 +24,9 @@ import AddContributions from '../screens/AddContributionsScreen'
 import ProfileScreen from '../screens/ProfileScreen'
 import MembersListScreen from '../screens/MembersListScreen'
 import EditProfileScreen from '../screens/EditProfileScreen'
+import EventDetailsScreen from '../screens/EventDetailsScreen'
+import EditEventScreen from '../screens/EditEventScreen'
+
 
 
 
@@ -62,9 +65,8 @@ export default function AppNavigator() {
                 <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
                 <Stack.Screen name="MembersListScreen" component={MembersListScreen} />
                 <Stack.Screen name="EditProfileScreen" component={EditProfileScreen} />
-
-
-
+                <Stack.Screen name="EventDetails" component={EventDetailsScreen} options={{ headerShown: false }} />
+                <Stack.Screen name="EditEventScreen" component={EditEventScreen}  />
 
 
 
