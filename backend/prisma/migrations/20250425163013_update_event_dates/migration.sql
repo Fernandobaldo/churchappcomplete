@@ -1,4 +1,0 @@
-ALTER TABLE "Event"
-DROP COLUMN "date",
-ADD COLUMN "startDate" TIMESTAMP(3),
-ADD COLUMN "endDate" TIMESTAMP(3);
