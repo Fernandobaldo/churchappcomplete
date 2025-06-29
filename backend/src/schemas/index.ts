@@ -3,4 +3,4 @@ export * from './eventSchemas';
 export * from './contributionSchemas';
 export * from './devotionalSchemas';
 export * from './churchSchemas';
-export * from './branchSchemas';
+export * from './branchSchema';

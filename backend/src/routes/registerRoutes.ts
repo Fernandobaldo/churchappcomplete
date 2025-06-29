@@ -2,14 +2,18 @@ import { FastifyInstance } from 'fastify';
 
 import { branchesRoutes } from './branchRoutes.js';
 import { churchRoutes } from './churchRoutes.js';
-import { membersRoutes } from './members.js';
+import { membersRoutes } from './membersRoutes.js';
 import { eventsRoutes } from './eventsRoutes.js';
 import { contributionsRoutes } from './contributionsRoutes.js';
 import { devotionalsRoutes } from './devotionalsRoutes.js';
 import { authRoutes } from './auth';
 import { permissionsRoutes } from './auth/permissions'
 import { registerRoute } from './auth/register'
-
+import { planRoutes } from './planRoutes';
+import { subscriptionRoutes } from './subscriptionRoutes';
+import { adminRoutes } from './adminRoutes';
+import { publicRegisterRoute } from './public/register'
+import { loginRoute } from './auth/login'
 
 
     export async function registerRoutes(app: FastifyInstance) {
@@ -22,6 +26,12 @@ import { registerRoute } from './auth/register'
         app.register(devotionalsRoutes, { prefix: '/devotionals' });
         app.register(permissionsRoutes, { prefix: '/permissions' });
         app.register(registerRoute, { prefix: '/register' });
+        app.register(planRoutes, { prefix: '/plans' });
+        app.register(subscriptionRoutes, { prefix: '/subscriptions' });
+        app.register(adminRoutes);
+        app.register(publicRegisterRoute, { prefix: '/public' })
+        app.register(loginRoute)
+
 
 
 }

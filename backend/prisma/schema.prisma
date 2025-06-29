@@ -19,7 +19,8 @@ model Branch {
   name         String
   pastorName   String
   churchId     String
-  church       Church         @relation(fields: [churchId], references: [id])
+  isMainBranch Boolean  @default(false) // NOVO CAMPO
+  church       Church         @relation(fields: [churchId], references: [id], onDelete: Cascade)
   members      Member[]
   Event        Event[]
   Transaction  Transaction[]
@@ -43,6 +44,9 @@ model Member {
   permissions    Permission[]
   Devotional     Devotional[]
   DevotionalLike DevotionalLike[]
+
+  userId String? @unique
+  user   User?   @relation("UserMember", fields: [userId], references: [id])
 }
 
 model Permission {
@@ -141,6 +145,43 @@ model Contribution {
 
   branchId String
   branch   Branch @relation(fields: [branchId], references: [id])
+}
+
+model User {
+  id            String         @id @default(cuid())
+  name          String
+  email         String         @unique
+  password      String
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  subscriptions Subscription[]
+  member        Member?        @relation("UserMember")
+}
+
+// Novo model para Planos
+model Plan {
+  id            String         @id @default(cuid())
+  name          String         @unique
+  price         Float
+  features      String[]
+  maxMembers    Int? // Limite de membros (null = ilimitado)
+  maxBranches   Int? // Limite de branches (null = ilimitado)
+  subscriptions Subscription[]
+}
+
+// Novo model para Assinaturas de Usuário
+model Subscription {
+  id        String    @id @default(cuid())
+  user      User      @relation(fields: [userId], references: [id])
+  userId    String
+  plan      Plan      @relation(fields: [planId], references: [id])
+  planId    String
+  status    String    @default("active")
+  startedAt DateTime  @default(now())
+  endsAt    DateTime?
+
+  @@index([userId])
+  @@index([planId])
 }
 
 enum ContributionType {
