@@ -3,6 +3,7 @@
 import { prisma } from '../lib/prisma'
 import { Role } from '@prisma/client'
 import { ALL_PERMISSION_TYPES } from '../constants/permissions'
+import bcrypt from 'bcryptjs'
 
 interface CreateChurchData {
   name: string
@@ -38,16 +39,18 @@ export class ChurchService {
         },
       })
 
-      const member = await tx.member.create({
-        data: {
-          name: user.name,
-          email: user.email,
-          password: user.password,
-          role: Role.ADMINGERAL,
-          branchId: branch.id,
-          userId: user.id,
-        },
-      })
+ const hashedPassword = await bcrypt.hash(user.password, 10)
+
+ const member = await tx.member.create({
+   data: {
+     name: user.name,
+     email: user.email,
+     password: hashedPassword,
+     role: Role.ADMINGERAL,
+     branchId: branch.id,
+     userId: user.id,
+   },
+ })
 
       const allPermissions = await tx.permission.findMany({
         where: { type: { in: ALL_PERMISSION_TYPES } },

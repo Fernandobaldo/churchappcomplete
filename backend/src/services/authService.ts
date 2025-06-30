@@ -8,9 +8,8 @@ const JWT_SECRET = process.env.JWT_SECRET || 'secret_dev_key'
 
 export class AuthService {
   async validateCredentials(email: string, password: string) {
-    const user = await prisma.member.findUnique({
+    const user = await prisma.user.findUnique({
       where: { email },
-      include: { permissions: true },
     })
 
     if (!user || !(await bcrypt.compare(password, user.password))) {
@@ -24,16 +23,23 @@ export class AuthService {
     const user = await this.validateCredentials(email, password)
     if (!user) throw new Error('Credenciais inválidas')
 
+    const member = await prisma.member.findFirst({
+      where: { userId: user.id },
+      include: { permissions: true },
+    })
+
     const token = jwt.sign(
       {
         sub: user.id,
         email: user.email,
-        permissions: user.permissions.map((p) => p.type),
+        permissions: member?.permissions.map((p) => p.type) || [],
       },
       JWT_SECRET,
       { expiresIn: '7d' }
     )
 
-    return { token, user }
+   const { password: _, ...safeUser } = user
+
+   return { token, user: safeUser, member }
   }
 }
