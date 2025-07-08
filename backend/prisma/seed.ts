@@ -11,7 +11,7 @@ async function main() {
   if (!existingPlan) {
     await prisma.plan.create({
       data: {
-        name: 'Free',
+        name: 'free',
         price: 0,
         features: [
           'Até 1 igreja',

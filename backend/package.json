@@ -5,9 +5,14 @@
   "main": "index.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
+    "migrate:test": "set DATABASE_URL=postgresql://postgres:postgres@localhost:5432/churchapp_test && prisma migrate deploy",
     "build": "tsc",
     "seed": "tsx prisma/seed.ts",
-    "test:unit": "vitest run --dir tests/unit"
+    "test:unit": "vitest run --dir tests/unit",
+    "test:report": "vitest run --reporter=verbose --coverage",
+    "test:watch": "vitest watch",
+    "test:integration": "vitest run --dir tests/integration",
+    "test": "dotenv -e .env.test -- vitest"
   },
   "type": "module",
   "keywords": [],
@@ -34,6 +39,7 @@
     "eslint": "^9.25.1",
     "nodemon": "^3.1.9",
     "prisma": "^6.6.0",
+    "supertest": "^7.1.1",
     "ts-node": "^10.9.2",
     "tsx": "^4.19.3",
     "typescript": "^5.8.3",

@@ -28,10 +28,10 @@ export default function LoginScreen() {
 
     setLoading(true)
     try {
-      const response = await api.post('/login', { email, password })
+      const response = await api.post('auth/login', { email, password })
       // Armazenar token, navegar, etc.
       Toast.show({ type: 'success', text1: 'Login realizado!' })
-      // navigation.navigate('Home') // ajuste conforme necessário
+       navigation.navigate('Dashboard') // ajuste conforme necessário
     } catch (error) {
       Toast.show({
         type: 'error',

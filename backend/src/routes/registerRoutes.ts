@@ -14,6 +14,7 @@ import { subscriptionRoutes } from './subscriptionRoutes';
 import { adminRoutes } from './adminRoutes';
 import { publicRegisterRoute } from './public/register'
 import { loginRoute } from './auth/login'
+import { authenticate } from '../middlewares/authenticate'
 
 
     export async function registerRoutes(app: FastifyInstance) {

@@ -8,38 +8,47 @@ const JWT_SECRET = process.env.JWT_SECRET || 'secret_dev_key'
 
 export class AuthService {
   async validateCredentials(email: string, password: string) {
+  const member = await prisma.member.findUnique({
+      where: { email },
+      include: { permissions: true },
+    })
+
+    if (member && await bcrypt.compare(password, member.password)) {
+      return { type: 'member', data: member }
+    }
+
+    // Tenta validar como User (Admin SaaS)
     const user = await prisma.user.findUnique({
       where: { email },
     })
 
-    if (!user || !(await bcrypt.compare(password, user.password))) {
-      return null
+    if (user && await bcrypt.compare(password, user.password)) {
+      return { type: 'user', data: user }
     }
 
-    return user
+    return null
   }
 
-  async login(email: string, password: string) {
-    const user = await this.validateCredentials(email, password)
-    if (!user) throw new Error('Credenciais inválidas')
+ async login(email: string, password: string) {
+   const result = await this.validateCredentials(email, password)
+   if (!result) throw new Error('Credenciais inválidas')
 
-    const member = await prisma.member.findFirst({
-      where: { userId: user.id },
-      include: { permissions: true },
-    })
+   const { type, data } = result
 
-    const token = jwt.sign(
-      {
-        sub: user.id,
-        email: user.email,
-        permissions: member?.permissions.map((p) => p.type) || [],
-      },
-      JWT_SECRET,
-      { expiresIn: '7d' }
-    )
+   const token = jwt.sign(
+     {
+       sub: data.id,
+       email: data.email,
+       type,
+       permissions: type === 'member' ? data.permissions?.map(p => p.type) : [],
+     },
+     JWT_SECRET,
+     { expiresIn: '7d' }
+   )
+ // Remove a senha do objeto retornado
+  const { password: _, ...sanitizedUser } = data
 
-   const { password: _, ...safeUser } = user
+  return { token, user: sanitizedUser, type }
 
-   return { token, user: safeUser, member }
-  }
-}
+ }
+ }

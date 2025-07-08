@@ -19,12 +19,24 @@ export async function authenticate(request: FastifyRequest, reply: FastifyReply)
       permissions: string[]
     }
 
-    request.user = {
-      id: payload.sub,
-      email: payload.email,
-      permissions: payload.permissions,
-    }
+request.user = {
+  id: payload.sub,
+  email: payload.email,
+  type: payload.type, // 'user' ou 'member'
+  permissions: payload.permissions || [],
+}
   } catch (error) {
     return reply.status(401).send({ message: 'Token inválido' })
+  }
+}
+
+declare module 'fastify' {
+  interface FastifyRequest {
+    user?: {
+      id: string
+      email: string
+      type: 'user' | 'member'
+      permissions: string[]
+    }
   }
 }
