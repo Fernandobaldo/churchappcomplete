@@ -2,6 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ChurchService } from '../../src/services/churchService'
 import { prisma } from '../../src/lib/prisma'
 
+vi.mock('bcryptjs', () => ({
+  default: {
+    hash: vi.fn((password, rounds) => Promise.resolve(`hashed_${password}`)),
+  },
+}))
+
 vi.mock('../../src/lib/prisma', () => {
   const mock = {
     church: {
@@ -41,6 +47,7 @@ const mockChurch = {
   church: {
     id: 'church1',
     name: 'Igreja Teste',
+    isActive: true,
   },
   branch: {
     id: 'branch1',
@@ -59,6 +66,7 @@ const mockChurch = {
     prisma.church.create.mockResolvedValue({
       id: 'church1',
       name: 'Igreja Teste',
+      isActive: true,
     })
     prisma.branch.create.mockResolvedValue(mockBranch)
     prisma.member.create.mockResolvedValue(mockMember)
@@ -67,16 +75,15 @@ const mockChurch = {
     const result = await service.createChurchWithMainBranch(
       {
         name: 'Igreja Teste',
-        ownerId: 'user1',
         branchName: 'Sede',
         pastorName: 'Pastor Teste',
-        user: {
-          name: 'Admin',
-          email: 'admin@teste.com',
-          password: '123456',
-        },
       },
-      true
+      {
+        id: 'user1',
+        name: 'Admin',
+        email: 'admin@teste.com',
+        password: '123456',
+      }
     )
 
     expect(result).toEqual(mockChurch)
@@ -89,20 +96,19 @@ const mockChurch = {
   it('deve lidar com erro ao criar igreja', async () => {
     prisma.church.create.mockRejectedValue(new Error('Erro inesperado'))
 
-    await expect(() =>
+    await expect(
       service.createChurchWithMainBranch(
         {
           name: 'Igreja com Erro',
-          ownerId: 'user1',
           branchName: 'Sede',
           pastorName: 'Pastor Teste',
-          user: {
-            name: 'Admin',
-            email: 'admin@erro.com',
-            password: '123456',
-          },
         },
-        true
+        {
+          id: 'user1',
+          name: 'Admin',
+          email: 'admin@erro.com',
+          password: '123456',
+        }
       )
     ).rejects.toThrow('Erro inesperado')
   })

@@ -1,6 +1,7 @@
 import { FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import { ChurchService } from '../services/churchService'
+import { AuditLogger } from '../utils/auditHelper'
 
 export class ChurchController {
   private service = new ChurchService()
@@ -26,6 +27,14 @@ export class ChurchController {
     }
 
     const result = await this.service.createChurchWithMainBranch(data, dbUser)
+    
+    // Log de auditoria
+    await AuditLogger.churchCreated(
+      request,
+      result.church.id,
+      result.church.name
+    )
+    
     return reply.code(201).send(result)
   }
 

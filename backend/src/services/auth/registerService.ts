@@ -2,6 +2,12 @@ import { prisma } from '../../lib/prisma'
 import bcrypt from 'bcryptjs'
 import { Role } from '@prisma/client'
 import { ALL_PERMISSION_TYPES } from '../../constants/permissions'
+import { checkPlanMembersLimit } from '../../utils/planLimits'
+import {
+  validateMemberCreationPermission,
+  getMemberFromUserId,
+} from '../../utils/authorization'
+import { AuditLogger } from '../../utils/auditHelper'
 
 interface RegisterUserInput {
   name: string
@@ -15,6 +21,7 @@ interface RegisterUserInput {
   address?: string
   avatarUrl?: string
   fromLandingPage?: boolean // ← usado para distinguir cadastro externo
+  creatorUserId?: string // ID do usuário que está criando (para validações)
 }
 
 export async function registerUserService(data: RegisterUserInput) {
@@ -30,6 +37,7 @@ export async function registerUserService(data: RegisterUserInput) {
     address,
     avatarUrl,
     fromLandingPage,
+    creatorUserId,
   } = data
 
   const hashedPassword = await bcrypt.hash(password, 10)
@@ -61,19 +69,48 @@ export async function registerUserService(data: RegisterUserInput) {
   }
 
   // 🧱 Caso seja criação de membro interno
-  let finalRole = role
-  if (!finalRole) {
-    const churchesCount = await prisma.church.count()
-    finalRole = churchesCount === 0 ? Role.ADMINGERAL : Role.ADMINFILIAL
+  // Validações de segurança
+  if (!branchId) {
+    throw new Error('branchId é obrigatório para criação de membros internos')
   }
 
+  if (!creatorUserId) {
+    throw new Error('Usuário criador não identificado')
+  }
+
+  // 1. Buscar dados do criador
+  const creatorMember = await getMemberFromUserId(creatorUserId)
+  if (!creatorMember) {
+    throw new Error('Membro criador não encontrado. Você precisa estar logado como membro para criar outros membros.')
+  }
+
+  // 2. Validar permissões de criação
+  await validateMemberCreationPermission(
+    creatorMember.id,
+    branchId,
+    role
+  )
+
+  // 3. Validar limite de plano
+  await checkPlanMembersLimit(creatorUserId)
+
+  // 4. Determinar role final (padrão: MEMBER)
+  const finalRole = role || Role.MEMBER
+
+  // 5. Verificar se email já existe
+  const existingMember = await prisma.member.findUnique({ where: { email } })
+  if (existingMember) {
+    throw new Error('Email já cadastrado como membro.')
+  }
+
+  // 6. Criar membro
   const member = await prisma.member.create({
     data: {
       name,
       email,
       password: hashedPassword,
       role: finalRole,
-      branchId: branchId!,
+      branchId,
       birthDate: birthDate ? new Date(birthDate) : undefined,
       phone,
       address,
@@ -81,7 +118,7 @@ export async function registerUserService(data: RegisterUserInput) {
     },
   })
 
-  // 🔐 Adiciona permissões
+  // 7. Adiciona permissões
   const typesToAssign =
     finalRole === Role.ADMINGERAL || finalRole === Role.ADMINFILIAL
       ? ALL_PERMISSION_TYPES
@@ -95,7 +132,7 @@ export async function registerUserService(data: RegisterUserInput) {
     await prisma.member.update({
       where: { id: member.id },
       data: {
-        permissions: {
+        Permission: {
           connect: perms.map((p) => ({ id: p.id })),
         },
       },
@@ -104,8 +141,12 @@ export async function registerUserService(data: RegisterUserInput) {
 
   const memberWithPerms = await prisma.member.findUnique({
     where: { id: member.id },
-    include: { permissions: true },
+    include: { Permission: true },
   })
+
+  // Log de auditoria (assíncrono, não bloqueia a resposta)
+  // Nota: request precisa ser passado como parâmetro para obter contexto
+  // Por enquanto, criamos o log sem o request (será adicionado no controller)
 
   return memberWithPerms
 }

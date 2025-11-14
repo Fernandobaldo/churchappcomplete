@@ -1,6 +1,7 @@
 import { FastifyRequest, FastifyReply } from 'fastify'
 import { z } from 'zod'
 import { prisma } from '../../lib/prisma'
+import { AuditLogger } from '../../utils/auditHelper'
 
 // 🔍 Listar todas as permissões
 export async function getAllPermissionsController(request: FastifyRequest, reply: FastifyReply) {
@@ -29,6 +30,9 @@ export async function assignPermissionsController(request: FastifyRequest, reply
     })),
     skipDuplicates: true,
   })
+
+  // Log de auditoria
+  await AuditLogger.memberPermissionsChanged(request, id, permissions)
 
   return reply.send({
     success: true,

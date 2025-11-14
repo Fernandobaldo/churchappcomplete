@@ -1,7 +1,6 @@
 import { z } from 'zod';
 
 export const createBranchSchema = z.object({
-name: z.string(),
-  pastorName: z.string(),
+  name: z.string(),
   churchId: z.string(),
 });

@@ -7,130 +7,46 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Church {
-  id       String   @id @default(cuid())
-  name     String
-  logoUrl  String?
-  branches Branch[]
+model AuditLog {
+  id          String      @id @default(cuid())
+  action      AuditAction
+  entityType  String
+  entityId    String?
+  userId      String
+  userEmail   String
+  userRole    String?
+  description String
+  metadata    Json?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime    @default(now())
+
+  @@index([action])
+  @@index([createdAt])
+  @@index([entityType, entityId])
+  @@index([userId])
 }
 
 model Branch {
   id           String         @id @default(cuid())
   name         String
-  pastorName   String
   churchId     String
-  isMainBranch Boolean  @default(false) // NOVO CAMPO
-  church       Church         @relation(fields: [churchId], references: [id], onDelete: Cascade)
-  members      Member[]
-  Event        Event[]
-  Transaction  Transaction[]
-  Devotional   Devotional[]
-  Notice       Notice[]
+  isMainBranch Boolean        @default(false)
+  Church       Church         @relation(fields: [churchId], references: [id], onDelete: Cascade)
   Contribution Contribution[]
+  Devotional   Devotional[]
+  Event        Event[]
+  Member       Member[]
+  Notice       Notice[]
+  Transaction  Transaction[]
 }
 
-model Member {
-  id             String           @id @default(cuid())
-  name           String
-  email          String           @unique
-  password       String
-  birthDate      DateTime? // Novo campo
-  phone          String? // Novo campo
-  address        String? // Novo campo
-  avatarUrl      String? // Novo campo
-  role           Role             @default(MEMBER)
-  branchId       String
-  branch         Branch           @relation(fields: [branchId], references: [id])
-  permissions    Permission[]
-  Devotional     Devotional[]
-  DevotionalLike DevotionalLike[]
-
-  userId String? @unique
-  user   User?   @relation("UserMember", fields: [userId], references: [id])
-}
-
-model Permission {
-  id       String @id @default(cuid())
-  type     String
-  memberId String
-  member   Member @relation(fields: [memberId], references: [id])
-
-  @@unique([type, memberId])
-}
-
-model Event {
-  id             String    @id @default(cuid())
-  title          String
-  description    String?
-  startDate      DateTime
-  endDate        DateTime?
-  location       String
-  branchId       String
-  branch         Branch    @relation(fields: [branchId], references: [id])
-  hasDonation    Boolean   @default(false)
-  donationLink   String?
-  donationReason String?
-  imageUrl       String?
-  time           String
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-}
-
-model Transaction {
-  id       String          @id @default(cuid())
-  title    String
-  amount   Float
-  type     TransactionType
-  category String?
-  branchId String
-  branch   Branch          @relation(fields: [branchId], references: [id])
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-enum TransactionType {
-  ENTRY
-  EXIT
-}
-
-model Devotional {
-  id        String           @id @default(cuid())
-  title     String
-  passage   String
-  content   String?
-  date      DateTime         @default(now())
-  authorId  String
-  author    Member           @relation(fields: [authorId], references: [id])
-  likes     DevotionalLike[]
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
-  Branch    Branch?          @relation(fields: [branchId], references: [id])
-  branchId  String?
-}
-
-model DevotionalLike {
-  id           String   @id @default(cuid())
-  devotionalId String
-  userId       String
-  createdAt    DateTime @default(now())
-
-  devotional Devotional @relation(fields: [devotionalId], references: [id])
-  user       Member     @relation(fields: [userId], references: [id])
-
-  @@unique([devotionalId, userId])
-}
-
-model Notice {
+model Church {
   id       String   @id @default(cuid())
-  title    String
-  message  String
-  branchId String
-  branch   Branch   @relation(fields: [branchId], references: [id])
-  viewedBy String[] // list of member IDs that read it
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  name     String
+  logoUrl  String?
+  isActive Boolean  @default(true)
+  Branch   Branch[]
 }
 
 model Contribution {
@@ -142,46 +58,158 @@ model Contribution {
   type        ContributionType
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
-
-  branchId String
-  branch   Branch @relation(fields: [branchId], references: [id])
+  branchId    String
+  Branch      Branch           @relation(fields: [branchId], references: [id])
 }
 
-model User {
-  id            String         @id @default(cuid())
-  name          String
-  email         String         @unique
-  password      String
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  subscriptions Subscription[]
-  member        Member?        @relation("UserMember")
+model Devotional {
+  id             String           @id @default(cuid())
+  title          String
+  content        String?
+  branchId       String?
+  createdAt      DateTime         @default(now())
+  date           DateTime         @default(now())
+  passage        String
+  authorId       String
+  updatedAt      DateTime         @updatedAt
+  Member         Member           @relation(fields: [authorId], references: [id])
+  Branch         Branch?          @relation(fields: [branchId], references: [id])
+  DevotionalLike DevotionalLike[]
 }
 
-// Novo model para Planos
+model DevotionalLike {
+  id           String     @id @default(cuid())
+  devotionalId String
+  userId       String
+  createdAt    DateTime   @default(now())
+  Devotional   Devotional @relation(fields: [devotionalId], references: [id])
+  Member       Member     @relation(fields: [userId], references: [id])
+
+  @@unique([devotionalId, userId])
+}
+
+model Event {
+  id             String    @id @default(cuid())
+  title          String
+  description    String?
+  location       String
+  branchId       String
+  hasDonation    Boolean   @default(false)
+  donationLink   String?
+  donationReason String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  time           String
+  startDate      DateTime
+  endDate        DateTime?
+  imageUrl       String?
+  Branch         Branch    @relation(fields: [branchId], references: [id])
+}
+
+model Member {
+  id             String           @id @default(cuid())
+  name           String
+  email          String           @unique
+  password       String
+  role           Role             @default(MEMBER)
+  branchId       String
+  address        String?
+  avatarUrl      String?
+  birthDate      DateTime?
+  phone          String?
+  userId         String?          @unique
+  Devotional     Devotional[]
+  DevotionalLike DevotionalLike[]
+  Branch         Branch           @relation(fields: [branchId], references: [id])
+  User           User?            @relation(fields: [userId], references: [id])
+  Permission     Permission[]
+}
+
+model Notice {
+  id        String   @id @default(cuid())
+  title     String
+  message   String
+  branchId  String
+  viewedBy  String[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime         @updatedAt
+  Branch    Branch   @relation(fields: [branchId], references: [id])
+}
+
+model Permission {
+  id       String @id @default(cuid())
+  memberId String
+  type     String
+  Member   Member @relation(fields: [memberId], references: [id])
+
+  @@unique([type, memberId])
+}
+
 model Plan {
-  id            String         @id @default(cuid())
-  name          String         @unique
-  price         Float
-  features      String[]
-  maxMembers    Int? // Limite de membros (null = ilimitado)
-  maxBranches   Int? // Limite de branches (null = ilimitado)
-  subscriptions Subscription[]
+  id           String         @id @default(cuid())
+  name         String         @unique
+  price        Float
+  features     String[]
+  maxBranches  Int?
+  maxMembers   Int?
+  Subscription Subscription[]
 }
 
-// Novo model para Assinaturas de Usuário
 model Subscription {
   id        String    @id @default(cuid())
-  user      User      @relation(fields: [userId], references: [id])
   userId    String
-  plan      Plan      @relation(fields: [planId], references: [id])
   planId    String
   status    String    @default("active")
   startedAt DateTime  @default(now())
   endsAt    DateTime?
+  Plan      Plan      @relation(fields: [planId], references: [id])
+  User      User      @relation(fields: [userId], references: [id])
 
-  @@index([userId])
   @@index([planId])
+  @@index([userId])
+}
+
+model Transaction {
+  id        String          @id @default(cuid())
+  title     String
+  amount    Float
+  type      TransactionType
+  category  String?
+  branchId  String
+  createdAt DateTime        @default(now())
+  updatedAt DateTime         @updatedAt
+  Branch    Branch          @relation(fields: [branchId], references: [id])
+}
+
+model User {
+  id           String         @id @default(cuid())
+  name         String
+  email        String         @unique
+  password     String
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  Member       Member?
+  Subscription Subscription[]
+}
+
+enum AuditAction {
+  MEMBER_CREATED
+  MEMBER_UPDATED
+  MEMBER_DELETED
+  MEMBER_ROLE_CHANGED
+  MEMBER_PERMISSIONS_CHANGED
+  BRANCH_CREATED
+  BRANCH_UPDATED
+  BRANCH_DELETED
+  CHURCH_CREATED
+  CHURCH_UPDATED
+  CHURCH_DELETED
+  PERMISSION_GRANTED
+  PERMISSION_REVOKED
+  LOGIN
+  LOGOUT
+  PLAN_LIMIT_EXCEEDED
+  UNAUTHORIZED_ACCESS_ATTEMPT
 }
 
 enum ContributionType {
@@ -195,4 +223,9 @@ enum Role {
   COORDINATOR
   ADMINFILIAL
   ADMINGERAL
+}
+
+enum TransactionType {
+  ENTRY
+  EXIT
 }

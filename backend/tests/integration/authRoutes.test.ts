@@ -1,5 +1,10 @@
+// IMPORTANTE: Carregar .env.test ANTES de qualquer importação
 import dotenv from 'dotenv'
 dotenv.config({ path: '.env.test' })
+
+// Força o NODE_ENV para test antes de importar qualquer coisa
+process.env.NODE_ENV = 'test'
+process.env.VITEST = 'true'
 
 import Fastify from 'fastify'
 import fastifyJwt from '@fastify/jwt'
@@ -10,6 +15,7 @@ import { prisma } from '../../src/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { resetTestDatabase } from '../utils/resetTestDatabase'
 import { seedTestDatabase } from '../utils/seedTestDatabase'
+import { debugSeed } from '../utils/debugSeed'
 
 
 
@@ -38,6 +44,35 @@ describe('Auth Routes - /auth/login', () => {
 
     await resetTestDatabase()
     testData = await seedTestDatabase()
+    
+    // Debug: verificar se os dados foram criados
+    await debugSeed()
+    
+    // Força uma nova conexão para garantir que estamos usando a mesma instância
+    // O Prisma Client faz commit automático, mas garantimos que a conexão está ativa
+    try {
+      await prisma.$connect()
+    } catch (error) {
+      // Já está conectado, ignora
+    }
+    
+    // Aguarda um pouco para garantir que as transações foram commitadas
+    await new Promise(resolve => setTimeout(resolve, 200))
+    
+    // Verifica novamente se os dados estão acessíveis usando a mesma instância do Prisma
+    console.log('[TEST] Verificando dados após seed...')
+    console.log('[TEST] Prisma Client instance ID:', (prisma as any).$internalEngine?.instanceId || 'N/A')
+    
+    // Lista todos os users e members para debug
+    const allUsers = await prisma.user.findMany({ select: { email: true } })
+    const allMembers = await prisma.member.findMany({ select: { email: true } })
+    console.log('[TEST] Users no banco:', allUsers.map(u => u.email))
+    console.log('[TEST] Members no banco:', allMembers.map(m => m.email))
+    
+    const verifyUser = await prisma.user.findUnique({ where: { email: 'user@example.com' } })
+    const verifyMember = await prisma.member.findUnique({ where: { email: 'member@example.com' } })
+    console.log('[TEST] User verificado:', verifyUser ? '✅' : '❌')
+    console.log('[TEST] Member verificado:', verifyMember ? '✅' : '❌')
   })
 
   afterAll(async () => {

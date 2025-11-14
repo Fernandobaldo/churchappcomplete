@@ -10,7 +10,53 @@ export function formatDate(date?: Date | null): string | null {
   }).format(date)
 }
 
-export async function findAllMembers(branchId: string) {
+/**
+ * Busca todos os membros
+ * @param branchId ID da branch (obrigatório para ADMINFILIAL e COORDINATOR)
+ * @param churchId ID da igreja (obrigatório para ADMINGERAL, opcional para outros)
+ * @param userRole Role do usuário que está buscando
+ */
+export async function findAllMembers(
+  branchId: string | null,
+  churchId: string | null = null,
+  userRole: string | null = null
+) {
+  // Se for ADMINGERAL e tiver churchId, busca todos os membros da igreja
+  if (userRole === 'ADMINGERAL' && churchId) {
+    return prisma.member.findMany({
+      where: {
+        branch: {
+          churchId,
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        branchId: true,
+        birthDate: true,
+        phone: true,
+        address: true,
+        avatarUrl: true,
+        email: true,
+        role: true,
+        permissions: {
+          select: { type: true },
+        },
+        branch: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    })
+  }
+
+  // Para outros roles, busca apenas membros da branch especificada
+  if (!branchId) {
+    throw new Error('branchId é obrigatório para buscar membros')
+  }
+
   return prisma.member.findMany({
     where: { branchId },
     select: {

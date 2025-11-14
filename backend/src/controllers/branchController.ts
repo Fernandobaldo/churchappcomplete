@@ -6,15 +6,78 @@ import {
   getBranchById,
   deleteBranchById,
 } from '../services/branchService';
+import { AuditLogger } from '../utils/auditHelper';
 
 export async function createBranchHandler(request: FastifyRequest, reply: FastifyReply) {
-  const parsed = createBranchSchema.safeParse(request.body);
-  if (!parsed.success) {
-    return reply.status(400).send({ error: parsed.error.flatten() });
-  }
+  try {
+    const parsed = createBranchSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.flatten() });
+    }
 
-  const branch = await createBranch(parsed.data);
-  return reply.status(201).send(branch);
+    // Adiciona o ID do usuário criador para validações
+    if (!request.user) {
+      return reply.status(401).send({ error: 'Autenticação necessária para criar filiais' });
+    }
+
+    const branch = await createBranch({
+      ...parsed.data,
+      creatorUserId: request.user.userId,
+    });
+
+    // Log de auditoria
+    await AuditLogger.branchCreated(
+      request,
+      branch.id,
+      branch.name,
+      branch.churchId
+    );
+
+    return reply.status(201).send(branch);
+  } catch (error: any) {
+    console.error('❌ Erro ao criar filial:', error);
+    
+    // Retorna erro 403 para erros de autorização/permissão
+    if (error.message?.includes('permissão') || 
+        error.message?.includes('Limite do plano') ||
+        error.message?.includes('não pode criar') ||
+        error.message?.includes('Apenas Administradores')) {
+      
+      // Log de tentativa não autorizada
+      if (error.message?.includes('Apenas Administradores') ||
+          error.message?.includes('não pode criar')) {
+        await AuditLogger.unauthorizedAccessAttempt(
+          request,
+          'CREATE_BRANCH',
+          error.message
+        );
+      }
+
+      // Log de limite excedido
+      if (error.message?.includes('Limite do plano')) {
+        const limitMatch = error.message.match(/(\d+)\s*filiais/)
+        if (limitMatch) {
+          await AuditLogger.planLimitExceeded(
+            request,
+            'branches',
+            parseInt(limitMatch[1]),
+            parseInt(limitMatch[1])
+          );
+        }
+      }
+
+      return reply.status(403).send({ error: error.message });
+    }
+
+    // Retorna erro 400 para erros de validação
+    if (error.message?.includes('obrigatório') || 
+        error.message?.includes('não encontrado') ||
+        error.message?.includes('já cadastrado')) {
+      return reply.status(400).send({ error: error.message });
+    }
+
+    return reply.status(500).send({ error: 'Erro ao criar filial', details: error.message });
+  }
 }
 
 export async function listBranchesHandler(request: FastifyRequest, reply: FastifyReply) {

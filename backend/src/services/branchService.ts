@@ -1,13 +1,41 @@
 import { prisma } from '../lib/prisma';
+import { checkPlanBranchesLimit } from '../utils/planLimits';
+import { getMemberFromUserId } from '../utils/authorization';
 
 type CreateBranchInput = {
   name: string;
-  pastorName: string;
   churchId: string;
+  creatorUserId?: string; // ID do usuário que está criando (para validações)
 };
 
 export async function createBranch(data: CreateBranchInput) {
-  return prisma.branch.create({ data });
+  const { creatorUserId, churchId } = data;
+
+  // Validações de segurança
+  if (creatorUserId) {
+    // 1. Buscar dados do criador
+    const creatorMember = await getMemberFromUserId(creatorUserId);
+    if (!creatorMember) {
+      throw new Error('Membro criador não encontrado. Você precisa estar logado como membro para criar filiais.');
+    }
+
+    // 2. Verificar se é ADMINGERAL (único que pode criar branches)
+    if (creatorMember.role !== 'ADMINGERAL') {
+      throw new Error('Apenas Administradores Gerais podem criar filiais');
+    }
+
+    // 3. Verificar se a igreja pertence ao criador
+    if (creatorMember.Branch.churchId !== churchId) {
+      throw new Error('Você não pode criar filiais para outras igrejas');
+    }
+
+    // 4. Validar limite de plano
+    await checkPlanBranchesLimit(creatorUserId);
+  }
+
+  // Remove creatorUserId antes de criar (não é campo do modelo)
+  const { creatorUserId: _, ...branchData } = data;
+  return prisma.branch.create({ data: branchData });
 }
 
 export async function getAllBranches() {
