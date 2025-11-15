@@ -102,21 +102,22 @@ describe('Events CRUD Integration', () => {
       // Preenche formulário
       const titleInput = screen.getByLabelText(/título/i)
       const descriptionInput = screen.getByLabelText(/descrição/i)
+      const dateInput = screen.getByLabelText(/data e hora/i)
       const locationInput = screen.getByLabelText(/local/i)
 
-      if (titleInput) await user.type(titleInput, 'Novo Evento')
-      if (descriptionInput) await user.type(descriptionInput, 'Descrição')
-      if (locationInput) await user.type(locationInput, 'Local')
+      await user.type(titleInput, 'Novo Evento')
+      await user.type(descriptionInput, 'Descrição')
+      // Preenche data no formato datetime-local (YYYY-MM-DDTHH:mm)
+      await user.type(dateInput, '2024-02-01T10:00')
+      await user.type(locationInput, 'Local')
 
       // Procura botão de submit
-      const submitButton = screen.getByRole('button', { name: /criar|salvar/i })
-      if (submitButton) {
-        await user.click(submitButton)
+      const submitButton = screen.getByRole('button', { name: /criar evento/i })
+      await user.click(submitButton)
 
-        await waitFor(() => {
-          expect(api.post).toHaveBeenCalled()
-        })
-      }
+      await waitFor(() => {
+        expect(api.post).toHaveBeenCalled()
+      })
     })
   })
 })

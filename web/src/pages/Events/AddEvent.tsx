@@ -50,10 +50,11 @@ export default function AddEvent() {
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-1">
               Título *
             </label>
             <input
+              id="title"
               {...register('title', { required: 'Título é obrigatório' })}
               className="input"
               placeholder="Ex: Culto de Domingo"
@@ -64,10 +65,11 @@ export default function AddEvent() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
               Descrição
             </label>
             <textarea
+              id="description"
               {...register('description')}
               className="input"
               rows={4}
@@ -77,10 +79,11 @@ export default function AddEvent() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="date" className="block text-sm font-medium text-gray-700 mb-1">
                 Data e Hora *
               </label>
               <input
+                id="date"
                 type="datetime-local"
                 {...register('date', { required: 'Data é obrigatória' })}
                 className="input"
@@ -91,10 +94,11 @@ export default function AddEvent() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="location" className="block text-sm font-medium text-gray-700 mb-1">
                 Local *
               </label>
               <input
+                id="location"
                 {...register('location', { required: 'Local é obrigatório' })}
                 className="input"
                 placeholder="Ex: Templo Principal"
@@ -106,10 +110,11 @@ export default function AddEvent() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="imageUrl" className="block text-sm font-medium text-gray-700 mb-1">
               URL da Imagem
             </label>
             <input
+              id="imageUrl"
               {...register('imageUrl')}
               type="url"
               className="input"
@@ -132,10 +137,11 @@ export default function AddEvent() {
           {hasDonation && (
             <>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="donationReason" className="block text-sm font-medium text-gray-700 mb-1">
                   Motivo da Doação
                 </label>
                 <input
+                  id="donationReason"
                   {...register('donationReason')}
                   className="input"
                   placeholder="Ex: Construção do novo templo"
@@ -143,10 +149,11 @@ export default function AddEvent() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="donationLink" className="block text-sm font-medium text-gray-700 mb-1">
                   Link para Doação
                 </label>
                 <input
+                  id="donationLink"
                   {...register('donationLink')}
                   type="url"
                   className="input"

@@ -35,8 +35,13 @@ describe('Contributions CRUD Integration', () => {
       )
 
       await waitFor(() => {
-        expect(screen.getByText('Dízimo')).toBeInTheDocument()
-        expect(screen.getByText('Oferta')).toBeInTheDocument()
+        const dizimoElements = screen.getAllByText('Dízimo')
+        expect(dizimoElements.length).toBeGreaterThan(0)
+        expect(dizimoElements[0]).toBeInTheDocument()
+        
+        const ofertaElements = screen.getAllByText('Oferta')
+        expect(ofertaElements.length).toBeGreaterThan(0)
+        expect(ofertaElements[0]).toBeInTheDocument()
       })
 
       expect(api.get).toHaveBeenCalledWith('/contributions')

@@ -24,7 +24,7 @@ export default function Login() {
       
       setUserFromToken(token)
       toast.success('Login realizado com sucesso!')
-      navigate('/dashboard')
+      navigate('/app/dashboard')
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Erro ao fazer login. Verifique seus dados.')
     } finally {

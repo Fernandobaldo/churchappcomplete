@@ -2,6 +2,12 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import { useAuthStore } from './stores/authStore'
 import Login from './pages/Login'
+import Register from './pages/Register'
+import BemVindo from './pages/onboarding/BemVindo'
+import Igreja from './pages/onboarding/Igreja'
+import Filial from './pages/onboarding/Filial'
+import Convites from './pages/onboarding/Convites'
+import Concluido from './pages/onboarding/Concluido'
 import Dashboard from './pages/Dashboard'
 import Events from './pages/Events'
 import EventDetails from './pages/Events/EventDetails'
@@ -21,23 +27,43 @@ import Profile from './pages/Profile'
 import Layout from './components/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
 
-function App() {
+// Componente para rotas públicas que redirecionam se já autenticado
+function PublicRoute({ children }: { children: React.ReactNode }) {
   const { token } = useAuthStore()
+  
+  if (token) {
+    return <Navigate to="/app/dashboard" replace />
+  }
+  
+  return <>{children}</>
+}
 
+function App() {
   return (
     <BrowserRouter>
       <Toaster position="top-right" />
       <Routes>
-        <Route path="/login" element={token ? <Navigate to="/dashboard" /> : <Login />} />
+        {/* Rotas públicas (registro e login) - redirecionam se já autenticado */}
+        <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
+        <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+        
+        {/* Rotas de onboarding - acessíveis sem autenticação, mas redirecionam se já autenticado */}
+        <Route path="/onboarding/bem-vindo" element={<PublicRoute><BemVindo /></PublicRoute>} />
+        <Route path="/onboarding/igreja" element={<PublicRoute><Igreja /></PublicRoute>} />
+        <Route path="/onboarding/filial" element={<PublicRoute><Filial /></PublicRoute>} />
+        <Route path="/onboarding/convites" element={<PublicRoute><Convites /></PublicRoute>} />
+        <Route path="/onboarding/concluido" element={<PublicRoute><Concluido /></PublicRoute>} />
+        
+        {/* Rotas protegidas (app) */}
         <Route
-          path="/"
+          path="/app"
           element={
             <ProtectedRoute>
               <Layout />
             </ProtectedRoute>
           }
         >
-          <Route index element={<Navigate to="/dashboard" replace />} />
+          <Route index element={<Navigate to="/app/dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="events" element={<Events />} />
           <Route path="events/new" element={<AddEvent />} />
@@ -55,6 +81,12 @@ function App() {
           <Route path="permissions" element={<Permissions />} />
           <Route path="profile" element={<Profile />} />
         </Route>
+
+        {/* Redireciona /dashboard antigo para /app/dashboard */}
+        <Route path="/dashboard" element={<Navigate to="/app/dashboard" replace />} />
+        
+        {/* Rota raiz redireciona para dashboard se autenticado, senão para login */}
+        <Route path="/" element={<Navigate to="/app/dashboard" replace />} />
       </Routes>
     </BrowserRouter>
   )

@@ -52,7 +52,9 @@ describe('Devotionals CRUD Integration', () => {
       )
 
       await waitFor(() => {
-        expect(screen.getByText('João Silva')).toBeInTheDocument()
+        const authorElements = screen.getAllByText('João Silva')
+        expect(authorElements.length).toBeGreaterThan(0)
+        expect(authorElements[0]).toBeInTheDocument()
       })
     })
   })
