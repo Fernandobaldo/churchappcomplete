@@ -11,7 +11,7 @@ import bcrypt from 'bcryptjs'
 
 export async function seedTestDatabase() {
   console.log('[SEED] Iniciando seed do banco de teste...')
-  
+
   // Busca ou cria o plano (obrigatório para a assinatura)
   let plan = await prisma.plan.findFirst({
     where: { name: 'Free Plan' },
@@ -20,14 +20,14 @@ export async function seedTestDatabase() {
   if (!plan) {
     try {
       plan = await prisma.plan.create({
-        data: {
-          name: 'Free Plan',
-          price: 0,
-          features: ['basic'],
-          maxMembers: 10,
-          maxBranches: 1,
-        },
-      })
+    data: {
+      name: 'Free Plan',
+      price: 0,
+      features: ['basic'],
+      maxMembers: 10,
+      maxBranches: 1,
+    },
+  })
     } catch (error: any) {
       // Se falhar por constraint, tenta buscar novamente
       if (error.code === 'P2002') {
@@ -52,12 +52,12 @@ export async function seedTestDatabase() {
   if (!user) {
     try {
       user = await prisma.user.create({
-        data: {
-          name: 'Usuário SaaS',
-          email: 'user@example.com',
-          password: await bcrypt.hash('password123', 10),
-        },
-      })
+    data: {
+      name: 'Usuário SaaS',
+      email: 'user@example.com',
+      password: await bcrypt.hash('password123', 10),
+    },
+  })
     } catch (error: any) {
       // Se falhar por constraint, tenta buscar novamente
       if (error.code === 'P2002') {
@@ -77,13 +77,13 @@ export async function seedTestDatabase() {
 
   if (!subscription) {
     try {
-      await prisma.subscription.create({
-        data: {
-          userId: user.id,
-          planId: plan.id,
-          status: 'active',
-        },
-      })
+  await prisma.subscription.create({
+    data: {
+      userId: user.id,
+      planId: plan.id,
+      status: 'active',
+    },
+  })
     } catch (error: any) {
       // Se falhar por constraint, ignora (já existe)
       if (error.code !== 'P2002' && error.code !== 'P2003') {
@@ -99,10 +99,10 @@ export async function seedTestDatabase() {
 
   if (!church) {
     church = await prisma.church.create({
-      data: {
-        name: 'Igreja Teste',
-      },
-    })
+    data: {
+      name: 'Igreja Teste',
+    },
+  })
   }
 
   // Busca ou cria uma filial
@@ -112,11 +112,11 @@ export async function seedTestDatabase() {
 
   if (!branch) {
     branch = await prisma.branch.create({
-      data: {
-        name: 'Filial Central',
-        churchId: church.id,
-      },
-    })
+    data: {
+      name: 'Filial Central',
+      churchId: church.id,
+    },
+  })
   }
 
   // Busca ou cria um membro com senha
@@ -127,14 +127,14 @@ export async function seedTestDatabase() {
   if (!member) {
     try {
       member = await prisma.member.create({
-        data: {
-          name: 'Membro Teste',
-          email: 'member@example.com',
-          password: await bcrypt.hash('password123', 10),
-          role: 'ADMINGERAL',
-          branchId: branch.id,
-        },
-      })
+    data: {
+      name: 'Membro Teste',
+      email: 'member@example.com',
+      password: await bcrypt.hash('password123', 10),
+      role: 'ADMINGERAL',
+      branchId: branch.id,
+    },
+  })
       console.log('[SEED] ✅ Member criado:', member.email)
     } catch (error: any) {
       // Se falhar por constraint, tenta buscar novamente

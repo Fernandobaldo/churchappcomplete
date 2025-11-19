@@ -16,10 +16,13 @@ vi.mock('../../src/lib/prisma', () => ({
   prisma: {
     member: {
       findUnique: vi.fn(),
+      findMany: vi.fn().mockResolvedValue([]),
     },
     user: {
       findUnique: vi.fn(),
+      findMany: vi.fn().mockResolvedValue([]),
     },
+    $connect: vi.fn().mockResolvedValue(undefined),
   },
 }))
 

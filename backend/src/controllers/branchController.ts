@@ -22,7 +22,7 @@ export async function createBranchHandler(request: FastifyRequest, reply: Fastif
 
     const branch = await createBranch({
       ...parsed.data,
-      creatorUserId: request.user.userId,
+      creatorUserId: request.user.userId || request.user.id,
     });
 
     // Log de auditoria
@@ -72,6 +72,7 @@ export async function createBranchHandler(request: FastifyRequest, reply: Fastif
     // Retorna erro 400 para erros de validação
     if (error.message?.includes('obrigatório') || 
         error.message?.includes('não encontrado') ||
+        error.message?.includes('não encontrada') ||
         error.message?.includes('já cadastrado')) {
       return reply.status(400).send({ error: error.message });
     }

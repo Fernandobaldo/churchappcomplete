@@ -11,25 +11,31 @@ type CreateBranchInput = {
 export async function createBranch(data: CreateBranchInput) {
   const { creatorUserId, churchId } = data;
 
+  // 1. Validar se a igreja existe (deve vir PRIMEIRO, antes de validar permissões)
+  const church = await prisma.church.findUnique({ where: { id: churchId } });
+  if (!church) {
+    throw new Error('Igreja não encontrada');
+  }
+
   // Validações de segurança
   if (creatorUserId) {
-    // 1. Buscar dados do criador
+    // 2. Buscar dados do criador
     const creatorMember = await getMemberFromUserId(creatorUserId);
     if (!creatorMember) {
       throw new Error('Membro criador não encontrado. Você precisa estar logado como membro para criar filiais.');
     }
 
-    // 2. Verificar se é ADMINGERAL (único que pode criar branches)
+    // 3. Verificar se é ADMINGERAL (único que pode criar branches)
     if (creatorMember.role !== 'ADMINGERAL') {
       throw new Error('Apenas Administradores Gerais podem criar filiais');
     }
 
-    // 3. Verificar se a igreja pertence ao criador
+    // 4. Verificar se a igreja pertence ao criador
     if (creatorMember.Branch.churchId !== churchId) {
       throw new Error('Você não pode criar filiais para outras igrejas');
     }
 
-    // 4. Validar limite de plano
+    // 5. Validar limite de plano
     await checkPlanBranchesLimit(creatorUserId);
   }
 

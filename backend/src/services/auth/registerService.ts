@@ -55,13 +55,23 @@ export async function registerUserService(data: RegisterUserInput) {
       },
     })
 
-    const freePlan = await prisma.plan.findUnique({ where: { name: 'Free' } })
-    if (!freePlan) throw new Error('Plano Free não encontrado.')
+    // Busca o plano gratuito (tenta diferentes variações do nome)
+    let freePlan = await prisma.plan.findFirst({ where: { name: 'free' } })
+    if (!freePlan) {
+      freePlan = await prisma.plan.findFirst({ where: { name: 'Free' } })
+    }
+    if (!freePlan) {
+      freePlan = await prisma.plan.findFirst({ where: { name: 'Free Plan' } })
+    }
+    if (!freePlan) {
+      throw new Error('Plano Free não encontrado. Execute o seed do banco de dados.')
+    }
 
     await prisma.subscription.create({
       data: {
         userId: user.id,
         planId: freePlan.id,
+        status: 'active',
       },
     })
 

@@ -38,7 +38,7 @@ describe('authorization', () => {
     it('deve lançar erro se ADMINFILIAL tentar criar ADMINGERAL', () => {
       expect(() => {
         validateRoleHierarchy(Role.ADMINFILIAL, Role.ADMINGERAL)
-      }).toThrow('Apenas o sistema pode criar um Administrador Geral')
+      }).toThrow('Você não pode criar um Administrador Geral')
     })
 
     it('deve lançar erro se COORDINATOR tentar criar role diferente de MEMBER', () => {
@@ -104,60 +104,60 @@ describe('authorization', () => {
       id: 'member-1',
       role: Role.ADMINGERAL,
       branchId: mockBranchId,
-      branch: {
+      Branch: {
         id: mockBranchId,
         churchId: mockChurchId,
-        church: {
+        Church: {
           id: mockChurchId,
           name: 'Igreja Teste',
         },
       },
-      permissions: [],
+      Permission: [],
     }
 
     const mockCreatorADMINFILIAL = {
       id: 'member-2',
       role: Role.ADMINFILIAL,
       branchId: mockBranchId,
-      branch: {
+      Branch: {
         id: mockBranchId,
         churchId: mockChurchId,
-        church: {
+        Church: {
           id: mockChurchId,
           name: 'Igreja Teste',
         },
       },
-      permissions: [],
+      Permission: [],
     }
 
     const mockCreatorCOORDINATOR = {
       id: 'member-3',
       role: Role.COORDINATOR,
       branchId: mockBranchId,
-      branch: {
+      Branch: {
         id: mockBranchId,
         churchId: mockChurchId,
-        church: {
+        Church: {
           id: mockChurchId,
           name: 'Igreja Teste',
         },
       },
-      permissions: [{ type: 'members_manage' }],
+      Permission: [{ type: 'members_manage' }],
     }
 
     const mockCreatorMEMBER = {
       id: 'member-4',
       role: Role.MEMBER,
       branchId: mockBranchId,
-      branch: {
+      Branch: {
         id: mockBranchId,
         churchId: mockChurchId,
-        church: {
+        Church: {
           id: mockChurchId,
           name: 'Igreja Teste',
         },
       },
-      permissions: [{ type: 'members_manage' }],
+      Permission: [{ type: 'members_manage' }],
     }
 
     const mockTargetBranch = {
@@ -227,7 +227,7 @@ describe('authorization', () => {
     it('deve lançar erro se COORDINATOR não tiver permissão members_manage', async () => {
       const coordinatorWithoutPermission = {
         ...mockCreatorCOORDINATOR,
-        permissions: [],
+        Permission: [],
       }
 
       prisma.member.findUnique.mockResolvedValue(coordinatorWithoutPermission)
@@ -245,7 +245,7 @@ describe('authorization', () => {
     it('deve lançar erro se MEMBER não tiver permissão members_manage', async () => {
       const memberWithoutPermission = {
         ...mockCreatorMEMBER,
-        permissions: [],
+        Permission: [],
       }
 
       prisma.member.findUnique.mockResolvedValue(memberWithoutPermission)
@@ -312,10 +312,10 @@ describe('authorization', () => {
       id: 'member-1',
       role: Role.ADMINGERAL,
       branchId: mockBranchId,
-      branch: {
+      Branch: {
         id: mockBranchId,
         churchId: mockChurchId,
-        church: {
+        Church: {
           id: mockChurchId,
           name: 'Igreja Teste',
         },
@@ -326,10 +326,10 @@ describe('authorization', () => {
       id: 'member-2',
       role: Role.ADMINFILIAL,
       branchId: mockBranchId,
-      branch: {
+      Branch: {
         id: mockBranchId,
         churchId: mockChurchId,
-        church: {
+        Church: {
           id: mockChurchId,
           name: 'Igreja Teste',
         },
@@ -339,10 +339,10 @@ describe('authorization', () => {
     const mockTargetMemberSameBranch = {
       id: 'member-3',
       branchId: mockBranchId,
-      branch: {
+      Branch: {
         id: mockBranchId,
         churchId: mockChurchId,
-        church: {
+        Church: {
           id: mockChurchId,
           name: 'Igreja Teste',
         },
@@ -352,10 +352,10 @@ describe('authorization', () => {
     const mockTargetMemberOtherBranch = {
       id: 'member-4',
       branchId: mockOtherBranchId,
-      branch: {
+      Branch: {
         id: mockOtherBranchId,
         churchId: mockChurchId,
-        church: {
+        Church: {
           id: mockChurchId,
           name: 'Igreja Teste',
         },
@@ -378,10 +378,10 @@ describe('authorization', () => {
     it('deve lançar erro se ADMINGERAL tentar editar membro de outra igreja', async () => {
       const targetMemberOtherChurch = {
         ...mockTargetMemberOtherBranch,
-        branch: {
-          ...mockTargetMemberOtherBranch.branch,
+        Branch: {
+          ...mockTargetMemberOtherBranch.Branch,
           churchId: mockOtherChurchId,
-          church: {
+          Church: {
             id: mockOtherChurchId,
             name: 'Outra Igreja',
           },
@@ -431,10 +431,10 @@ describe('authorization', () => {
         id: 'member-5',
         role: Role.MEMBER,
         branchId: mockBranchId,
-        branch: {
+        Branch: {
           id: mockBranchId,
           churchId: mockChurchId,
-          church: {
+          Church: {
             id: mockChurchId,
             name: 'Igreja Teste',
           },
@@ -455,10 +455,10 @@ describe('authorization', () => {
         id: 'member-5',
         role: Role.MEMBER,
         branchId: mockBranchId,
-        branch: {
+        Branch: {
           id: mockBranchId,
           churchId: mockChurchId,
-          church: {
+          Church: {
             id: mockChurchId,
             name: 'Igreja Teste',
           },
@@ -479,16 +479,16 @@ describe('authorization', () => {
     it('deve retornar member quando existe', async () => {
       const mockUser = {
         id: 'user-1',
-        member: {
+        Member: {
           id: 'member-1',
           role: Role.ADMINGERAL,
-          branch: {
+          Branch: {
             id: 'branch-1',
-            church: {
+            Church: {
               id: 'church-1',
             },
           },
-          permissions: [],
+          Permission: [],
         },
       }
 
@@ -496,13 +496,13 @@ describe('authorization', () => {
 
       const result = await getMemberFromUserId('user-1')
 
-      expect(result).toEqual(mockUser.member)
+      expect(result).toEqual(mockUser.Member)
     })
 
     it('deve retornar null quando user não tem member', async () => {
       prisma.user.findUnique.mockResolvedValue({
         id: 'user-1',
-        member: null,
+        Member: null,
       })
 
       const result = await getMemberFromUserId('user-1')

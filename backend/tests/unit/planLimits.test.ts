@@ -26,10 +26,10 @@ describe('planLimits', () => {
 
     const mockUserWithPlan = {
       id: mockUserId,
-      subscriptions: [
+      Subscription: [
         {
           status: 'active',
-          plan: {
+          Plan: {
             id: 'plan-1',
             name: 'Free',
             maxMembers: 10,
@@ -37,9 +37,9 @@ describe('planLimits', () => {
           },
         },
       ],
-      member: {
+      Member: {
         id: 'member-1',
-        branch: {
+        Branch: {
           id: 'branch-1',
           churchId: mockChurchId,
           church: {
@@ -55,7 +55,7 @@ describe('planLimits', () => {
       prisma.branch.findMany.mockResolvedValue([
         {
           id: 'branch-1',
-          _count: { members: 5 },
+          _count: { Member: 5 },
         },
       ])
 
@@ -67,7 +67,7 @@ describe('planLimits', () => {
       prisma.branch.findMany.mockResolvedValue([
         {
           id: 'branch-1',
-          _count: { members: 10 },
+          _count: { Member: 10 },
         },
       ])
 
@@ -79,10 +79,10 @@ describe('planLimits', () => {
     it('deve permitir criar membro quando maxMembers é null (ilimitado)', async () => {
       const userWithUnlimitedPlan = {
         ...mockUserWithPlan,
-        subscriptions: [
+        Subscription: [
           {
             status: 'active',
-            plan: {
+            Plan: {
               id: 'plan-1',
               name: 'Premium',
               maxMembers: null,
@@ -96,7 +96,7 @@ describe('planLimits', () => {
       prisma.branch.findMany.mockResolvedValue([
         {
           id: 'branch-1',
-          _count: { members: 100 },
+          _count: { Member: 100 },
         },
       ])
 
@@ -106,8 +106,8 @@ describe('planLimits', () => {
     it('deve lançar erro quando usuário não tem plano', async () => {
       prisma.user.findUnique.mockResolvedValue({
         id: mockUserId,
-        subscriptions: [],
-        member: null,
+        Subscription: [],
+        Member: null,
       })
 
       await expect(checkPlanMembersLimit(mockUserId)).rejects.toThrow(
@@ -118,17 +118,17 @@ describe('planLimits', () => {
     it('deve lançar erro quando usuário não tem igreja', async () => {
       prisma.user.findUnique.mockResolvedValue({
         id: mockUserId,
-        subscriptions: [
+        Subscription: [
           {
             status: 'active',
-            plan: {
+            Plan: {
               id: 'plan-1',
               name: 'Free',
               maxMembers: 10,
             },
           },
         ],
-        member: null,
+        Member: null,
       })
 
       await expect(checkPlanMembersLimit(mockUserId)).rejects.toThrow(
@@ -141,11 +141,11 @@ describe('planLimits', () => {
       prisma.branch.findMany.mockResolvedValue([
         {
           id: 'branch-1',
-          _count: { members: 5 },
+          _count: { Member: 5 },
         },
         {
           id: 'branch-2',
-          _count: { members: 3 },
+          _count: { Member: 3 },
         },
       ])
 
@@ -159,11 +159,11 @@ describe('planLimits', () => {
       prisma.branch.findMany.mockResolvedValue([
         {
           id: 'branch-1',
-          _count: { members: 6 },
+          _count: { Member: 6 },
         },
         {
           id: 'branch-2',
-          _count: { members: 5 },
+          _count: { Member: 5 },
         },
       ])
 
@@ -180,10 +180,10 @@ describe('planLimits', () => {
 
     const mockUserWithPlan = {
       id: mockUserId,
-      subscriptions: [
+      Subscription: [
         {
           status: 'active',
-          plan: {
+          Plan: {
             id: 'plan-1',
             name: 'Free',
             maxMembers: 10,
@@ -191,9 +191,9 @@ describe('planLimits', () => {
           },
         },
       ],
-      member: {
+      Member: {
         id: 'member-1',
-        branch: {
+        Branch: {
           id: 'branch-1',
           churchId: mockChurchId,
           church: {
@@ -223,10 +223,10 @@ describe('planLimits', () => {
     it('deve permitir criar branch quando maxBranches é null (ilimitado)', async () => {
       const userWithUnlimitedPlan = {
         ...mockUserWithPlan,
-        subscriptions: [
+        Subscription: [
           {
             status: 'active',
-            plan: {
+            Plan: {
               id: 'plan-1',
               name: 'Premium',
               maxMembers: null,
@@ -245,8 +245,8 @@ describe('planLimits', () => {
     it('deve lançar erro quando usuário não tem plano', async () => {
       prisma.user.findUnique.mockResolvedValue({
         id: mockUserId,
-        subscriptions: [],
-        member: null,
+        Subscription: [],
+        Member: null,
       })
 
       await expect(checkPlanBranchesLimit(mockUserId)).rejects.toThrow(
@@ -257,17 +257,17 @@ describe('planLimits', () => {
     it('deve lançar erro quando usuário não tem igreja', async () => {
       prisma.user.findUnique.mockResolvedValue({
         id: mockUserId,
-        subscriptions: [
+        Subscription: [
           {
             status: 'active',
-            plan: {
+            Plan: {
               id: 'plan-1',
               name: 'Free',
               maxBranches: 1,
             },
           },
         ],
-        member: null,
+        Member: null,
       })
 
       await expect(checkPlanBranchesLimit(mockUserId)).rejects.toThrow(

@@ -70,7 +70,13 @@ export async function validateMemberCreationPermission(
     }
   }
 
-  // 3. Verificar se a branch de destino existe e pertence à mesma igreja
+  // 3. Validar hierarquia de roles PRIMEIRO (antes de verificar branch)
+  // Isso garante que erros de hierarquia sejam retornados como 403, não 400
+  if (targetRole) {
+    validateRoleHierarchy(creator.role, targetRole)
+  }
+
+  // 4. Verificar se a branch de destino existe e pertence à mesma igreja
   const targetBranch = await prisma.branch.findUnique({
     where: { id: targetBranchId },
   })
@@ -79,24 +85,19 @@ export async function validateMemberCreationPermission(
     throw new Error('Filial não encontrada')
   }
 
-  // 4. Verificar se ADMINFILIAL está tentando criar em outra filial (ANTES de verificar igreja)
+  // 5. Verificar se ADMINFILIAL está tentando criar em outra filial (ANTES de verificar igreja)
   if (creator.role === Role.ADMINFILIAL && creator.branchId !== targetBranchId) {
     throw new Error('Você só pode criar membros na sua própria filial')
   }
 
-  // 5. Verificar se a branch pertence à mesma igreja do criador
+  // 6. Verificar se a branch pertence à mesma igreja do criador
   if (targetBranch.churchId !== creator.Branch.churchId) {
     throw new Error('Você não pode criar membros em filiais de outras igrejas')
   }
 
-  // 6. Verificar se COORDINATOR está tentando criar em outra filial
+  // 7. Verificar se COORDINATOR está tentando criar em outra filial
   if (creator.role === Role.COORDINATOR && creator.branchId !== targetBranchId) {
     throw new Error('Você só pode criar membros na sua própria filial')
-  }
-
-  // 7. Validar hierarquia de roles
-  if (targetRole) {
-    validateRoleHierarchy(creator.role, targetRole)
   }
 }
 
@@ -110,14 +111,14 @@ export function validateRoleHierarchy(
   creatorRole: Role,
   targetRole: Role
 ): void {
+  // ADMINFILIAL não pode criar ADMINGERAL (verificar ANTES da verificação geral)
+  if (creatorRole === Role.ADMINFILIAL && targetRole === Role.ADMINGERAL) {
+    throw new Error('Você não pode criar um Administrador Geral')
+  }
+
   // ADMINGERAL não pode criar outro ADMINGERAL (apenas o sistema pode)
   if (targetRole === Role.ADMINGERAL) {
     throw new Error('Apenas o sistema pode criar um Administrador Geral')
-  }
-
-  // ADMINFILIAL não pode criar ADMINGERAL
-  if (creatorRole === Role.ADMINFILIAL && targetRole === Role.ADMINGERAL) {
-    throw new Error('Você não pode criar um Administrador Geral')
   }
 
   // COORDINATOR só pode criar MEMBER

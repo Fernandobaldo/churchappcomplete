@@ -4,8 +4,15 @@ import { PrismaClient } from '@prisma/client'
 const prisma = new PrismaClient()
 
 async function main() {
+  // Verifica se já existe algum plano gratuito (tenta diferentes variações)
   const existingPlan = await prisma.plan.findFirst({
-    where: { name: 'Free' },
+    where: {
+      OR: [
+        { name: 'free' },
+        { name: 'Free' },
+        { name: 'Free Plan' },
+      ],
+    },
   })
 
   if (!existingPlan) {
@@ -25,7 +32,7 @@ async function main() {
     })
     console.log('✅ Plano Free criado com sucesso.')
   } else {
-    console.log('ℹ️ Plano Free já existe.')
+    console.log(`ℹ️ Plano Free já existe (nome: "${existingPlan.name}").`)
   }
 }
 

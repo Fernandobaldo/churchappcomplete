@@ -6,13 +6,14 @@ import { registerRoutes } from './routes/registerRoutes';
 import fastifySwagger from '@fastify/swagger';
 import fastifySwaggerUi from '@fastify/swagger-ui';
 import dotenv from 'dotenv';
+import { env } from './env.js';
 dotenv.config();
 const app = fastify({ logger: true });
 
 app.register(fastifyCors, { origin: true });
 
 app.register(fastifyJwt, {
-    secret: 'churchapp-secret-key',
+    secret: env.JWT_SECRET,
 });
 
 app.decorate('authenticate', async function (

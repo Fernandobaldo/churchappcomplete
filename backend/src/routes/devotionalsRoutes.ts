@@ -7,22 +7,22 @@ import { createDevotionalSchema } from '../schemas/devotionalSchemas'
 export async function devotionalsRoutes(app: FastifyInstance) {
   const controller = new DevotionalController()
 
-  app.get('/', { preHandler: [app.authenticate] }, controller.getAll)
+  app.get('/', { preHandler: [app.authenticate] }, controller.getAll.bind(controller))
 
   app.post('/', {
     preHandler: [
       app.authenticate,
       checkRole(['ADMINGERAL', 'ADMINFILIAL', 'COORDINATOR']),
-      checkPermission(['events_manage']),
+      checkPermission(['devotional_manage']),
     ],
     schema: createDevotionalSchema
-  }, controller.create)
+  }, controller.create.bind(controller))
 
   app.post('/:id/like', {
     preHandler: [app.authenticate],
-  }, controller.like)
+  }, controller.like.bind(controller))
 
   app.delete('/:id/unlike', {
     preHandler: [app.authenticate],
-  }, controller.unlike)
+  }, controller.unlike.bind(controller))
 }

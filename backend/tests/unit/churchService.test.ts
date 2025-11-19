@@ -80,9 +80,9 @@ const mockChurch = {
       },
       {
         id: 'user1',
-        name: 'Admin',
-        email: 'admin@teste.com',
-        password: '123456',
+          name: 'Admin',
+          email: 'admin@teste.com',
+          password: '123456',
       }
     )
 
@@ -105,9 +105,9 @@ const mockChurch = {
         },
         {
           id: 'user1',
-          name: 'Admin',
-          email: 'admin@erro.com',
-          password: '123456',
+            name: 'Admin',
+            email: 'admin@erro.com',
+            password: '123456',
         }
       )
     ).rejects.toThrow('Erro inesperado')
@@ -121,7 +121,7 @@ const mockChurch = {
     expect(result).toEqual(churchMock)
     expect(prisma.church.findUnique).toHaveBeenCalledWith({
       where: { id: '123' },
-      include: { branches: true },
+      include: { Branch: true },
     })
   })
 

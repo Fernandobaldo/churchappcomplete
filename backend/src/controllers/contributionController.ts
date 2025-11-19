@@ -3,10 +3,13 @@ import { ContributionService } from '../services/contributionService'
 import { createContributionSchema } from '../schemas/contributionSchemas'
 
 export class ContributionController {
-private service = new ContributionService()
+  private service = new ContributionService()
 
-async getAll(request: FastifyRequest, reply: FastifyReply) {
+  async getAll(request: FastifyRequest, reply: FastifyReply) {
     const user = request.user
+    if (!user?.branchId) {
+      return reply.status(400).send({ message: 'Usuário não vinculado a uma filial.' })
+    }
     const contributions = await this.service.getByBranch(user.branchId)
     return reply.send(contributions)
   }

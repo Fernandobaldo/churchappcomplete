@@ -57,7 +57,7 @@ export class AuthService {
         console.log(`[AUTH DEBUG] ❌ Member NÃO encontrado para: ${email}`)
         // Lista todos os members para debug
         const allMembers = await prisma.member.findMany({ select: { email: true } })
-        console.log(`[AUTH DEBUG] Members no banco:`, allMembers.map(m => m.email))
+        console.log(`[AUTH DEBUG] Members no banco:`, allMembers?.map(m => m.email) || [])
       }
     }
 
@@ -82,7 +82,7 @@ export class AuthService {
         console.log(`[AUTH DEBUG] ❌ User NÃO encontrado para: ${email}`)
         // Lista todos os users para debug
         const allUsers = await prisma.user.findMany({ select: { email: true } })
-        console.log(`[AUTH DEBUG] Users no banco:`, allUsers.map(u => u.email))
+        console.log(`[AUTH DEBUG] Users no banco:`, allUsers?.map(u => u.email) || [])
       }
     }
 

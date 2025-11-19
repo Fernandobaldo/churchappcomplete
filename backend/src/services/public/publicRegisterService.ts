@@ -20,10 +20,16 @@ export async function publicRegisterUserService(data: {
   // Criptografa a senha
   const hashedPassword = await bcrypt.hash(password, 10)
 
-  // Busca o plano gratuito (free)
-  const freePlan = await prisma.plan.findFirst({ where: { name: 'free' } })
+  // Busca o plano gratuito (tenta diferentes variações do nome)
+  let freePlan = await prisma.plan.findFirst({ where: { name: 'free' } })
   if (!freePlan) {
-    throw new Error('Plano gratuito não encontrado.')
+    freePlan = await prisma.plan.findFirst({ where: { name: 'Free' } })
+  }
+  if (!freePlan) {
+    freePlan = await prisma.plan.findFirst({ where: { name: 'Free Plan' } })
+  }
+  if (!freePlan) {
+    throw new Error('Plano gratuito não encontrado. Execute o seed do banco de dados.')
   }
 
   // Cria o usuário e associa o plano
@@ -32,7 +38,7 @@ export async function publicRegisterUserService(data: {
       name,
       email,
       password: hashedPassword,
-      subscriptions: {
+      Subscription: {
         create: {
           planId: freePlan.id,
           status: 'active',

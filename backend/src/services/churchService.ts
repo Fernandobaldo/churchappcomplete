@@ -10,6 +10,7 @@ interface CreateChurchData {
   logoUrl?: string
   branchName?: string
   pastorName?: string
+  withBranch?: boolean
 }
 
 interface UserData {
@@ -30,40 +31,45 @@ export class ChurchService {
         },
       })
 
-      const branch = await tx.branch.create({
-        data: {
-          name: data.branchName || `${data.name} - Sede`,
-          pastorName: data.pastorName || 'Responsável',
-          churchId: church.id,
-          isMainBranch: true,
-        },
-      })
+      let branch = null
+      let member = null
 
- const hashedPassword = await bcrypt.hash(user.password, 10)
-
- const member = await tx.member.create({
-   data: {
-     name: user.name,
-     email: user.email,
-     password: hashedPassword,
-     role: Role.ADMINGERAL,
-     branchId: branch.id,
-     userId: user.id,
-   },
- })
-
-      const allPermissions = await tx.permission.findMany({
-        where: { type: { in: ALL_PERMISSION_TYPES } },
-      })
-
-      await tx.member.update({
-        where: { id: member.id },
-        data: {
-          permissions: {
-            connect: allPermissions.map((p) => ({ id: p.id })),
+      // Só cria branch e member se withBranch não for false
+      if (data.withBranch !== false) {
+        branch = await tx.branch.create({
+          data: {
+            name: data.branchName || 'Sede',
+            churchId: church.id,
+            isMainBranch: true,
           },
-        },
-      })
+        })
+
+        const hashedPassword = await bcrypt.hash(user.password, 10)
+
+        member = await tx.member.create({
+          data: {
+            name: user.name,
+            email: user.email,
+            password: hashedPassword,
+            role: Role.ADMINGERAL,
+            branchId: branch.id,
+            userId: user.id,
+          },
+        })
+
+        const allPermissions = await tx.permission.findMany({
+          where: { type: { in: ALL_PERMISSION_TYPES } },
+        })
+
+        await tx.member.update({
+          where: { id: member.id },
+          data: {
+            Permission: {
+              connect: allPermissions.map((p) => ({ id: p.id })),
+            },
+          },
+        })
+      }
 
       return {
         church,
@@ -77,7 +83,7 @@ export class ChurchService {
     return prisma.church.findMany({
       where: { isActive: true },
       include: {
-        branches: true,
+        Branch: true,
       },
     })
   }
@@ -86,7 +92,7 @@ export class ChurchService {
     return prisma.church.findUnique({
       where: { id },
       include: {
-        branches: true,
+        Branch: true,
       },
     })
   }

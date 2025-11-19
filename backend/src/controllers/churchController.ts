@@ -2,6 +2,7 @@ import { FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import { ChurchService } from '../services/churchService'
 import { AuditLogger } from '../utils/auditHelper'
+import { prisma } from '../lib/prisma'
 
 export class ChurchController {
   private service = new ChurchService()
@@ -28,6 +29,32 @@ export class ChurchController {
 
     const result = await this.service.createChurchWithMainBranch(data, dbUser)
     
+    // Busca o Member criado para gerar o token atualizado (apenas se foi criado)
+    let newToken = null
+    if (result.member) {
+      const member = await prisma.member.findUnique({
+        where: { id: result.member.id },
+        include: {
+          Permission: true,
+        },
+      })
+
+      // Gera novo token JWT com os dados do Member
+      if (member) {
+        const tokenPayload = {
+          sub: dbUser.id,
+          email: dbUser.email,
+          name: member.name,
+          type: 'member' as const,
+          role: member.role,
+          branchId: member.branchId,
+          permissions: member.Permission.map(p => p.type),
+        }
+        
+        newToken = request.server.jwt.sign(tokenPayload, { expiresIn: '7d' })
+      }
+    }
+    
     // Log de auditoria
     await AuditLogger.churchCreated(
       request,
@@ -35,12 +62,23 @@ export class ChurchController {
       result.church.name
     )
     
-    return reply.code(201).send(result)
+    return reply.code(201).send({
+      ...result,
+      token: newToken, // Retorna o novo token (pode ser null se não criou member)
+    })
   }
 
   async getAll(request: FastifyRequest, reply: FastifyReply) {
-    const churches = await this.service.getAllChurches()
-    return reply.send(churches)
+    try {
+      const churches = await this.service.getAllChurches()
+      return reply.send(churches)
+    } catch (error: any) {
+      console.error('Erro ao buscar igrejas:', error)
+      return reply.status(500).send({ 
+        error: 'Erro ao buscar igrejas',
+        message: error.message 
+      })
+    }
   }
 
   async getById(request: FastifyRequest, reply: FastifyReply) {
@@ -105,8 +143,8 @@ async deactivate(request: FastifyRequest<{ Params: { id: string } }>, reply: Fas
 
   // Permitir se for SAASADMIN ou ADMINGERAL dessa igreja
   const isSaasAdmin = user.role === 'SAASADMIN'
-  const isChurchOwner = user.role === 'ADMINGERAL' && church.branches.some(branch =>
-    branch.members.some(member => member.userId === user.id)
+  const isChurchOwner = user.role === 'ADMINGERAL' && church.Branch?.some(branch =>
+    branch.members?.some(member => member.userId === user.id)
   )
 
   if (!isSaasAdmin && !isChurchOwner) {

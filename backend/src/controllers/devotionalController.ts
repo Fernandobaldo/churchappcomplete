@@ -4,11 +4,14 @@ import { createDevotionalSchema } from '../schemas/devotionalSchemas'
 import { DevotionalService } from '../services/devotionalService'
 
 export class DevotionalController {
-private service = new DevotionalService()
+  private service = new DevotionalService()
 
-async getAll(request: FastifyRequest, reply: FastifyReply) {
+  async getAll(request: FastifyRequest, reply: FastifyReply) {
     const user = request.user
-    const result = await this.service.getAll(user.sub, user.branchId)
+    if (!user?.branchId) {
+      return reply.status(400).send({ message: 'Usuário não vinculado a uma filial.' })
+    }
+    const result = await this.service.getAll(user.sub || user.id, user.branchId)
     return reply.send(result)
   }
 

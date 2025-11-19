@@ -259,34 +259,55 @@ describe('Member Registration - Validações de Segurança', () => {
 
   describe('Validação de Limites de Plano', () => {
     it('deve retornar 403 quando limite de membros é excedido', async () => {
-      // Criar membros até atingir o limite (10 membros do plano Free)
+      // Buscar a igreja do admin para contar membros apenas dessa igreja
+      const adminMember = await prisma.member.findFirst({
+        where: { userId: adminUserId },
+        include: { Branch: true },
+      })
+      if (!adminMember) throw new Error('Admin member não encontrado')
+
+      const churchId = adminMember.Branch.churchId
+
+      // Contar membros existentes na igreja do admin
+      const existingBranches = await prisma.branch.findMany({
+        where: { churchId },
+        include: { _count: { select: { Member: true } } },
+      })
+      const existingMembersCount = existingBranches.reduce(
+        (sum, b) => sum + b._count.Member,
+        0
+      )
+
+      // Buscar o plano
       const plan = await prisma.plan.findFirst()
       if (!plan) throw new Error('Plano não encontrado')
 
-      // Atualizar plano para ter limite de 2 membros para teste
+      // Atualizar plano para ter limite igual ao número atual de membros + 1
+      // Isso garante que ao criar mais 1 membro, o limite será excedido
+      const newLimit = existingMembersCount + 1
       await prisma.plan.update({
         where: { id: plan.id },
-        data: { maxMembers: 2 },
+        data: { maxMembers: newLimit },
       })
 
-      // Já temos 1 membro (admin), criar mais 1 para atingir o limite
+      // Criar 1 membro para atingir o limite
       await prisma.member.create({
         data: {
           name: 'Membro 1',
-          email: 'membro1@example.com',
+          email: `membro1-${Date.now()}@example.com`,
           password: await bcrypt.hash('password123', 10),
           role: 'MEMBER',
           branchId: adminBranchId,
         },
       })
 
-      // Tentar criar mais um membro (deve falhar)
+      // Tentar criar mais um membro (deve falhar porque já atingiu o limite)
       const response = await request(app.server)
         .post('/register')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           name: 'Membro Excedente',
-          email: 'excedente@example.com',
+          email: `excedente-${Date.now()}@example.com`,
           password: 'password123',
           branchId: adminBranchId,
         })

@@ -14,6 +14,11 @@ export async function eventsRoutes(app: FastifyInstance) {
   app.get('/', { preHandler: [app.authenticate] }, async (request, reply) => {
     const user = request.user
 
+    // Se o usuário não tem branchId (usuário sem membro associado), retorna array vazio
+    if (!user.branchId) {
+      return reply.send([])
+    }
+
     const events = await prisma.event.findMany({
       where: {
         branchId: user.branchId,
@@ -24,6 +29,33 @@ export async function eventsRoutes(app: FastifyInstance) {
     })
 
     return reply.send(events)
+  })
+
+  // Rota para obter o próximo evento (deve vir antes de /:id para não ser capturada como parâmetro)
+  app.get('/next', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const user = request.user
+
+    // Se o usuário não tem branchId (usuário sem membro associado), retorna null
+    if (!user.branchId) {
+      return reply.send(null)
+    }
+
+    const now = new Date()
+
+    const nextEvent = await prisma.event.findFirst({
+      where: {
+        branchId: user.branchId,
+        startDate: {
+          gte: now, // Eventos que começam a partir de agora
+        },
+      },
+      orderBy: {
+        startDate: 'asc', // Ordena por data mais próxima
+      },
+    })
+
+    // Retorna null quando não há eventos próximos (200 OK)
+    return reply.send(nextEvent || null)
   })
 
   app.get('/:id', { preHandler: [app.authenticate] }, async (request, reply) => {
@@ -60,6 +92,13 @@ export async function eventsRoutes(app: FastifyInstance) {
     async (request, reply) => {
       const data = eventBodySchema.parse(request.body)
       const user = request.user
+
+      // Se o usuário não tem branchId (usuário sem membro associado), retorna erro
+      if (!user.branchId) {
+        return reply.status(400).send({ 
+          message: 'Usuário não está associado a uma filial. Não é possível criar eventos.' 
+        })
+      }
 
       const parsedStartDate = parse(data.startDate.trim(), 'dd/MM/yyyy', new Date())
       const parsedEndDate = parse(data.endDate.trim(), 'dd/MM/yyyy', new Date())

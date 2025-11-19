@@ -7,16 +7,30 @@ export async function registerRoute(app: FastifyInstance) {
   // Rota autenticada para criação de membros internos
   app.post('/', {
     preHandler: async (request, reply) => {
+      // Tenta ler o body para verificar se é registro público
+      // No Fastify, o body pode não estar parseado ainda no preHandler
+      // então tentamos ler de forma segura
+      try {
+        const body = request.body as any
+        // Se for landing page, não precisa autenticação
+        if (body?.fromLandingPage === true) {
+          return // Permite continuar sem autenticação
+        }
+      } catch (error) {
+        // Se não conseguir ler o body, continua para autenticação
+      }
+      
       // Se não for landing page, exige autenticação
-      const body = request.body as any
-      if (!body?.fromLandingPage) {
+      // Mas só tenta autenticar se houver token no header
+      const authHeader = request.headers.authorization
+      if (authHeader && authHeader.startsWith('Bearer ')) {
         await authenticate(request, reply)
         // Se a autenticação falhar, o authenticate já enviou a resposta
-        // Verifica se a resposta já foi enviada antes de continuar
         if (reply.sent) {
           return
         }
       }
+      // Se não houver token, deixa o controller decidir (pode ser registro público)
     },
     schema: {
       description: `
@@ -64,9 +78,9 @@ Cria um novo membro ou usuário.
           },
           role: {
             type: 'string',
-            enum: ['MEMBER', 'COORDINATOR', 'ADMINFILIAL'],
+            enum: ['MEMBER', 'COORDINATOR', 'ADMINFILIAL', 'ADMINGERAL'],
             default: 'MEMBER',
-            description: 'Role do membro. ADMINGERAL não pode ser criado por usuários.',
+            description: 'Role do membro. ADMINGERAL não pode ser criado por usuários (será validado no controller).',
           },
           permissions: {
             type: 'array',
@@ -110,9 +124,20 @@ Cria um novo membro ou usuário.
       },
       response: {
         201: {
-          description: 'Membro criado com sucesso',
+          description: 'Membro criado com sucesso (registro interno) ou Usuário criado com sucesso (registro público)',
           type: 'object',
           properties: {
+            // Campos para registro público
+            user: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+                name: { type: 'string' },
+                email: { type: 'string' },
+              },
+            },
+            token: { type: 'string' },
+            // Campos para registro interno
             id: { type: 'string' },
             name: { type: 'string' },
             email: { type: 'string' },
@@ -128,6 +153,7 @@ Cria um novo membro ou usuário.
               },
             },
           },
+          additionalProperties: true, // Permite campos adicionais não definidos no schema
         },
         400: {
           description: 'Erro de validação',
