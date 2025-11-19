@@ -17,7 +17,7 @@ export default function BemVindo() {
 
           <div className="mt-8">
             <button
-              onClick={() => navigate('/onboarding/igreja')}
+              onClick={() => navigate('/onboarding/start')}
               className="btn-primary px-8 py-3 text-lg"
             >
               Começar configuração

@@ -28,8 +28,10 @@ export default function Contributions() {
     try {
       const response = await api.get('/contributions')
       setContributions(response.data)
-    } catch (error) {
-      toast.error('Erro ao carregar contribuições')
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || 'Erro ao carregar contribuições'
+      toast.error(errorMessage)
+      console.error('Erro ao carregar contribuições:', error)
     } finally {
       setLoading(false)
     }

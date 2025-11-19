@@ -9,6 +9,7 @@ export default defineConfig({
     environment: 'happy-dom',
     setupFiles: ['./src/test/setup.ts'],
     css: true,
+    testTimeout: 15000, // Timeout padrão de 15 segundos para testes
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

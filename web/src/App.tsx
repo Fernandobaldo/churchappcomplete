@@ -4,6 +4,10 @@ import { useAuthStore } from './stores/authStore'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import BemVindo from './pages/onboarding/BemVindo'
+import Start from './pages/onboarding/Start'
+import Church from './pages/onboarding/Church'
+import Branches from './pages/onboarding/Branches'
+import Settings from './pages/onboarding/Settings'
 import Igreja from './pages/onboarding/Igreja'
 import Filial from './pages/onboarding/Filial'
 import Convites from './pages/onboarding/Convites'
@@ -38,6 +42,30 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+// Componente para rotas de onboarding - permite acesso mesmo com token
+// mas redireciona para dashboard se o onboarding já foi completado (tem branchId/role)
+function OnboardingRoute({ children }: { children: React.ReactNode }) {
+  const { token, user } = useAuthStore()
+  
+  // Se não tem token, permite acesso (usuário pode estar no meio do registro)
+  if (!token) {
+    return <>{children}</>
+  }
+  
+  // Se tem token mas não tem branchId/role, ainda está no onboarding
+  // Permite continuar o onboarding
+  if (token && (!user?.branchId || !user?.role)) {
+    return <>{children}</>
+  }
+  
+  // Se já completou onboarding (tem branchId e role), redireciona para dashboard
+  if (token && user?.branchId && user?.role) {
+    return <Navigate to="/app/dashboard" replace />
+  }
+  
+  return <>{children}</>
+}
+
 function App() {
   return (
     <BrowserRouter>
@@ -47,12 +75,17 @@ function App() {
         <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
         <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
         
-        {/* Rotas de onboarding - acessíveis sem autenticação, mas redirecionam se já autenticado */}
-        <Route path="/onboarding/bem-vindo" element={<PublicRoute><BemVindo /></PublicRoute>} />
-        <Route path="/onboarding/igreja" element={<PublicRoute><Igreja /></PublicRoute>} />
-        <Route path="/onboarding/filial" element={<PublicRoute><Filial /></PublicRoute>} />
-        <Route path="/onboarding/convites" element={<PublicRoute><Convites /></PublicRoute>} />
-        <Route path="/onboarding/concluido" element={<PublicRoute><Concluido /></PublicRoute>} />
+        {/* Rotas de onboarding - permitem acesso mesmo com token se onboarding não completo */}
+        <Route path="/onboarding/bem-vindo" element={<OnboardingRoute><BemVindo /></OnboardingRoute>} />
+        <Route path="/onboarding/start" element={<OnboardingRoute><Start /></OnboardingRoute>} />
+        <Route path="/onboarding/church" element={<OnboardingRoute><Church /></OnboardingRoute>} />
+        <Route path="/onboarding/branches" element={<OnboardingRoute><Branches /></OnboardingRoute>} />
+        <Route path="/onboarding/settings" element={<OnboardingRoute><Settings /></OnboardingRoute>} />
+        {/* Rotas antigas mantidas para compatibilidade */}
+        <Route path="/onboarding/igreja" element={<OnboardingRoute><Igreja /></OnboardingRoute>} />
+        <Route path="/onboarding/filial" element={<OnboardingRoute><Filial /></OnboardingRoute>} />
+        <Route path="/onboarding/convites" element={<OnboardingRoute><Convites /></OnboardingRoute>} />
+        <Route path="/onboarding/concluido" element={<OnboardingRoute><Concluido /></OnboardingRoute>} />
         
         {/* Rotas protegidas (app) */}
         <Route

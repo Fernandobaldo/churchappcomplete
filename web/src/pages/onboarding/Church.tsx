@@ -1,0 +1,276 @@
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useForm } from 'react-hook-form'
+import toast from 'react-hot-toast'
+import { jwtDecode } from 'jwt-decode'
+import api from '../../api/api'
+import { useAuthStore } from '../../stores/authStore'
+
+interface ChurchForm {
+  name: string
+  country: string
+  city: string
+  language: string
+  primaryColor: string
+  logoUrl: string
+  address: string
+}
+
+export default function Church() {
+  const navigate = useNavigate()
+  const { user, setUserFromToken } = useAuthStore()
+  const [loading, setLoading] = useState(false)
+  const [churchId, setChurchId] = useState<string | null>(null)
+  const structureType = localStorage.getItem('onboarding_structure') || 'simple'
+  
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    setValue,
+  } = useForm<ChurchForm>({
+    defaultValues: {
+      language: 'pt-BR',
+      primaryColor: '#3B82F6', // Azul padrão
+      country: 'BR',
+    },
+  })
+
+  // Busca os dados da igreja ao montar o componente
+  useEffect(() => {
+    const loadChurchData = async () => {
+      try {
+        const response = await api.get('/churches').catch(() => ({ data: [] }))
+        const churches = response.data
+        
+        if (churches && Array.isArray(churches) && churches.length > 0) {
+          const church = churches[0]
+          setChurchId(church.id)
+          setValue('name', church.name || '')
+          setValue('logoUrl', church.logoUrl || '')
+        }
+      } catch (error: any) {
+        // Se não houver igreja ainda, pode continuar normalmente
+        // Isso é esperado se o registro ainda não criou a igreja
+        console.log('Igreja ainda não encontrada. Será criada neste passo.')
+      }
+    }
+
+    loadChurchData()
+  }, [setValue])
+
+  const onSubmit = async (data: ChurchForm) => {
+    setLoading(true)
+    try {
+      if (churchId) {
+        // Atualiza a igreja existente
+        await api.put(`/churches/${churchId}`, {
+          name: data.name,
+          logoUrl: data.logoUrl || undefined,
+        })
+        toast.success('Configurações da igreja atualizadas!')
+      } else {
+        // Cria uma nova igreja
+        const response = await api.post('/churches', {
+          name: data.name,
+          logoUrl: data.logoUrl || undefined,
+          withBranch: true,
+          branchName: 'Sede',
+        })
+        setChurchId(response.data.church?.id || response.data.id)
+        
+        // Atualiza o token se um novo token foi retornado
+        if (response.data.token) {
+          console.log('🔑 Token recebido após criar igreja:', response.data.token.substring(0, 50) + '...')
+          setUserFromToken(response.data.token)
+          
+          // Verifica se o branchId foi incluído no token
+          const decoded = jwtDecode<{ branchId?: string | null; role?: string; name?: string }>(response.data.token)
+          console.log('🔍 Token decodificado:', { branchId: decoded.branchId, role: decoded.role, name: decoded.name })
+          
+          if (!decoded.branchId) {
+            console.warn('⚠️ ATENÇÃO: branchId não está presente no token após criar igreja!')
+          }
+        } else {
+          console.warn('⚠️ Token não foi retornado após criar igreja')
+        }
+        
+        toast.success('Igreja criada com sucesso!')
+      }
+
+      // Salva dados adicionais no localStorage para uso posterior
+      localStorage.setItem('onboarding_church_data', JSON.stringify({
+        country: data.country,
+        city: data.city,
+        language: data.language,
+        primaryColor: data.primaryColor,
+        address: data.address,
+      }))
+
+      // Se escolheu estrutura com filiais, vai para criação de filiais
+      // Caso contrário, vai direto para configurações
+      if (structureType === 'branches') {
+        navigate('/onboarding/branches')
+      } else {
+        navigate('/onboarding/settings')
+      }
+    } catch (error: any) {
+      console.error('Erro ao salvar configurações da igreja:', error)
+      toast.error('Não foi possível salvar as configurações. Tente novamente.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-8">
+      <div className="max-w-2xl w-full">
+        <div className="bg-white rounded-lg shadow-lg p-8">
+          <div className="mb-6">
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Criar Igreja Principal</h1>
+            <p className="text-gray-600">
+              Configure as informações básicas da sua igreja
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            <div>
+              <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+                Nome da igreja *
+              </label>
+              <input
+                id="name"
+                type="text"
+                {...register('name', {
+                  required: 'Nome da igreja é obrigatório',
+                  minLength: { value: 2, message: 'Nome deve ter pelo menos 2 caracteres' },
+                })}
+                className="input"
+                placeholder="Nome da sua igreja"
+              />
+              {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>}
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="country" className="block text-sm font-medium text-gray-700 mb-1">
+                  País *
+                </label>
+                <select
+                  id="country"
+                  {...register('country', { required: 'País é obrigatório' })}
+                  className="input"
+                >
+                  <option value="BR">Brasil</option>
+                  <option value="US">Estados Unidos</option>
+                  <option value="PT">Portugal</option>
+                  <option value="ES">Espanha</option>
+                  <option value="MX">México</option>
+                </select>
+                {errors.country && <p className="mt-1 text-sm text-red-600">{errors.country.message}</p>}
+              </div>
+
+              <div>
+                <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1">
+                  Cidade *
+                </label>
+                <input
+                  id="city"
+                  type="text"
+                  {...register('city', { required: 'Cidade é obrigatória' })}
+                  className="input"
+                  placeholder="São Paulo"
+                />
+                {errors.city && <p className="mt-1 text-sm text-red-600">{errors.city.message}</p>}
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-1">
+                Endereço
+              </label>
+              <input
+                id="address"
+                type="text"
+                {...register('address')}
+                className="input"
+                placeholder="Rua, número, bairro"
+              />
+              <p className="mt-1 text-xs text-gray-500">Campo opcional</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="language" className="block text-sm font-medium text-gray-700 mb-1">
+                  Idioma padrão *
+                </label>
+                <select
+                  id="language"
+                  {...register('language', { required: true })}
+                  className="input"
+                >
+                  <option value="pt-BR">Português (Brasil)</option>
+                  <option value="pt-PT">Português (Portugal)</option>
+                  <option value="en-US">English (US)</option>
+                  <option value="es-ES">Español</option>
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="primaryColor" className="block text-sm font-medium text-gray-700 mb-1">
+                  Cor principal *
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    id="primaryColor"
+                    type="color"
+                    {...register('primaryColor', { required: true })}
+                    className="h-10 w-20 rounded border border-gray-300 cursor-pointer"
+                  />
+                  <input
+                    type="text"
+                    {...register('primaryColor', { required: true })}
+                    className="input flex-1"
+                    placeholder="#3B82F6"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="logoUrl" className="block text-sm font-medium text-gray-700 mb-1">
+                Logo (URL)
+              </label>
+              <input
+                id="logoUrl"
+                type="url"
+                {...register('logoUrl')}
+                className="input"
+                placeholder="https://exemplo.com/logo.png"
+              />
+              <p className="mt-1 text-xs text-gray-500">Campo opcional - Cole a URL da imagem do logo</p>
+            </div>
+
+            <div className="pt-4 border-t border-gray-200 flex gap-4">
+              <button
+                type="button"
+                onClick={() => navigate('/onboarding/start')}
+                className="btn-secondary flex-1"
+              >
+                Voltar
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="btn-primary flex-1"
+              >
+                {loading ? 'Salvando...' : 'Continuar'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  )
+}
+

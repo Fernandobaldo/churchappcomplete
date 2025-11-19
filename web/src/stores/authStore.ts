@@ -15,14 +15,15 @@ export type User = {
 }
 
 type DecodedToken = {
-  name: string
+  name?: string
   email: string
-  role: string
-  branchId: string
-  permissions: string[]
+  role?: string | null
+  branchId?: string | null
+  permissions?: string[]
   sub: string
   iat: number
   exp: number
+  type?: 'user' | 'member'
 }
 
 type AuthStore = {
@@ -41,14 +42,19 @@ export const useAuthStore = create<AuthStore>()(
       setUserFromToken: (token) => {
         const decoded = jwtDecode<DecodedToken>(token)
 
+        // Log para debug
+        if (!decoded.branchId) {
+          console.warn('⚠️ ATENÇÃO: branchId não está presente no token!', decoded)
+        }
+
         set({
           user: {
             id: decoded.sub,
-            name: decoded.name,
+            name: decoded.name || '',
             email: decoded.email,
-            role: decoded.role,
-            branchId: decoded.branchId,
-            permissions: decoded.permissions.map((type) => ({ type })),
+            role: decoded.role || '',
+            branchId: decoded.branchId || '',
+            permissions: (decoded.permissions || []).map((type) => ({ type })),
             token,
           },
           token,

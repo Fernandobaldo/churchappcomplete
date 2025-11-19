@@ -37,27 +37,31 @@ export default function Dashboard() {
 
   const tiles = [
     {
+      id: 'events',
       title: 'Eventos',
       icon: Calendar,
-      path: '/events',
+      path: '/app/events',
       color: 'bg-blue-500',
     },
     {
+      id: 'contributions',
       title: 'Contribuições',
       icon: Heart,
-      path: '/contributions',
+      path: '/app/contributions',
       color: 'bg-red-500',
     },
     {
+      id: 'devotionals',
       title: 'Devocionais',
       icon: BookOpen,
-      path: '/devotionals',
+      path: '/app/devotionals',
       color: 'bg-green-500',
     },
     {
-      title: 'Cultos',
+      id: 'members',
+      title: 'Membros',
       icon: Church,
-      path: '/events',
+      path: '/app/members',
       color: 'bg-purple-500',
     },
   ]
@@ -82,7 +86,7 @@ export default function Dashboard() {
           const Icon = tile.icon
           return (
             <button
-              key={tile.path}
+              key={tile.id}
               onClick={() => navigate(tile.path)}
               className="card hover:shadow-md transition-shadow text-left"
             >
@@ -120,7 +124,7 @@ export default function Dashboard() {
               <p className="text-gray-600">{nextEvent.location}</p>
             </div>
             <button
-              onClick={() => navigate(`/events/${nextEvent.id}`)}
+              onClick={() => navigate(`/app/events/${nextEvent.id}`)}
               className="btn-primary"
             >
               Ver Detalhes
@@ -136,21 +140,21 @@ export default function Dashboard() {
           </div>
           <div className="space-y-2">
             <button
-              onClick={() => navigate('/events/new')}
+              onClick={() => navigate('/app/events/new')}
               className="w-full flex items-center gap-2 px-4 py-2 text-left hover:bg-gray-50 rounded-lg transition-colors"
             >
               <Plus className="w-5 h-5 text-primary" />
               <span>Criar Novo Evento</span>
             </button>
             <button
-              onClick={() => navigate('/contributions/new')}
+              onClick={() => navigate('/app/contributions/new')}
               className="w-full flex items-center gap-2 px-4 py-2 text-left hover:bg-gray-50 rounded-lg transition-colors"
             >
               <Plus className="w-5 h-5 text-primary" />
               <span>Adicionar Contribuição</span>
             </button>
             <button
-              onClick={() => navigate('/devotionals/new')}
+              onClick={() => navigate('/app/devotionals/new')}
               className="w-full flex items-center gap-2 px-4 py-2 text-left hover:bg-gray-50 rounded-lg transition-colors"
             >
               <Plus className="w-5 h-5 text-primary" />

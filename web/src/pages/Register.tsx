@@ -27,17 +27,42 @@ export default function Register() {
     try {
       let response
       
-      // Tenta primeiro o endpoint /register como descrito no prompt (com churchName)
+      // Tenta primeiro o endpoint /register (registro público)
       try {
         response = await api.post('/register', {
           name: data.name,
           email: data.email,
           password: data.password,
-          churchName: data.churchName,
         })
+        
+        const { token } = response.data
+        
+        if (!token) {
+          throw new Error('Token não recebido do servidor')
+        }
+        
+        // Salva o token
+        setUserFromToken(token)
+        
+        // Tenta criar a igreja com filial
+        try {
+          await api.post('/churches', {
+            name: data.churchName,
+            withBranch: true,
+            branchName: 'Sede',
+          })
+          toast.success('Conta e igreja criadas com sucesso!')
+        } catch (churchError: any) {
+          // Se não conseguir criar a igreja, continua mesmo assim
+          console.warn('Não foi possível criar a igreja automaticamente:', churchError)
+          toast.success('Conta criada! Complete a configuração da igreja no próximo passo.')
+        }
+        
+        navigate('/onboarding/start')
+        return
       } catch (firstError: any) {
         // Se falhar, tenta o endpoint /public/register e depois cria a igreja
-        if (firstError.response?.status === 400 || firstError.response?.status === 404) {
+        if (firstError.response?.status === 400 || firstError.response?.status === 404 || firstError.response?.status === 401) {
           console.log('Endpoint /register não disponível, usando alternativa...')
           
           // Registra o usuário primeiro
@@ -70,21 +95,11 @@ export default function Register() {
             toast.success('Conta criada! Complete a configuração da igreja no próximo passo.')
           }
           
-          navigate('/onboarding/bem-vindo')
+          navigate('/onboarding/start')
           return
         }
         throw firstError
       }
-
-      const { token } = response.data
-
-      if (!token) {
-        throw new Error('Token não recebido do servidor')
-      }
-
-      setUserFromToken(token)
-      toast.success('Conta criada com sucesso!')
-      navigate('/onboarding/bem-vindo')
     } catch (error: any) {
       console.error('Erro ao criar conta:', error)
       
