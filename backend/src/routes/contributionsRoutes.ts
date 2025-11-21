@@ -14,7 +14,7 @@ export async function contributionsRoutes(app: FastifyInstance) {
     preHandler: [
       authenticate,
       checkRole(['ADMINGERAL', 'ADMINFILIAL', 'COORDINATOR']),
-      checkPermission(['contribution_manage'])
+      checkPermission(['contributions_manage'])
     ],
     schema: createContributionSchema
   }, controller.create.bind(controller))

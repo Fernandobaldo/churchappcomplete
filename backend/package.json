@@ -14,6 +14,9 @@
     "test:report": "vitest run --reporter=verbose --coverage",
     "test:watch": "vitest watch",
     "test:integration": "vitest run --dir tests/integration",
+    "test:e2e:setup": "tsx tests/e2e/setup-e2e-db.js",
+    "test:e2e": "npm run test:e2e:setup && npx dotenv-cli -e .env.test -- vitest run --dir tests/e2e",
+    "test:e2e:watch": "npx dotenv-cli -e .env.test -- vitest watch --dir tests/e2e",
     "test": "npx dotenv-cli -e .env.test -- vitest"
   },
   "type": "module",

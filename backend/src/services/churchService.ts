@@ -57,17 +57,14 @@ export class ChurchService {
           },
         })
 
-        const allPermissions = await tx.permission.findMany({
-          where: { type: { in: ALL_PERMISSION_TYPES } },
-        })
-
-        await tx.member.update({
-          where: { id: member.id },
-          data: {
-            Permission: {
-              connect: allPermissions.map((p) => ({ id: p.id })),
-            },
-          },
+        // Cria as permissões diretamente para o member
+        // Permission tem memberId obrigatório, então não pode existir sem um member
+        await tx.permission.createMany({
+          data: ALL_PERMISSION_TYPES.map((type) => ({
+            memberId: member.id,
+            type,
+          })),
+          skipDuplicates: true,
         })
       }
 

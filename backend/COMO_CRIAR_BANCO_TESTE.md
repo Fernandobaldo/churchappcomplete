@@ -31,12 +31,29 @@ Este comando faz tudo:
 
 ### 1. Conectar ao PostgreSQL
 
+**Linux/macOS:**
 ```bash
 # Se você tem o PostgreSQL instalado localmente
 psql -U postgres
 
 # Ou se estiver usando Docker
 docker exec -it <nome_do_container_postgres> psql -U postgres
+```
+
+**Windows (PowerShell):**
+```powershell
+# Se você tem o PostgreSQL instalado localmente
+# Use o caminho completo (ajuste a versão):
+& "C:\Program Files\PostgreSQL\16\bin\psql.exe" -U postgres
+
+# Ou se estiver usando Docker
+docker exec -it <nome_do_container_postgres> psql -U postgres
+```
+
+**💡 Dica para Windows:** Se você não tem o `psql` no PATH, use o script npm em vez disso:
+```powershell
+cd backend
+npm run create-test-db
 ```
 
 ### 2. Criar o Banco
@@ -96,6 +113,44 @@ npm test
 
 ## 🔍 Solução de Problemas
 
+### Erro: "psql is not recognized" (Windows)
+
+O comando `psql` não está no PATH do Windows. Você tem 3 opções:
+
+#### ✅ Opção 1: Usar o Script NPM (Recomendado)
+
+Não precisa do `psql`! Use o script que já existe:
+
+```powershell
+cd backend
+npm run create-test-db
+```
+
+Este script usa Node.js/Prisma e não requer o `psql` instalado.
+
+#### Opção 2: Usar o Caminho Completo do psql
+
+Encontre onde o PostgreSQL está instalado e use o caminho completo:
+
+```powershell
+# Localizações comuns no Windows:
+# C:\Program Files\PostgreSQL\<versão>\bin\psql.exe
+# C:\Program Files (x86)\PostgreSQL\<versão>\bin\psql.exe
+
+# Exemplo (ajuste a versão):
+& "C:\Program Files\PostgreSQL\16\bin\psql.exe" -U postgres -h localhost -p 5432 -c "CREATE DATABASE churchapp_test;"
+```
+
+#### Opção 3: Adicionar PostgreSQL ao PATH (Permanente)
+
+1. Encontre o caminho do PostgreSQL (geralmente `C:\Program Files\PostgreSQL\<versão>\bin`)
+2. Adicione ao PATH do sistema:
+   - Pressione `Win + R`, digite `sysdm.cpl` e pressione Enter
+   - Vá em "Avançado" → "Variáveis de Ambiente"
+   - Em "Variáveis do sistema", encontre "Path" e clique em "Editar"
+   - Clique em "Novo" e adicione: `C:\Program Files\PostgreSQL\<versão>\bin`
+   - Reinicie o PowerShell
+
 ### Erro: "authentication failed"
 
 As credenciais no `.env.test` estão incorretas. Verifique:
@@ -114,6 +169,10 @@ brew services start postgresql
 
 # Linux (systemd)
 sudo systemctl start postgresql
+
+# Windows (PowerShell como Administrador)
+Start-Service postgresql-x64-<versão>
+# Ou use o Services (services.msc) e inicie o serviço PostgreSQL
 
 # Docker
 docker start <nome_do_container>

@@ -135,17 +135,14 @@ export async function registerUserService(data: RegisterUserInput) {
       : permissions ?? []
 
   if (typesToAssign.length > 0) {
-    const perms = await prisma.permission.findMany({
-      where: { type: { in: typesToAssign } },
-    })
-
-    await prisma.member.update({
-      where: { id: member.id },
-      data: {
-        Permission: {
-          connect: perms.map((p) => ({ id: p.id })),
-        },
-      },
+    // Cria as permissões diretamente para o member
+    // Permission tem memberId obrigatório, então não pode existir sem um member
+    await prisma.permission.createMany({
+      data: typesToAssign.map((type) => ({
+        memberId: member.id,
+        type,
+      })),
+      skipDuplicates: true,
     })
   }
 

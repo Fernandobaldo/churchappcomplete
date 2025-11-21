@@ -1,6 +1,6 @@
 import { FastifyRequest, FastifyReply } from 'fastify'
 import { ContributionService } from '../services/contributionService'
-import { createContributionSchema } from '../schemas/contributionSchemas'
+import { createContributionBodySchema } from '../schemas/contributionSchemas'
 
 export class ContributionController {
   private service = new ContributionService()
@@ -15,7 +15,7 @@ export class ContributionController {
   }
 
   async create(request: FastifyRequest, reply: FastifyReply) {
-    const data = createContributionSchema.body.parse(request.body)
+    const data = createContributionBodySchema.parse(request.body)
     const user = request.user
 
     const created = await this.service.create({

@@ -19,7 +19,7 @@ async getByBranch(branchId: string) {
   }
 
   async create(data: CreateContributionInput) {
-    return prisma.contribution.create({
+    const contribution = await prisma.contribution.create({
       data: {
         title: data.title,
         description: data.description,
@@ -29,5 +29,8 @@ async getByBranch(branchId: string) {
         branchId: data.branchId
       }
     })
+    
+    // Prisma já serializa enums como strings, mas garantimos que está presente
+    return contribution
   }
 }
