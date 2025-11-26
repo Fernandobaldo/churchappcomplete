@@ -1,37 +1,25 @@
 import axios from 'axios'
 import { Platform } from 'react-native'
+import Constants from 'expo-constants'
 import { useAuthStore } from '../stores/authStore'
 
 // Configuração da API base
-// Prioridade: variável de ambiente > IP detectado > fallback
+// Prioridade: variável de ambiente EXPO_PUBLIC > app.config.js extra > detecção de plataforma > fallback
 const getBaseURL = (): string => {
-  // 1. Verificar variável de ambiente (melhor opção)
+  // 1. Verificar variável de ambiente EXPO_PUBLIC (mais alta prioridade)
   if (process.env.EXPO_PUBLIC_API_URL) {
     console.log('📱 Usando API URL da variável de ambiente:', process.env.EXPO_PUBLIC_API_URL)
     return process.env.EXPO_PUBLIC_API_URL
   }
 
-  // 2. Para desenvolvimento, você pode detectar o IP automaticamente
-  // ou usar um IP padrão de desenvolvimento
-  // IMPORTANTE: Use o IP da sua máquina na mesma rede do dispositivo móvel
-  // Para descobrir seu IP: ifconfig (macOS/Linux) ou ipconfig (Windows)
-  // Procure por "inet" na interface en0 (WiFi) ou en1 (Ethernet)
-  
-  // Opções de IP (descomente a que corresponde à sua rede):
-  // const devIP = '172.20.10.2' // WiFi hotspot
-  // const devIP = '192.168.1.13' // Rede local comum
-  // const devIP = '10.22.1.23' // Rede local alternativa
-  // const devIP = 'localhost' // Apenas para emulador Android (não funciona em dispositivo físico)
-  
-  // Para Expo Go em dispositivo físico, você PRECISA usar o IP da sua máquina
-  // Para emulador Android, pode usar '10.0.2.2' (localhost do emulador)
-  // Para iOS Simulator, pode usar 'localhost'
-  
-  // IMPORTANTE: Atualize este IP com o IP da sua máquina na rede local
-  // Para descobrir: ifconfig (macOS/Linux) ou ipconfig (Windows)
-  // O IP encontrado foi: 192.168.1.7
-  
-  // Detecção automática do IP baseado na plataforma
+  // 2. Verificar configuração do app.config.js
+  const configApiUrl = Constants.expoConfig?.extra?.apiUrl
+  if (configApiUrl) {
+    console.log('📱 Usando API URL do app.config.js:', configApiUrl)
+    return configApiUrl
+  }
+
+  // 3. Detecção automática do IP baseado na plataforma (fallback para desenvolvimento)
   // IMPORTANTE: Se estiver usando Expo Go em dispositivo físico, você PRECISA usar o IP da sua máquina
   // Para descobrir seu IP: ifconfig (macOS/Linux) ou ipconfig (Windows)
   // Procure pelo IP na interface en0 (WiFi) ou en1 (Ethernet)
@@ -55,6 +43,12 @@ const getBaseURL = (): string => {
   const baseURL = `http://${devIP}:3333`
   console.log('📱 API Base URL:', baseURL, '(Platform:', Platform.OS + ', Dev:', __DEV__ + ')')
   return baseURL
+}
+
+// Obter URL base e logar para debug (apenas em desenvolvimento)
+const baseURL = getBaseURL()
+if (__DEV__) {
+  console.log('🔗 API Base URL:', baseURL)
 }
 
 const api = axios.create({
