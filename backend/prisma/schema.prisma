@@ -56,6 +56,13 @@ model Contribution {
   value       Float
   date        DateTime
   type        ContributionType
+  goal        Float?
+  raised      Float?           @default(0)
+  bankName    String?
+  agency      String?
+  accountName String?
+  qrCodeUrl   String?
+  paymentLink String?
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
   branchId    String

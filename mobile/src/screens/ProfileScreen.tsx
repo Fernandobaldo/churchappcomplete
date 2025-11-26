@@ -76,12 +76,11 @@ export default function ProfileScreen() {
             .map((type) =>
                 type
                     .replace('events_manage', 'Editar eventos')
-                    .replace('contribution_manage', 'Editar contribuição')
-                    .replace('finance_manage', 'Editar finanças')
-                    .replace('permission_manage', 'Gerenciar permissões')
+                    .replace('contributions_manage', 'Editar contribuição')
+                    .replace('finances_manage', 'Editar finanças')
                     .replace('devotional_manage', 'Editar devocional')
-                    .replace('notice_manage', 'Gerenciar avisos')
-                    .replace('member_manage', 'Gerenciar membros')
+                    .replace('members_view', 'Visualizar membros')
+                    .replace('members_manage', 'Gerenciar membros')
 
 
             )

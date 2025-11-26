@@ -324,5 +324,112 @@ describe('Contributions Routes', () => {
       expect(response.status).toBe(403)
     })
   })
+
+  describe('GET /contributions/:id', () => {
+    it('deve retornar contribuição por ID', async () => {
+      // Criar contribuição
+      const contribution = await prisma.contribution.create({
+        data: {
+          title: 'Dízimo Especial',
+          description: 'Dízimo do mês de janeiro',
+          value: 200.0,
+          date: new Date('2024-01-15'),
+          type: 'DIZIMO',
+          branchId: branchId,
+          goal: 5000.0,
+          raised: 2000.0,
+          bankName: 'Banco Teste',
+          agency: '1234',
+          accountName: 'Igreja Teste',
+        },
+      })
+
+      const response = await request(app.server)
+        .get(`/contributions/${contribution.id}`)
+        .set('Authorization', `Bearer ${userToken}`)
+
+      expect(response.status).toBe(200)
+      expect(response.body).toHaveProperty('id', contribution.id)
+      expect(response.body).toHaveProperty('title', 'Dízimo Especial')
+      expect(response.body).toHaveProperty('value', 200.0)
+      expect(response.body).toHaveProperty('goal', 5000.0)
+      expect(response.body).toHaveProperty('raised', 2000.0)
+      expect(response.body).toHaveProperty('bankName', 'Banco Teste')
+      expect(response.body).toHaveProperty('agency', '1234')
+      expect(response.body).toHaveProperty('accountName', 'Igreja Teste')
+    })
+
+    it('deve retornar 404 quando contribuição não existe', async () => {
+      const fakeId = 'clx123456789012345678901234'
+      const response = await request(app.server)
+        .get(`/contributions/${fakeId}`)
+        .set('Authorization', `Bearer ${userToken}`)
+
+      expect(response.status).toBe(404)
+      expect(response.body).toHaveProperty('message', 'Contribuição não encontrada')
+    })
+
+    it('deve retornar 403 quando contribuição pertence a outra filial', async () => {
+      // Criar outra filial
+      const otherBranch = await prisma.branch.create({
+        data: {
+          name: 'Outra Filial',
+          churchId: churchId,
+        },
+      })
+
+      // Criar contribuição na outra filial
+      const contribution = await prisma.contribution.create({
+        data: {
+          title: 'Contribuição Outra Filial',
+          value: 100.0,
+          date: new Date('2024-01-15'),
+          type: 'OFERTA',
+          branchId: otherBranch.id,
+        },
+      })
+
+      const response = await request(app.server)
+        .get(`/contributions/${contribution.id}`)
+        .set('Authorization', `Bearer ${userToken}`)
+
+      expect(response.status).toBe(403)
+      expect(response.body).toHaveProperty('message', 'Você não tem permissão para visualizar esta contribuição')
+    })
+
+    it('deve retornar 400 quando usuário não tem branchId', async () => {
+      const userWithoutMember = await prisma.user.create({
+        data: {
+          name: 'User Without Member',
+          email: 'nowmember3@example.com',
+          password: await bcrypt.hash('password123', 10),
+        },
+      })
+
+      const tokenWithoutMember = app.jwt.sign({
+        sub: userWithoutMember.id,
+        email: userWithoutMember.email,
+        name: userWithoutMember.name,
+        type: 'user',
+      })
+
+      const contribution = await prisma.contribution.create({
+        data: {
+          title: 'Test',
+          value: 100.0,
+          date: new Date('2024-01-15'),
+          type: 'OFERTA',
+          branchId: branchId,
+        },
+      })
+
+      const response = await request(app.server)
+        .get(`/contributions/${contribution.id}`)
+        .set('Authorization', `Bearer ${tokenWithoutMember}`)
+
+      expect(response.status).toBe(400)
+      expect(response.body).toHaveProperty('message', 'Usuário não vinculado a uma filial.')
+    })
+  })
 })
 

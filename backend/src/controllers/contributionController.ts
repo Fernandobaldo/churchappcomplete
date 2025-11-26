@@ -15,6 +15,33 @@ export class ContributionController {
     return reply.send(contributions)
   }
 
+  async getById(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const { id } = request.params as { id: string }
+      const user = request.user
+
+      if (!user?.branchId) {
+        return reply.status(400).send({ message: 'Usuário não vinculado a uma filial.' })
+      }
+
+      const contribution = await this.service.getById(id)
+
+      if (!contribution) {
+        return reply.status(404).send({ message: 'Contribuição não encontrada' })
+      }
+
+      // Verificar se a contribuição pertence à mesma filial do usuário
+      if (contribution.branchId !== user.branchId) {
+        return reply.status(403).send({ message: 'Você não tem permissão para visualizar esta contribuição' })
+      }
+
+      return reply.send(contribution)
+    } catch (error: any) {
+      console.error('❌ Erro ao buscar contribuição:', error)
+      return reply.status(500).send({ error: 'Erro interno ao buscar contribuição', details: error.message })
+    }
+  }
+
   async create(request: FastifyRequest, reply: FastifyReply) {
     try {
       const data = createContributionBodySchema.parse(request.body)

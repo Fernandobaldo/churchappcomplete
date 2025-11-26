@@ -65,4 +65,27 @@ export class DevotionalService {
       where: { devotionalId, userId: memberId },
     })
   }
+
+  async update(id: string, data: {
+    title?: string
+    passage?: string
+    content?: string
+  }) {
+    return await prisma.devotional.update({
+      where: { id },
+      data,
+    })
+  }
+
+  async delete(id: string) {
+    // Primeiro deleta os likes associados
+    await prisma.devotionalLike.deleteMany({
+      where: { devotionalId: id },
+    })
+    
+    // Depois deleta o devocional
+    return await prisma.devotional.delete({
+      where: { id },
+    })
+  }
 }

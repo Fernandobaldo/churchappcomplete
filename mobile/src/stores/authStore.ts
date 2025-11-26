@@ -18,14 +18,18 @@ export type User = {
 }
 
 type DecodedToken = {
-    name: string
-    email: string
-    role: string
-    branchId: string
-    permissions: string[]
+    name?: string
+    email?: string
+    role?: string | null
+    branchId?: string | null
+    permissions?: string[]
     sub: string
-    iat: number
-    exp: number
+    userId?: string
+    memberId?: string | null
+    churchId?: string | null
+    type?: string
+    iat?: number
+    exp?: number
 }
 
 type AuthStore = {
@@ -42,21 +46,33 @@ export const useAuthStore = create<AuthStore>()(
             user: null,
             token: null,
             setUserFromToken: (token) => {
-                const decoded = jwtDecode<DecodedToken>(token)
-                console.log('Token decodificado:', decoded.permissions)
+                try {
+                    const decoded = jwtDecode<DecodedToken>(token)
+                    console.log('Token decodificado:', decoded)
 
-                set({
-                    user: {
-                        id: decoded.sub,
-                        name: decoded.name,
-                        email: decoded.email,
-                        role: decoded.role,
-                        branchId: decoded.branchId,
-                        permissions: decoded.permissions.map((type) => ({ type })),
+                    // Garante que permissions seja sempre um array
+                    const permissions = decoded.permissions || []
+                    const permissionsArray = Array.isArray(permissions) 
+                        ? permissions.map((type) => ({ type }))
+                        : []
+
+                    set({
+                        user: {
+                            id: decoded.sub || decoded.userId || '',
+                            name: decoded.name || '',
+                            email: decoded.email || '',
+                            role: decoded.role || '',
+                            branchId: decoded.branchId || '',
+                            permissions: permissionsArray,
+                            token,
+                        },
                         token,
-                    },
-                    token,
-                })
+                    })
+                } catch (error) {
+                    console.error('Erro ao decodificar token:', error)
+                    // Em caso de erro, ainda salva o token
+                    set({ token })
+                }
             },
             logout: () => set({ user: null, token: null }),
             setToken: (token) => set({ token }),

@@ -51,7 +51,7 @@ export default function ContributionsScreen() {
     const canManageContributions =
         user.role === 'ADMINGERAL' ||
         user.role === 'ADMINFILIAL' ||
-        user.permissions?.some((p: any) => p.type === 'contribution_manage')
+        user.permissions?.some((p: any) => p.type === 'contributions_manage')
 
 
     return (

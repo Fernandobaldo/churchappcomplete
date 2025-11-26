@@ -17,12 +17,11 @@ import Toast from 'react-native-toast-message'
 import api from '../api/api'
 
 const PERMISSIONS = [
-    { key: 'finance_manage', label: 'Gerenciar Finanças' },
+    { key: 'finances_manage', label: 'Gerenciar Finanças' },
     { key: 'events_manage', label: 'Gerenciar Eventos' },
-    { key: 'member_manage', label: 'Gerenciar Membros' },
+    { key: 'members_manage', label: 'Gerenciar Membros' },
     { key: 'devotional_manage', label: 'Gerenciar Devocionais' },
-    { key: 'notice_manage', label: 'Gerenciar Avisos' },
-    { key: 'contribution_manage', label: 'Gerenciar Contribuições' },
+    { key: 'contributions_manage', label: 'Gerenciar Contribuições' },
 ]
 
 export default function EditMemberPermissionsScreen({ route, navigation }: any) {

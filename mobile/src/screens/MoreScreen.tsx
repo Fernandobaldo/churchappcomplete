@@ -18,12 +18,12 @@ export default function MoreScreen() {
     ]
 
     const adminOptions = [
-        { label: 'Gestão de Membros', icon: <Ionicons name="people-outline" size={20} />, screen: 'Members', permission: 'member_manage' },
-        { label: 'Gestão de Finanças', icon: <Ionicons name="cash-outline" size={20} />, screen: 'Finances', permission: 'finance_manage' },
-        { label: 'Gestão de Eventos', icon: <Ionicons name="calendar-outline" size={20} />, screen: 'Events', permission: 'event_manage' },
+        { label: 'Gestão de Membros', icon: <Ionicons name="people-outline" size={20} />, screen: 'Members', permission: 'members_manage' },
+        { label: 'Gestão de Finanças', icon: <Ionicons name="cash-outline" size={20} />, screen: 'Finances', permission: 'finances_manage' },
+        { label: 'Gestão de Eventos', icon: <Ionicons name="calendar-outline" size={20} />, screen: 'Events', permission: 'events_manage' },
         { label: 'Painel Administrativo', icon: <MaterialIcons name="admin-panel-settings" size={20} />, screen: 'AdminPanel', permission: 'admin_access' },
-        { label: 'Convites e Cadastro de Membros', icon: <FontAwesome5 name="user-plus" size={18} />, screen: 'InviteLink', permission: 'member_invite' },
-        { label: 'Permissões e Hierarquias', icon: <Feather name="lock" size={20} />, screen: 'Permissions', permission: 'permission_manage' },
+        { label: 'Convites e Cadastro de Membros', icon: <FontAwesome5 name="user-plus" size={18} />, screen: 'InviteLink', permission: 'members_manage' },
+        { label: 'Permissões e Hierarquias', icon: <Feather name="lock" size={20} />, screen: 'Permissions', permission: 'members_manage' },
 
 
 

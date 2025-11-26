@@ -11,11 +11,27 @@ branchId: string
 }
 
 export class ContributionService {
-async getByBranch(branchId: string) {
+  async getByBranch(branchId: string) {
     return prisma.contribution.findMany({
       where: { branchId },
       orderBy: { date: 'desc' }
     })
+  }
+
+  async getById(id: string) {
+    const contribution = await prisma.contribution.findUnique({
+      where: { id },
+      include: {
+        Branch: {
+          select: {
+            id: true,
+            name: true,
+            churchId: true,
+          },
+        },
+      },
+    })
+    return contribution
   }
 
   async create(data: CreateContributionInput) {

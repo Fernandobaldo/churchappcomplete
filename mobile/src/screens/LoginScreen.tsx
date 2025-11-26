@@ -12,13 +12,15 @@ import {
 } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import Toast from 'react-native-toast-message'
-import api from '../api/api'
+import api, { setToken } from '../api/api'
+import { useAuthStore } from '../stores/authStore'
 
 export default function LoginScreen() {
   const navigation = useNavigation()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const { setUserFromToken } = useAuthStore()
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -29,14 +31,42 @@ export default function LoginScreen() {
     setLoading(true)
     try {
       const response = await api.post('auth/login', { email, password })
-      // Armazenar token, navegar, etc.
+      
+      // Extrai os dados da resposta
+      const { token, user } = response.data
+      
+      if (!token) {
+        Toast.show({ type: 'error', text1: 'Erro ao fazer login', text2: 'Token não recebido.' })
+        return
+      }
+
+      // Salva o token no axios
+      setToken(token)
+      
+      // Salva o token e dados do usuário no store
+      setUserFromToken(token)
+      
       Toast.show({ type: 'success', text1: 'Login realizado!' })
-       navigation.navigate('Dashboard') // ajuste conforme necessário
-    } catch (error) {
+      navigation.navigate('Dashboard' as never)
+    } catch (error: any) {
+      console.error('Erro no login:', error)
+      
+      // Tratamento melhorado de erros
+      let errorMessage = 'Verifique seus dados.'
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message
+      } else if (error.message) {
+        errorMessage = error.message
+      } else if (error.code === 'ECONNABORTED') {
+        errorMessage = 'Tempo de conexão esgotado. Verifique sua conexão.'
+      } else if (error.code === 'ERR_NETWORK') {
+        errorMessage = 'Erro de rede. Verifique se o servidor está rodando.'
+      }
+      
       Toast.show({
         type: 'error',
         text1: 'Erro ao fazer login',
-        text2: error.response?.data?.message || 'Verifique seus dados.',
+        text2: errorMessage,
       })
     } finally {
       setLoading(false)

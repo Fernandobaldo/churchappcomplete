@@ -7,6 +7,12 @@ export const createDevotionalBodySchema = z.object({
     content: z.string().optional(),
 })
 
+export const updateDevotionalBodySchema = z.object({
+    title: z.string().min(1, 'Título obrigatório').optional(),
+    passage: z.string().min(1, 'Passagem bíblica obrigatória').optional(),
+    content: z.string().optional(),
+})
+
 // Schema Fastify para documentação Swagger
 export const createDevotionalSchema = {
     summary: 'Criar um devocional',

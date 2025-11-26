@@ -13,7 +13,7 @@ export default function FinancesScreen() {
 
 
         return (
-            <Protected permission="finance_manage">
+            <Protected permission="finances_manage">
                 <View style={{ padding: 20 }}>
                     <Text style={{ fontSize: 18 }}>Página de Finanças</Text>
                     {/* ... restante da tela ... */}

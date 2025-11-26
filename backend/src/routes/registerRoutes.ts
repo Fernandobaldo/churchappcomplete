@@ -16,6 +16,8 @@ import { publicRegisterRoute } from './public/register'
 import { loginRoute } from './auth/login'
 import { authenticate } from '../middlewares/authenticate'
 import { auditRoutes } from './auditRoutes'
+import { noticesRoutes } from './noticesRoutes'
+import { financesRoutes } from './financesRoutes'
 
 
     export async function registerRoutes(app: FastifyInstance) {
@@ -32,6 +34,8 @@ import { auditRoutes } from './auditRoutes'
         app.register(subscriptionRoutes, { prefix: '/subscriptions' });
         app.register(adminRoutes);
         app.register(publicRegisterRoute, { prefix: '/public' })
+        app.register(noticesRoutes, { prefix: '/notices' });
+        app.register(financesRoutes, { prefix: '/finances' });
         // loginRoute já está registrado dentro de authRoutes, não precisa registrar novamente
         app.register(auditRoutes, { prefix: '/audit' })
 

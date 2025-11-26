@@ -157,3 +157,86 @@ describe('Auth Routes - /auth/login', () => {
     expect(response.body.message).toBeDefined()
   })
 })
+
+describe('Auth Routes - /auth/me', () => {
+  const app = Fastify()
+  let testData: Awaited<ReturnType<typeof seedTestDatabase>>
+
+  beforeAll(async () => {
+    app.register(fastifyJwt, {
+      secret: 'churchapp-secret-key',
+    })
+
+    app.decorate('authenticate', authenticate)
+    await registerRoutes(app)
+    await app.ready()
+
+    await resetTestDatabase()
+    testData = await seedTestDatabase()
+  })
+
+  afterAll(async () => {
+    await resetTestDatabase()
+    await app.close()
+  })
+
+  it('deve retornar perfil do usuário autenticado (member)', async () => {
+    // Fazer login para obter token
+    const loginResponse = await request(app.server)
+      .post('/auth/login')
+      .send({ email: 'member@example.com', password: 'password123' })
+
+    const token = loginResponse.body.token
+
+    const response = await request(app.server)
+      .get('/auth/me')
+      .set('Authorization', `Bearer ${token}`)
+
+    expect(response.status).toBe(200)
+    expect(response.body).toHaveProperty('id')
+    expect(response.body).toHaveProperty('name')
+    expect(response.body).toHaveProperty('email', 'member@example.com')
+    expect(response.body).toHaveProperty('role')
+    expect(response.body).toHaveProperty('branchId')
+  })
+
+  it('deve retornar 401 quando token não é fornecido', async () => {
+    const response = await request(app.server)
+      .get('/auth/me')
+
+    expect(response.status).toBe(401)
+  })
+
+  it('deve retornar 401 quando token é inválido', async () => {
+    const response = await request(app.server)
+      .get('/auth/me')
+      .set('Authorization', 'Bearer invalid-token')
+
+    expect(response.status).toBe(401)
+  })
+
+  it('deve retornar 404 quando member não existe', async () => {
+    // Criar user sem member
+    const user = await prisma.user.create({
+      data: {
+        name: 'User Sem Member',
+        email: 'nosemember@example.com',
+        password: await bcrypt.hash('password123', 10),
+      },
+    })
+
+    const token = app.jwt.sign({
+      sub: user.id,
+      email: user.email,
+      name: user.name,
+      type: 'user',
+    })
+
+    const response = await request(app.server)
+      .get('/auth/me')
+      .set('Authorization', `Bearer ${token}`)
+
+    expect(response.status).toBe(404)
+    expect(response.body.message).toContain('Membro não encontrado')
+  })
+})

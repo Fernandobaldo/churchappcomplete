@@ -314,5 +314,318 @@ describe('Devotional Routes', () => {
       expect(response.body.message).toBe('Usuário não vinculado a uma filial.')
     })
   })
+
+  describe('PUT /devotionals/:id', () => {
+    it('deve atualizar devocional com sucesso', async () => {
+      // Criar devocional para editar
+      const devotional = await prisma.devotional.create({
+        data: {
+          title: 'Devocional Original',
+          passage: 'João 3:16',
+          content: 'Conteúdo original',
+          authorId: memberId,
+          branchId,
+        },
+      })
+      const devotionalId = devotional.id
+
+      const response = await request(app.server)
+        .put(`/devotionals/${devotionalId}`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({
+          title: 'Devocional Atualizado',
+          passage: 'Romanos 8:28',
+          content: 'Conteúdo atualizado',
+        })
+
+      expect(response.status).toBe(200)
+      expect(response.body).toHaveProperty('id', devotionalId)
+      expect(response.body).toHaveProperty('title', 'Devocional Atualizado')
+      expect(response.body).toHaveProperty('passage', 'Romanos 8:28')
+      expect(response.body).toHaveProperty('content', 'Conteúdo atualizado')
+    })
+
+    it('deve atualizar apenas título', async () => {
+      // Criar devocional para editar
+      const devotional = await prisma.devotional.create({
+        data: {
+          title: 'Devocional Original',
+          passage: 'João 3:16',
+          content: 'Conteúdo original',
+          authorId: memberId,
+          branchId,
+        },
+      })
+      const devotionalId = devotional.id
+
+      const response = await request(app.server)
+        .put(`/devotionals/${devotionalId}`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({
+          title: 'Apenas Título Atualizado',
+        })
+
+      expect(response.status).toBe(200)
+      expect(response.body).toHaveProperty('title', 'Apenas Título Atualizado')
+      expect(response.body).toHaveProperty('passage', 'João 3:16') // Mantém original
+    })
+
+    it('deve retornar 404 quando devocional não existe', async () => {
+      const fakeId = 'clx123456789012345678901234'
+      const response = await request(app.server)
+        .put(`/devotionals/${fakeId}`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({
+          title: 'Título',
+        })
+
+      expect(response.status).toBe(404)
+      expect(response.body.message).toBe('Devocional não encontrado.')
+    })
+
+    it('deve retornar 403 quando usuário não é o autor e não tem permissão', async () => {
+      // Criar devocional para editar
+      const devotional = await prisma.devotional.create({
+        data: {
+          title: 'Devocional Original',
+          passage: 'João 3:16',
+          content: 'Conteúdo original',
+          authorId: memberId,
+          branchId,
+        },
+      })
+      const devotionalId = devotional.id
+      // Criar outro membro sem permissão
+      const otherUser = await prisma.user.create({
+        data: {
+          name: 'Other User',
+          email: 'other@test.com',
+          password: await bcrypt.hash('password123', 10),
+        },
+      })
+
+      const otherMember = await prisma.member.create({
+        data: {
+          name: 'Other Member',
+          email: 'othermember@test.com',
+          branchId,
+          role: 'MEMBER',
+          userId: otherUser.id,
+        },
+      })
+
+      const otherToken = app.jwt.sign({
+        sub: otherUser.id,
+        email: otherUser.email,
+        name: otherUser.name,
+        type: 'member',
+        id: otherUser.id,
+        userId: otherUser.id,
+        memberId: otherMember.id,
+        role: otherMember.role,
+        branchId: otherMember.branchId,
+        churchId: null,
+        permissions: [],
+      })
+
+      const response = await request(app.server)
+        .put(`/devotionals/${devotionalId}`)
+        .set('Authorization', `Bearer ${otherToken}`)
+        .send({
+          title: 'Tentativa de Edição',
+        })
+
+      expect(response.status).toBe(403)
+      // O middleware pode retornar "Acesso negado" ou a mensagem do controller
+      expect(response.body.message || response.body.error).toBeDefined()
+    })
+
+    it('deve permitir edição quando usuário tem permissão devotional_manage', async () => {
+      // Criar devocional para editar
+      const devotional = await prisma.devotional.create({
+        data: {
+          title: 'Devocional Original',
+          passage: 'João 3:16',
+          content: 'Conteúdo original',
+          authorId: memberId,
+          branchId,
+        },
+      })
+      const devotionalId = devotional.id
+
+      // Criar membro com permissão mas não é o autor
+      const otherUser = await prisma.user.create({
+        data: {
+          name: 'Admin User',
+          email: 'admin@test.com',
+          password: await bcrypt.hash('password123', 10),
+        },
+      })
+
+      const adminMember = await prisma.member.create({
+        data: {
+          name: 'Admin Member',
+          email: 'adminmember@test.com',
+          branchId,
+          role: 'ADMINFILIAL',
+          userId: otherUser.id,
+          Permission: {
+            create: { type: 'devotional_manage' },
+          },
+        },
+        include: { Permission: true },
+      })
+
+      const adminToken = app.jwt.sign({
+        sub: otherUser.id,
+        email: otherUser.email,
+        name: otherUser.name,
+        type: 'member',
+        id: otherUser.id,
+        userId: otherUser.id,
+        memberId: adminMember.id,
+        role: adminMember.role,
+        branchId: adminMember.branchId,
+        churchId: null,
+        permissions: adminMember.Permission.map(p => p.type),
+      })
+
+      const response = await request(app.server)
+        .put(`/devotionals/${devotionalId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          title: 'Editado por Admin',
+        })
+
+      expect(response.status).toBe(200)
+      expect(response.body).toHaveProperty('title', 'Editado por Admin')
+    })
+  })
+
+  describe('DELETE /devotionals/:id', () => {
+    it('deve deletar devocional com sucesso', async () => {
+      // Criar devocional para deletar
+      const devotional = await prisma.devotional.create({
+        data: {
+          title: 'Devocional para Deletar',
+          passage: 'João 3:16',
+          content: 'Conteúdo',
+          authorId: memberId,
+          branchId,
+        },
+      })
+      const devotionalId = devotional.id
+      const response = await request(app.server)
+        .delete(`/devotionals/${devotionalId}`)
+        .set('Authorization', `Bearer ${userToken}`)
+
+      expect(response.status).toBe(200)
+      expect(response.body).toHaveProperty('message', 'Devocional deletado com sucesso')
+
+      // Verificar se foi deletado
+      const deleted = await prisma.devotional.findUnique({
+        where: { id: devotionalId },
+      })
+      expect(deleted).toBeNull()
+    })
+
+    it('deve deletar likes associados ao devocional', async () => {
+      // Criar devocional para deletar
+      const devotional = await prisma.devotional.create({
+        data: {
+          title: 'Devocional para Deletar',
+          passage: 'João 3:16',
+          content: 'Conteúdo',
+          authorId: memberId,
+          branchId,
+        },
+      })
+      const devotionalId = devotional.id
+
+      // Criar like
+      await prisma.devotionalLike.create({
+        data: {
+          devotionalId,
+          userId: memberId,
+        },
+      })
+
+      const response = await request(app.server)
+        .delete(`/devotionals/${devotionalId}`)
+        .set('Authorization', `Bearer ${userToken}`)
+
+      expect(response.status).toBe(200)
+
+      // Verificar se likes foram deletados
+      const likes = await prisma.devotionalLike.findMany({
+        where: { devotionalId },
+      })
+      expect(likes.length).toBe(0)
+    })
+
+    it('deve retornar 404 quando devocional não existe', async () => {
+      const fakeId = 'clx123456789012345678901234'
+      const response = await request(app.server)
+        .delete(`/devotionals/${fakeId}`)
+        .set('Authorization', `Bearer ${userToken}`)
+
+      expect(response.status).toBe(404)
+      expect(response.body.message).toBe('Devocional não encontrado.')
+    })
+
+    it('deve retornar 403 quando usuário não é o autor e não tem permissão', async () => {
+      // Criar devocional para deletar
+      const devotional = await prisma.devotional.create({
+        data: {
+          title: 'Devocional para Deletar',
+          passage: 'João 3:16',
+          content: 'Conteúdo',
+          authorId: memberId,
+          branchId,
+        },
+      })
+      const devotionalId = devotional.id
+      // Criar outro membro sem permissão
+      const otherUser = await prisma.user.create({
+        data: {
+          name: 'Other User',
+          email: 'other2@test.com',
+          password: await bcrypt.hash('password123', 10),
+        },
+      })
+
+      const otherMember = await prisma.member.create({
+        data: {
+          name: 'Other Member',
+          email: 'othermember2@test.com',
+          branchId,
+          role: 'MEMBER',
+          userId: otherUser.id,
+        },
+      })
+
+      const otherToken = app.jwt.sign({
+        sub: otherUser.id,
+        email: otherUser.email,
+        name: otherUser.name,
+        type: 'member',
+        id: otherUser.id,
+        userId: otherUser.id,
+        memberId: otherMember.id,
+        role: otherMember.role,
+        branchId: otherMember.branchId,
+        churchId: null,
+        permissions: [],
+      })
+
+      const response = await request(app.server)
+        .delete(`/devotionals/${devotionalId}`)
+        .set('Authorization', `Bearer ${otherToken}`)
+
+      expect(response.status).toBe(403)
+      // O middleware pode retornar "Acesso negado" ou a mensagem do controller
+      expect(response.body.message || response.body.error).toBeDefined()
+    })
+  })
 })
 
