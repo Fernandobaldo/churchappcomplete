@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Church, Building2, Users } from 'lucide-react'
+import OnboardingHeader from '../../components/OnboardingHeader'
 
 type StructureType = 'simple' | 'branches' | 'existing' | null
 
@@ -25,7 +26,9 @@ export default function Start() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-8">
+    <div className="min-h-screen bg-gray-50">
+      <OnboardingHeader />
+      <div className="flex items-center justify-center px-4 py-8">
       <div className="max-w-4xl w-full">
         <div className="bg-white rounded-lg shadow-lg p-8 md:p-12">
           <div className="mb-8 text-center">
@@ -174,6 +177,7 @@ export default function Start() {
             </button>
           </div>
         </div>
+      </div>
       </div>
     </div>
   )

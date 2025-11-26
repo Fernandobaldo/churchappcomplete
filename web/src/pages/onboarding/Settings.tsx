@@ -2,11 +2,14 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { CheckCircle, Calendar, Heart, DollarSign, BookOpen, Users } from 'lucide-react'
+import OnboardingHeader from '../../components/OnboardingHeader'
+import { useAuthStore } from '../../stores/authStore'
 
 type Step = 1 | 2 | 3
 
 export default function Settings() {
   const navigate = useNavigate()
+  const { user } = useAuthStore()
   const [currentStep, setCurrentStep] = useState<Step>(1)
   const [loading, setLoading] = useState(false)
   const [rolesCreated, setRolesCreated] = useState(false)
@@ -55,6 +58,13 @@ export default function Settings() {
       if (emails.length > 0) {
         toast.success(`${emails.length} convite(s) será(ão) enviado(s)!`)
       }
+      
+      // Verifica se o token tem branchId e role antes de navegar
+      if (!user?.branchId || !user?.role) {
+        console.warn('⚠️ Token não tem branchId/role. O ProtectedRoute redirecionará se necessário.')
+        toast.info('Finalizando configuração...')
+      }
+      
       // Finaliza onboarding
       navigate('/app/dashboard')
     } catch (error) {
@@ -215,7 +225,9 @@ export default function Settings() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-8">
+    <div className="min-h-screen bg-gray-50">
+      <OnboardingHeader />
+      <div className="flex items-center justify-center px-4 py-8">
       <div className="max-w-4xl w-full">
         <div className="bg-white rounded-lg shadow-lg p-8">
           {/* Progress Steps */}
@@ -260,6 +272,7 @@ export default function Settings() {
           {/* Step Content */}
           <div className="min-h-[400px]">{renderStepContent()}</div>
         </div>
+      </div>
       </div>
     </div>
   )

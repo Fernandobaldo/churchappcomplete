@@ -40,14 +40,20 @@ export async function debugSeed() {
       email: member.email,
       name: member.name,
       role: member.role,
-      hasPassword: !!member.password,
-      passwordLength: member.password?.length,
+      userId: member.userId,
       permissionsCount: member.Permission?.length || 0,
     })
     
-    // Testar senha
-    const passwordMatch = await bcrypt.compare('password123', member.password)
-    console.log('🔑 Senha "password123" corresponde:', passwordMatch)
+    // NOVO MODELO: Member não tem senha, usa senha do User associado
+    if (member.userId) {
+      const memberUser = await prisma.user.findUnique({
+        where: { id: member.userId },
+      })
+      if (memberUser) {
+        const passwordMatch = await bcrypt.compare('password123', memberUser.password)
+        console.log('🔑 Senha "password123" do User associado corresponde:', passwordMatch)
+      }
+    }
   } else {
     console.log('❌ Member NÃO encontrado')
   }

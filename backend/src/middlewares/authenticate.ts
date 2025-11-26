@@ -1,6 +1,7 @@
 import { FastifyRequest, FastifyReply } from 'fastify'
 import jwt from 'jsonwebtoken'
 import dotenv from 'dotenv'
+import { env } from '../env'
 
 // Carrega .env.test se estiver em ambiente de teste
 if (process.env.NODE_ENV === 'test' || process.env.VITEST) {
@@ -9,11 +10,9 @@ if (process.env.NODE_ENV === 'test' || process.env.VITEST) {
   dotenv.config()
 }
 
-// Em testes, usa o mesmo secret que os testes estão usando
-// Em produção, usa o JWT_SECRET do .env
-const JWT_SECRET = (process.env.NODE_ENV === 'test' || process.env.VITEST) 
-  ? (process.env.JWT_SECRET || 'churchapp-secret-key')
-  : (process.env.JWT_SECRET || 'secret_dev_key')
+// Usa o mesmo JWT_SECRET que o fastifyJwt está usando (vem de env.ts)
+// Isso garante que tokens criados com request.server.jwt.sign() sejam validados corretamente
+const JWT_SECRET = env.JWT_SECRET
 
 export async function authenticate(request: FastifyRequest, reply: FastifyReply) {
   const authHeader = request.headers.authorization
@@ -30,11 +29,13 @@ export async function authenticate(request: FastifyRequest, reply: FastifyReply)
       sub: string
       userId?: string
       email: string
+      name?: string
       type?: 'user' | 'member'
       permissions?: string[]
-      role?: string
-      branchId?: string
-      memberId?: string
+      role?: string | null
+      branchId?: string | null
+      memberId?: string | null
+      churchId?: string | null
     }
 
     request.user = {
@@ -46,6 +47,7 @@ export async function authenticate(request: FastifyRequest, reply: FastifyReply)
       role: payload.role || null,
       branchId: payload.branchId || null,
       memberId: payload.memberId || null,
+      churchId: payload.churchId || null,
     }
   } catch (error: any) {
     // Debug em ambiente de teste
@@ -69,6 +71,7 @@ declare module 'fastify' {
       role: string | null
       branchId: string | null
       memberId: string | null
+      churchId: string | null
     }
   }
 }

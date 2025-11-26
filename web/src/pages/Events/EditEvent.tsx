@@ -35,7 +35,9 @@ export default function EditEvent() {
       const event = response.data
       setValue('title', event.title)
       setValue('description', event.description || '')
-      setValue('date', new Date(event.date).toISOString().slice(0, 16))
+      // Usa startDate se disponível, senão usa date (compatibilidade)
+      const eventDate = event.startDate || event.date
+      setValue('date', eventDate ? new Date(eventDate).toISOString().slice(0, 16) : '')
       setValue('location', event.location)
       setValue('hasDonation', event.hasDonation || false)
       setValue('donationLink', event.donationLink || '')
@@ -43,15 +45,23 @@ export default function EditEvent() {
       setValue('imageUrl', event.imageUrl || '')
     } catch (error) {
       toast.error('Erro ao carregar evento')
-      navigate('/events')
+      navigate('/app/events')
     }
   }
 
   const onSubmit = async (data: EventForm) => {
     try {
-      await api.put(`/events/${id}`, data)
+      // Converte date (datetime-local) para startDate e endDate (ISO)
+      const dateValue = data.date ? new Date(data.date).toISOString() : ''
+      
+      await api.put(`/events/${id}`, {
+        ...data,
+        startDate: dateValue,
+        endDate: dateValue, // Por padrão, usa a mesma data para início e fim
+        date: undefined, // Remove o campo date
+      })
       toast.success('Evento atualizado com sucesso!')
-      navigate(`/events/${id}`)
+      navigate(`/app/events/${id}`)
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Erro ao atualizar evento')
     }
@@ -60,7 +70,7 @@ export default function EditEvent() {
   return (
     <div className="space-y-6">
       <button
-        onClick={() => navigate(`/events/${id}`)}
+        onClick={() => navigate(`/app/events/${id}`)}
         className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
       >
         <ArrowLeft className="w-5 h-5" />
@@ -175,7 +185,7 @@ export default function EditEvent() {
           <div className="flex gap-4 pt-4">
             <button
               type="button"
-              onClick={() => navigate(`/events/${id}`)}
+              onClick={() => navigate(`/app/events/${id}`)}
               className="btn-secondary flex-1"
             >
               Cancelar

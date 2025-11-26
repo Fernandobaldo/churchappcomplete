@@ -36,7 +36,7 @@ export default function MemberDetails() {
       setMember(response.data)
     } catch (error) {
       toast.error('Erro ao carregar membro')
-      navigate('/members')
+      navigate('/app/members')
     } finally {
       setLoading(false)
     }
@@ -99,7 +99,7 @@ export default function MemberDetails() {
           </div>
           {canManagePermissions && (
             <button
-              onClick={() => navigate(`/permissions?memberId=${member.id}`)}
+              onClick={() => navigate(`/app/permissions?memberId=${member.id}`)}
               className="btn-secondary flex items-center gap-2"
             >
               <Shield className="w-4 h-4" />

@@ -26,7 +26,7 @@ export default function AddMember() {
     try {
       await api.post('/register', data)
       toast.success('Membro criado com sucesso!')
-      navigate('/members')
+      navigate('/app/members')
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Erro ao criar membro')
     }
@@ -35,7 +35,8 @@ export default function AddMember() {
   return (
     <div className="space-y-6">
       <button
-        onClick={() => navigate('/members')}
+        data-testid="back-button"
+        onClick={() => navigate('/app/members')}
         className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
       >
         <ArrowLeft className="w-5 h-5" />
@@ -51,6 +52,7 @@ export default function AddMember() {
               Nome *
             </label>
             <input
+              data-testid="name-input"
               {...register('name', { required: 'Nome é obrigatório' })}
               className="input"
               placeholder="Nome completo"
@@ -66,6 +68,7 @@ export default function AddMember() {
                 Email *
               </label>
               <input
+                data-testid="email-input"
                 type="email"
                 {...register('email', { required: 'Email é obrigatório' })}
                 className="input"
@@ -81,6 +84,7 @@ export default function AddMember() {
                 Senha *
               </label>
               <input
+                data-testid="password-input"
                 type="password"
                 {...register('password', { required: 'Senha é obrigatória', minLength: 6 })}
                 className="input"
@@ -133,6 +137,7 @@ export default function AddMember() {
               Função *
             </label>
             <select
+              data-testid="role-select"
               {...register('role', { required: 'Função é obrigatória' })}
               className="input"
             >
@@ -148,13 +153,14 @@ export default function AddMember() {
 
           <div className="flex gap-4 pt-4">
             <button
+              data-testid="cancel-button"
               type="button"
-              onClick={() => navigate('/members')}
+              onClick={() => navigate('/app/members')}
               className="btn-secondary flex-1"
             >
               Cancelar
             </button>
-            <button type="submit" className="btn-primary flex-1">
+            <button data-testid="submit-button" type="submit" className="btn-primary flex-1">
               Criar Membro
             </button>
           </div>

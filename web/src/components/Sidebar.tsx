@@ -11,13 +11,13 @@ import {
 import { useAuthStore } from '../stores/authStore'
 
 const menuItems = [
-  { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { path: '/events', icon: Calendar, label: 'Eventos' },
-  { path: '/contributions', icon: Heart, label: 'Contribuições' },
-  { path: '/devotionals', icon: BookOpen, label: 'Devocionais' },
-  { path: '/members', icon: Users, label: 'Membros' },
-  { path: '/permissions', icon: Shield, label: 'Permissões' },
-  { path: '/profile', icon: User, label: 'Perfil' },
+  { path: '/app/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+  { path: '/app/events', icon: Calendar, label: 'Eventos' },
+  { path: '/app/contributions', icon: Heart, label: 'Contribuições' },
+  { path: '/app/devotionals', icon: BookOpen, label: 'Devocionais' },
+  { path: '/app/members', icon: Users, label: 'Membros' },
+  { path: '/app/permissions', icon: Shield, label: 'Permissões' },
+  { path: '/app/profile', icon: User, label: 'Perfil' },
 ]
 
 export default function Sidebar() {
@@ -25,7 +25,7 @@ export default function Sidebar() {
   const permissions = user?.permissions?.map((p) => p.type) || []
 
   const filteredMenuItems = menuItems.filter((item) => {
-    if (item.path === '/permissions') {
+    if (item.path === '/app/permissions') {
       return permissions.includes('MANAGE_PERMISSIONS') || user?.role === 'ADMINGERAL'
     }
     return true

@@ -36,82 +36,197 @@ export class AuthService {
       console.error('[AUTH DEBUG] Erro ao conectar Prisma:', error)
     }
     
-    const member = await prisma.member.findUnique({
-      where: { email },
-      include: { Permission: true },
-    })
-
-    if (member) {
-      if (process.env.NODE_ENV === 'test' || process.env.VITEST) {
-        console.log(`[AUTH DEBUG] ✅ Member encontrado: ${member.email} (ID: ${member.id})`)
-      }
-      const passwordMatch = await bcrypt.compare(password, member.password)
-      if (process.env.NODE_ENV === 'test' || process.env.VITEST) {
-        console.log(`[AUTH DEBUG] 🔑 Senha do member corresponde: ${passwordMatch}`)
-      }
-      if (passwordMatch) {
-        return { type: 'member', data: member }
-      }
-    } else {
-      if (process.env.NODE_ENV === 'test' || process.env.VITEST) {
-        console.log(`[AUTH DEBUG] ❌ Member NÃO encontrado para: ${email}`)
-        // Lista todos os members para debug
-        const allMembers = await prisma.member.findMany({ select: { email: true } })
-        console.log(`[AUTH DEBUG] Members no banco:`, allMembers?.map(m => m.email) || [])
-      }
-    }
-
-    // Tenta validar como User (Admin SaaS)
+    // NOVO MODELO: Sempre valida como User primeiro
     const user = await prisma.user.findUnique({
       where: { email },
+      include: {
+        Member: {
+          include: {
+            Permission: true,
+            Branch: {
+              include: {
+                Church: true,
+              },
+            },
+          },
+        },
+      },
     })
 
-    if (user) {
-      if (process.env.NODE_ENV === 'test' || process.env.VITEST) {
-        console.log(`[AUTH DEBUG] ✅ User encontrado: ${user.email} (ID: ${user.id})`)
-      }
-      const passwordMatch = await bcrypt.compare(password, user.password)
-      if (process.env.NODE_ENV === 'test' || process.env.VITEST) {
-        console.log(`[AUTH DEBUG] 🔑 Senha do user corresponde: ${passwordMatch}`)
-      }
-      if (passwordMatch) {
-        return { type: 'user', data: user }
-      }
-    } else {
+    if (!user) {
       if (process.env.NODE_ENV === 'test' || process.env.VITEST) {
         console.log(`[AUTH DEBUG] ❌ User NÃO encontrado para: ${email}`)
-        // Lista todos os users para debug
-        const allUsers = await prisma.user.findMany({ select: { email: true } })
-        console.log(`[AUTH DEBUG] Users no banco:`, allUsers?.map(u => u.email) || [])
       }
+      return null
     }
 
     if (process.env.NODE_ENV === 'test' || process.env.VITEST) {
-      console.log(`[AUTH DEBUG] ❌ Nenhuma credencial válida encontrada`)
+      console.log(`[AUTH DEBUG] ✅ User encontrado: ${user.email} (ID: ${user.id})`)
+      console.log(`[AUTH DEBUG] User.Member existe: ${!!user.Member}`)
+      if (user.Member) {
+        console.log(`[AUTH DEBUG] User.Member.id: ${user.Member.id}`)
+      }
     }
-    return null
+
+    // Debug adicional: Se o Member não foi carregado, tenta buscar manualmente
+    if (!user.Member && (process.env.NODE_ENV === 'test' || process.env.VITEST)) {
+      console.log(`[AUTH DEBUG] ⚠️ Member não foi carregado no include, buscando manualmente...`)
+      const memberCheck = await prisma.member.findFirst({
+        where: { userId: user.id },
+        include: {
+          Permission: true,
+          Branch: {
+            include: {
+              Church: true,
+            },
+          },
+        },
+      })
+      if (memberCheck) {
+        console.log(`[AUTH DEBUG] ✅ Member encontrado manualmente! userId=${user.id}, memberId=${memberCheck.id}, role=${memberCheck.role}`)
+        // Atualiza o user com o Member encontrado
+        (user as any).Member = memberCheck
+      } else {
+        // Tenta buscar por email também
+        const memberByEmail = await prisma.member.findUnique({
+          where: { email: user.email },
+          include: {
+            Permission: true,
+            Branch: {
+              include: {
+                Church: true,
+              },
+            },
+          },
+        })
+        if (memberByEmail) {
+          console.log(`[AUTH DEBUG] ✅ Member encontrado por email! email=${user.email}, memberId=${memberByEmail.id}, userId=${memberByEmail.userId}`)
+          if (memberByEmail.userId !== user.id) {
+            console.log(`[AUTH DEBUG] ⚠️ ATENÇÃO: Member.userId (${memberByEmail.userId}) não corresponde ao User.id (${user.id})!`)
+          }
+          (user as any).Member = memberByEmail
+        } else {
+          console.log(`[AUTH DEBUG] ❌ Member NÃO encontrado no banco para userId=${user.id} ou email=${user.email}`)
+        }
+      }
+    }
+
+    // Valida senha do User
+    const passwordMatch = await bcrypt.compare(password, user.password)
+    if (process.env.NODE_ENV === 'test' || process.env.VITEST) {
+      console.log(`[AUTH DEBUG] 🔑 Senha do user corresponde: ${passwordMatch}`)
+    }
+
+    if (!passwordMatch) {
+      return null
+    }
+
+    // Se User tem Member associado, retorna dados do Member
+    if (user.Member) {
+      if (process.env.NODE_ENV === 'test' || process.env.VITEST) {
+        console.log(`[AUTH DEBUG] ✅ Member associado encontrado: ${user.Member.id} (Role: ${user.Member.role})`)
+        console.log(`[AUTH DEBUG] Member tem Branch: ${!!user.Member.Branch}, tem Permission: ${!!user.Member.Permission}`)
+        console.log(`[AUTH DEBUG] Member Branch ID: ${user.Member.Branch?.id}, Church ID: ${user.Member.Branch?.Church?.id}`)
+      }
+      return {
+        type: 'member' as const,
+        user,
+        member: user.Member,
+      }
+    }
+
+    // Se não tem Member, retorna apenas User
+    if (process.env.NODE_ENV === 'test' || process.env.VITEST) {
+      console.log(`[AUTH DEBUG] ⚠️ User sem Member associado (user.Member é ${user.Member})`)
+      // Verifica se há Member no banco com esse userId
+      const memberCheck = await prisma.member.findFirst({
+        where: { userId: user.id },
+      })
+      if (memberCheck) {
+        console.log(`[AUTH DEBUG] ⚠️ ATENÇÃO: Member existe no banco com userId=${user.id}, mas não foi carregado no include!`)
+      }
+    }
+    return {
+      type: 'user' as const,
+      user,
+      member: null,
+    }
   }
 
- async login(email: string, password: string) {
-   const result = await this.validateCredentials(email, password)
-   if (!result) throw new Error('Credenciais inválidas')
+  async login(email: string, password: string) {
+    const result = await this.validateCredentials(email, password)
+    if (!result) throw new Error('Credenciais inválidas')
 
-   const { type, data } = result
+    const { type, user, member } = result
 
-   const token = jwt.sign(
-     {
-       sub: data.id,
-       email: data.email,
-       type,
-       permissions: type === 'member' ? (data as any).Permission?.map((p: any) => p.type) || [] : [],
-     },
-     JWT_SECRET,
-     { expiresIn: '7d' }
-   )
- // Remove a senha do objeto retornado
-  const { password: _, ...sanitizedUser } = data
+    if (process.env.NODE_ENV === 'test' || process.env.VITEST) {
+      console.log(`[AUTH LOGIN] Type: ${type}, Member existe: ${!!member}, Member ID: ${member?.id}`)
+    }
 
-  return { token, user: sanitizedUser, type }
+    // Monta payload do token
+    const tokenPayload: any = {
+      sub: user.id,
+      email: user.email,
+      name: user.name,
+      type: type,
+    }
 
- }
- }
+    // Se tem Member, adiciona contexto da igreja
+    if (member) {
+      // member vem de user.Member que já tem as relações carregadas
+      tokenPayload.memberId = member.id
+      tokenPayload.role = member.role
+      tokenPayload.branchId = member.branchId
+      tokenPayload.churchId = member.Branch?.Church?.id || null
+      tokenPayload.permissions = member.Permission?.map(p => p.type) || []
+      
+      if (process.env.NODE_ENV === 'test' || process.env.VITEST) {
+        console.log(`[AUTH LOGIN] ✅ Member encontrado: ID=${member.id}, Role=${member.role}, Branch=${member.branchId}`)
+      }
+    } else {
+      // Quando não há Member, omite campos de Member do payload (não inclui)
+      // Isso indica que o onboarding não foi completado
+      tokenPayload.permissions = [] // Sempre array vazio, nunca undefined
+      
+      if (process.env.NODE_ENV === 'test' || process.env.VITEST) {
+        console.log(`[AUTH LOGIN] ⚠️ User sem Member associado`)
+      }
+    }
+
+    const token = jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: '7d' })
+
+    // Monta resposta
+    const responseUser: any = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+    }
+
+    if (member) {
+      // Garante que memberId está sempre presente quando há member
+      responseUser.memberId = member.id
+      responseUser.role = member.role
+      responseUser.branchId = member.branchId
+      responseUser.churchId = member.Branch?.Church?.id || null
+      // Permissions deve ser array de objetos { type: string } ou array vazio
+      responseUser.permissions = member.Permission?.map(p => ({ type: p.type })) || []
+      
+      if (process.env.NODE_ENV === 'test' || process.env.VITEST) {
+        console.log(`[AUTH LOGIN] ✅ ResponseUser com Member: memberId=${responseUser.memberId}, role=${responseUser.role}`)
+      }
+    } else {
+      // Garante que sempre retorna array vazio para User sem Member
+      responseUser.permissions = []
+      
+      if (process.env.NODE_ENV === 'test' || process.env.VITEST) {
+        console.log(`[AUTH LOGIN] ⚠️ ResponseUser sem Member`)
+      }
+    }
+
+    return {
+      token,
+      type,
+      user: responseUser,
+    }
+  }
+}

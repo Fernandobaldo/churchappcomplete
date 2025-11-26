@@ -72,7 +72,7 @@ export default function Contributions() {
           <h1 className="text-3xl font-bold text-gray-900">Contribuições</h1>
           <p className="text-gray-600 mt-1">Gerencie as contribuições da igreja</p>
         </div>
-        <button onClick={() => navigate('/contributions/new')} className="btn-primary flex items-center gap-2">
+        <button onClick={() => navigate('/app/contributions/new')} className="btn-primary flex items-center gap-2">
           <Plus className="w-5 h-5" />
           Nova Contribuição
         </button>
@@ -126,7 +126,7 @@ export default function Contributions() {
         <div className="card text-center py-12">
           <Heart className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <p className="text-gray-600 mb-4">Nenhuma contribuição cadastrada</p>
-          <button onClick={() => navigate('/contributions/new')} className="btn-primary">
+          <button onClick={() => navigate('/app/contributions/new')} className="btn-primary">
             Adicionar Primeira Contribuição
           </button>
         </div>
@@ -168,7 +168,7 @@ export default function Contributions() {
                     </td>
                     <td className="py-3 px-4">
                       <button
-                        onClick={() => navigate(`/contributions/${contribution.id}`)}
+                        onClick={() => navigate(`/app/contributions/${contribution.id}`)}
                         className="text-primary hover:underline text-sm"
                       >
                         Ver Detalhes

@@ -119,23 +119,50 @@ export async function seedTestDatabase() {
   })
   }
 
-  // Busca ou cria um membro com senha
+  // NOVO MODELO: Cria User para o Member primeiro
+  let memberUser = await prisma.user.findUnique({
+    where: { email: 'member@example.com' },
+  })
+
+  if (!memberUser) {
+    try {
+      memberUser = await prisma.user.create({
+        data: {
+          name: 'Membro Teste',
+          email: 'member@example.com',
+          password: await bcrypt.hash('password123', 10),
+        },
+      })
+      console.log('[SEED] ✅ User para Member criado:', memberUser.email)
+    } catch (error: any) {
+      if (error.code === 'P2002') {
+        memberUser = await prisma.user.findUnique({
+          where: { email: 'member@example.com' },
+        })
+        console.log('[SEED] ⚠️ User para Member já existia, usando existente:', memberUser?.email)
+      } else {
+        throw error
+      }
+    }
+  }
+
+  // Busca ou cria um membro associado ao User (SEM senha - usa senha do User)
   let member = await prisma.member.findUnique({
     where: { email: 'member@example.com' },
   })
 
-  if (!member) {
+  if (!member && memberUser) {
     try {
       member = await prisma.member.create({
-    data: {
-      name: 'Membro Teste',
-      email: 'member@example.com',
-      password: await bcrypt.hash('password123', 10),
-      role: 'ADMINGERAL',
-      branchId: branch.id,
-    },
-  })
-      console.log('[SEED] ✅ Member criado:', member.email)
+        data: {
+          name: 'Membro Teste',
+          email: 'member@example.com',
+          role: 'ADMINGERAL',
+          branchId: branch.id,
+          userId: memberUser.id, // Associa ao User
+        },
+      })
+      console.log('[SEED] ✅ Member criado (sem senha, associado ao User):', member.email)
     } catch (error: any) {
       // Se falhar por constraint, tenta buscar novamente
       if (error.code === 'P2002') {
@@ -148,7 +175,7 @@ export async function seedTestDatabase() {
       }
     }
   } else {
-    console.log('[SEED] ⚠️ Member já existia, usando existente:', member.email)
+    console.log('[SEED] ⚠️ Member já existia, usando existente:', member?.email)
   }
 
   // Verifica se os dados foram realmente salvos

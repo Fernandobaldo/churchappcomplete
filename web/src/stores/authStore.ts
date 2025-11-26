@@ -19,6 +19,8 @@ type DecodedToken = {
   email: string
   role?: string | null
   branchId?: string | null
+  memberId?: string | null
+  churchId?: string | null
   permissions?: string[]
   sub: string
   iat: number

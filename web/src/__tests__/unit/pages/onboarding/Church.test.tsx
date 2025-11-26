@@ -124,10 +124,23 @@ describe('Church - Criação de Igreja', () => {
     })
   })
 
-  it('deve carregar dados da igreja existente', async () => {
+  it('deve carregar dados da igreja existente quando usuário tem branchId', async () => {
     const mockChurches = [
-      { id: 'church-123', name: 'Igreja Existente', logoUrl: 'https://example.com/logo.png' },
+      { 
+        id: 'church-123', 
+        name: 'Igreja Existente', 
+        logoUrl: 'https://example.com/logo.png',
+        Branch: [{ id: 'branch-123', name: 'Sede' }],
+      },
     ]
+
+    ;(useAuthStore as any).mockReturnValue({
+      user: { 
+        id: 'user-123', 
+        email: 'test@example.com',
+        branchId: 'branch-123',
+      },
+    })
 
     vi.mocked(api.get).mockResolvedValue({ data: mockChurches })
 
@@ -144,6 +157,75 @@ describe('Church - Criação de Igreja', () => {
     await waitFor(() => {
       const nameInput = screen.getByLabelText(/nome da igreja/i) as HTMLInputElement
       expect(nameInput.value).toBe('Igreja Existente')
+    })
+  })
+
+  it('não deve carregar dados quando usuário não tem igreja configurada (array vazio)', async () => {
+    ;(useAuthStore as any).mockReturnValue({
+      user: { 
+        id: 'user-123', 
+        email: 'test@example.com',
+        branchId: null,
+      },
+    })
+
+    vi.mocked(api.get).mockResolvedValue({ data: [] })
+
+    render(
+      <MemoryRouter>
+        <Church />
+      </MemoryRouter>
+    )
+
+    await waitFor(() => {
+      expect(api.get).toHaveBeenCalledWith('/churches')
+    })
+
+    // O formulário deve estar vazio
+    await waitFor(() => {
+      const nameInput = screen.getByLabelText(/nome da igreja/i) as HTMLInputElement
+      expect(nameInput.value).toBe('')
+    })
+  })
+
+  it('deve usar a igreja correta do usuário quando há múltiplas igrejas', async () => {
+    const mockChurches = [
+      { 
+        id: 'church-other', 
+        name: 'Igreja de Outro Usuário',
+        Branch: [{ id: 'branch-other', name: 'Sede' }],
+      },
+      { 
+        id: 'church-123', 
+        name: 'Igreja do Usuário',
+        Branch: [{ id: 'branch-123', name: 'Sede' }],
+      },
+    ]
+
+    ;(useAuthStore as any).mockReturnValue({
+      user: { 
+        id: 'user-123', 
+        email: 'test@example.com',
+        branchId: 'branch-123',
+      },
+    })
+
+    vi.mocked(api.get).mockResolvedValue({ data: mockChurches })
+
+    render(
+      <MemoryRouter>
+        <Church />
+      </MemoryRouter>
+    )
+
+    await waitFor(() => {
+      expect(api.get).toHaveBeenCalledWith('/churches')
+    })
+
+    // Deve carregar a igreja correta (a que tem a branch do usuário)
+    await waitFor(() => {
+      const nameInput = screen.getByLabelText(/nome da igreja/i) as HTMLInputElement
+      expect(nameInput.value).toBe('Igreja do Usuário')
     })
   })
 })

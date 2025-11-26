@@ -18,7 +18,7 @@ export default function AddDevotional() {
     try {
       await api.post('/devotionals', data)
       toast.success('Devocional criado com sucesso!')
-      navigate('/devotionals')
+      navigate('/app/devotionals')
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Erro ao criar devocional')
     }
@@ -27,7 +27,8 @@ export default function AddDevotional() {
   return (
     <div className="space-y-6">
       <button
-        onClick={() => navigate('/devotionals')}
+        data-testid="back-button"
+        onClick={() => navigate('/app/devotionals')}
         className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
       >
         <ArrowLeft className="w-5 h-5" />
@@ -43,6 +44,7 @@ export default function AddDevotional() {
               Título *
             </label>
             <input
+              data-testid="title-input"
               {...register('title', { required: 'Título é obrigatório' })}
               className="input"
               placeholder="Ex: A importância da oração"
@@ -57,6 +59,7 @@ export default function AddDevotional() {
               Passagem Bíblica *
             </label>
             <input
+              data-testid="passage-input"
               {...register('passage', { required: 'Passagem bíblica é obrigatória' })}
               className="input"
               placeholder="Ex: João 3:16"
@@ -71,6 +74,7 @@ export default function AddDevotional() {
               Conteúdo *
             </label>
             <textarea
+              data-testid="content-input"
               {...register('content', { required: 'Conteúdo é obrigatório' })}
               className="input"
               rows={12}
@@ -83,13 +87,14 @@ export default function AddDevotional() {
 
           <div className="flex gap-4 pt-4">
             <button
+              data-testid="cancel-button"
               type="button"
-              onClick={() => navigate('/devotionals')}
+              onClick={() => navigate('/app/devotionals')}
               className="btn-secondary flex-1"
             >
               Cancelar
             </button>
-            <button type="submit" className="btn-primary flex-1">
+            <button data-testid="submit-button" type="submit" className="btn-primary flex-1">
               Criar Devocional
             </button>
           </div>

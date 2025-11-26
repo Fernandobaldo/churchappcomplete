@@ -1,0 +1,138 @@
+// Atualização para suportar soft delete para usuários comuns e hard delete para admin do SaaS
+import { prisma } from '../lib/prisma';
+import { Role } from '@prisma/client';
+import { ALL_PERMISSION_TYPES } from '../constants/permissions';
+export class ChurchService {
+    async createChurchWithMainBranch(data, user) {
+        return await prisma.$transaction(async (tx) => {
+            const church = await tx.church.create({
+                data: {
+                    name: data.name,
+                    logoUrl: data.logoUrl,
+                    isActive: true,
+                },
+            });
+            let branch = null;
+            let member = null;
+            // Só cria branch e member se withBranch não for false
+            if (data.withBranch !== false) {
+                branch = await tx.branch.create({
+                    data: {
+                        name: data.branchName || 'Sede',
+                        churchId: church.id,
+                        isMainBranch: true,
+                    },
+                });
+                // Verifica se já existe um Member com esse email
+                let existingMember = await tx.member.findUnique({
+                    where: { email: user.email },
+                });
+                if (existingMember) {
+                    // Se já existe, atualiza para associar à nova branch e role
+                    member = await tx.member.update({
+                        where: { id: existingMember.id },
+                        data: {
+                            role: Role.ADMINGERAL,
+                            branchId: branch.id,
+                            userId: user.id,
+                        },
+                    });
+                }
+                else {
+                    // Se não existe, cria novo Member (sem senha - usa senha do User)
+                    member = await tx.member.create({
+                        data: {
+                            name: user.name,
+                            email: user.email,
+                            role: Role.ADMINGERAL,
+                            branchId: branch.id,
+                            userId: user.id,
+                        },
+                    });
+                }
+                // Cria as permissões diretamente para o member (apenas se não existirem)
+                // Permission tem memberId obrigatório, então não pode existir sem um member
+                await tx.permission.createMany({
+                    data: ALL_PERMISSION_TYPES.map((type) => ({
+                        memberId: member.id,
+                        type,
+                    })),
+                    skipDuplicates: true,
+                });
+            }
+            return {
+                church,
+                branch,
+                member,
+            };
+        });
+    }
+    async getAllChurches(userBranchId) {
+        // Se o usuário tem branchId, retorna apenas a igreja da branch do usuário
+        if (userBranchId) {
+            const branch = await prisma.branch.findUnique({
+                where: { id: userBranchId },
+                include: {
+                    Church: {
+                        include: {
+                            Branch: true,
+                        },
+                    },
+                },
+            });
+            if (branch?.Church) {
+                return [branch.Church];
+            }
+            // Se não encontrou a branch, retorna array vazio
+            return [];
+        }
+        // Se não tem branchId, significa que o usuário não tem igreja configurada
+        // Retorna array vazio em vez de todas as igrejas
+        return [];
+    }
+    async getChurchById(id) {
+        return prisma.church.findUnique({
+            where: { id },
+            include: {
+                Branch: true,
+            },
+        });
+    }
+    async updateChurch(id, data) {
+        return prisma.church.update({
+            where: { id },
+            data: {
+                name: data.name,
+                logoUrl: data.logoUrl,
+            },
+        });
+    }
+    // Soft delete para usuários normais
+    async deactivateChurch(id) {
+        return prisma.church.update({
+            where: { id },
+            data: { isActive: false },
+        });
+    }
+    // Hard delete apenas para admin do SaaS
+    async deleteChurch(id) {
+        return prisma.$transaction(async (tx) => {
+            // Apaga membros relacionados a branches da igreja
+            const branches = await tx.branch.findMany({
+                where: { churchId: id },
+            });
+            for (const branch of branches) {
+                await tx.member.deleteMany({ where: { branchId: branch.id } });
+            }
+            // Apaga branches da igreja
+            await tx.branch.deleteMany({ where: { churchId: id } });
+            // Apaga a igreja
+            return await tx.church.delete({ where: { id } });
+        });
+    }
+    async getUserData(userId) {
+        return prisma.user.findUnique({
+            where: { id: userId },
+        });
+    }
+}

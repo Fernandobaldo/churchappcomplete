@@ -6,11 +6,10 @@ import Login from '@/pages/Login'
 import api from '@/api/api'
 import { useAuthStore } from '@/stores/authStore'
 import { mockDecodedToken } from '@/test/mocks/mockData'
+import { jwtDecode } from 'jwt-decode'
 
 vi.mock('@/api/api')
-vi.mock('jwt-decode', () => ({
-  jwtDecode: vi.fn(() => mockDecodedToken),
-}))
+vi.mock('jwt-decode')
 
 describe('Login Integration', () => {
   beforeEach(() => {
@@ -18,7 +17,7 @@ describe('Login Integration', () => {
     vi.clearAllMocks()
   })
 
-  it('deve fazer login com sucesso e redirecionar', async () => {
+  it('deve fazer login com sucesso e redirecionar para dashboard quando onboarding completo', async () => {
     const user = userEvent.setup()
     const mockToken = 'valid-jwt-token'
     const mockResponse = {
@@ -31,6 +30,13 @@ describe('Login Integration', () => {
         type: 'member',
       },
     }
+
+    // Mock do token com onboarding completo
+    vi.mocked(jwtDecode).mockReturnValue({
+      ...mockDecodedToken,
+      branchId: 'branch-123',
+      role: 'ADMINGERAL',
+    } as any)
 
     vi.mocked(api.post).mockResolvedValue(mockResponse)
 
@@ -58,6 +64,69 @@ describe('Login Integration', () => {
     // Verifica se token foi salvo
     await waitFor(() => {
       expect(useAuthStore.getState().token).toBe(mockToken)
+    })
+
+    // Verifica se jwtDecode foi chamado
+    await waitFor(() => {
+      expect(jwtDecode).toHaveBeenCalledWith(mockToken)
+    })
+  })
+
+  it('deve redirecionar para onboarding quando login bem-sucedido mas sem onboarding completo', async () => {
+    const user = userEvent.setup()
+    const mockToken = 'valid-jwt-token'
+    const mockResponse = {
+      data: {
+        token: mockToken,
+        user: {
+          id: 'user-123',
+          email: 'test@example.com',
+        },
+        type: 'user',
+      },
+    }
+
+    // Mock do token sem onboarding completo (sem branchId ou role)
+    vi.mocked(jwtDecode).mockReturnValue({
+      sub: 'user-123',
+      email: 'test@example.com',
+      branchId: null,
+      role: null,
+      iat: 1234567890,
+      exp: 1234571490,
+    } as any)
+
+    vi.mocked(api.post).mockResolvedValue(mockResponse)
+
+    render(
+      <MemoryRouter>
+        <Login />
+      </MemoryRouter>
+    )
+
+    // Preenche formulário
+    await user.type(screen.getByLabelText(/email/i), 'test@example.com')
+    await user.type(screen.getByLabelText(/senha/i), 'password123')
+
+    // Submete formulário
+    await user.click(screen.getByRole('button', { name: /entrar/i }))
+
+    // Verifica chamada da API
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith('/auth/login', {
+        email: 'test@example.com',
+        password: 'password123',
+      })
+    })
+
+    // Verifica se token foi salvo
+    await waitFor(() => {
+      expect(useAuthStore.getState().token).toBe(mockToken)
+    })
+
+    // Verifica se jwtDecode foi chamado para verificar onboarding
+    await waitFor(() => {
+      expect(jwtDecode).toHaveBeenCalledWith(mockToken)
     })
   })
 

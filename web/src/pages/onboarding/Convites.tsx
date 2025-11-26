@@ -53,7 +53,9 @@ export default function Convites() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-8">
+    <div className="min-h-screen bg-gray-50">
+      <OnboardingHeader />
+      <div className="flex items-center justify-center px-4 py-8">
       <div className="max-w-2xl w-full">
         <div className="bg-white rounded-lg shadow-lg p-8">
           <div className="mb-6">
@@ -98,6 +100,7 @@ export default function Convites() {
             </div>
           </form>
         </div>
+      </div>
       </div>
     </div>
   )

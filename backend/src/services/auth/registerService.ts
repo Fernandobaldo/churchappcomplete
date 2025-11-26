@@ -107,20 +107,34 @@ export async function registerUserService(data: RegisterUserInput) {
   // 4. Determinar role final (padrão: MEMBER)
   const finalRole = role || Role.MEMBER
 
-  // 5. Verificar se email já existe
+  // 5. Verificar se email já existe como User ou Member
+  const existingUser = await prisma.user.findUnique({ where: { email } })
+  if (existingUser) {
+    throw new Error('Email já cadastrado como usuário.')
+  }
+
   const existingMember = await prisma.member.findUnique({ where: { email } })
   if (existingMember) {
     throw new Error('Email já cadastrado como membro.')
   }
 
-  // 6. Criar membro
-  const member = await prisma.member.create({
+  // 6. Criar User primeiro (para ter senha)
+  const newUser = await prisma.user.create({
     data: {
       name,
       email,
       password: hashedPassword,
+    },
+  })
+
+  // 7. Criar Member associado ao User (SEM senha - usa senha do User)
+  const member = await prisma.member.create({
+    data: {
+      name,
+      email,
       role: finalRole,
       branchId,
+      userId: newUser.id, // Associa ao User criado
       birthDate: birthDate ? new Date(birthDate) : undefined,
       phone,
       address,
@@ -128,7 +142,7 @@ export async function registerUserService(data: RegisterUserInput) {
     },
   })
 
-  // 7. Adiciona permissões
+  // 8. Adiciona permissões
   const typesToAssign =
     finalRole === Role.ADMINGERAL || finalRole === Role.ADMINFILIAL
       ? ALL_PERMISSION_TYPES

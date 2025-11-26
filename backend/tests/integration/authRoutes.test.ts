@@ -16,6 +16,7 @@ import bcrypt from 'bcryptjs'
 import { resetTestDatabase } from '../utils/resetTestDatabase'
 import { seedTestDatabase } from '../utils/seedTestDatabase'
 import { debugSeed } from '../utils/debugSeed'
+import { authenticate } from '../../src/middlewares/authenticate'
 
 
 
@@ -29,14 +30,8 @@ describe('Auth Routes - /auth/login', () => {
          secret: 'churchapp-secret-key',
        })
 
-       // Decora método de autenticação
-       app.decorate('authenticate', async function (request, reply) {
-         try {
-           await request.jwtVerify()
-         } catch (err) {
-           return reply.status(401).send({ message: 'Token inválido' })
-         }
-       })
+       // Usa o middleware authenticate do projeto que popula request.user corretamente
+       app.decorate('authenticate', authenticate)
 
        // Registra todas as rotas da aplicação
        await registerRoutes(app)
@@ -80,19 +75,45 @@ describe('Auth Routes - /auth/login', () => {
     await app.close()
   })
 
-  it('deve fazer login com member válido e retornar token', async () => {
+  it('deve fazer login com member válido e retornar token com contexto de Member', async () => {
+    // Debug: Verificar se o Member existe no banco antes do teste
+    const memberUser = await prisma.user.findUnique({
+      where: { email: 'member@example.com' },
+      include: { Member: true },
+    })
+    console.log('[TEST] User do Member antes do login:', {
+      id: memberUser?.id,
+      email: memberUser?.email,
+      hasMember: !!memberUser?.Member,
+      memberId: memberUser?.Member?.id,
+      memberUserId: memberUser?.Member?.userId,
+    })
+
     const response = await request(app.server)
       .post('/auth/login')
       .send({ email: 'member@example.com', password: 'password123' })
+
+    // Debug apenas se necessário
+    if (process.env.DEBUG_TEST) {
+      console.log('[TEST] Response body:', JSON.stringify(response.body, null, 2))
+      console.log('[TEST] Response body.user keys:', Object.keys(response.body.user || {}))
+    }
 
     expect(response.status).toBe(200)
     expect(response.body.token).toBeDefined()
     expect(response.body.user.email).toBe('member@example.com')
     expect(response.body.type).toBe('member')
     expect(response.body.user.password).toBeUndefined() // segurança
+    
+    // NOVO MODELO: Token deve conter contexto de Member
+    expect(response.body.user.memberId).toBeDefined()
+    expect(response.body.user.role).toBeDefined()
+    expect(response.body.user.branchId).toBeDefined()
+    expect(response.body.user.permissions).toBeDefined()
+    expect(Array.isArray(response.body.user.permissions)).toBe(true)
   })
 
-  it('deve fazer login com user válido e retornar token', async () => {
+  it('deve fazer login com user válido (sem Member) e retornar token sem contexto de Member', async () => {
     const response = await request(app.server)
       .post('/auth/login')
       .send({ email: 'user@example.com', password: 'password123' })
@@ -102,6 +123,11 @@ describe('Auth Routes - /auth/login', () => {
     expect(response.body.user.email).toBe('user@example.com')
     expect(response.body.type).toBe('user')
     expect(response.body.user.password).toBeUndefined()
+    
+    // NOVO MODELO: User sem Member não deve ter contexto de Member
+    expect(response.body.user.memberId).toBeUndefined()
+    expect(response.body.user.role).toBeUndefined()
+    expect(response.body.user.branchId).toBeUndefined()
   })
 
   it('deve retornar 401 se o email não existir', async () => {

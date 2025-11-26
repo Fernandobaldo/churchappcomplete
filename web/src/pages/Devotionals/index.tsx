@@ -54,7 +54,7 @@ export default function Devotionals() {
           <h1 className="text-3xl font-bold text-gray-900">Devocionais</h1>
           <p className="text-gray-600 mt-1">Estudos bíblicos e devocionais</p>
         </div>
-        <button onClick={() => navigate('/devotionals/new')} className="btn-primary flex items-center gap-2">
+        <button onClick={() => navigate('/app/devotionals/new')} className="btn-primary flex items-center gap-2">
           <Plus className="w-5 h-5" />
           Novo Devocional
         </button>
@@ -64,7 +64,7 @@ export default function Devotionals() {
         <div className="card text-center py-12">
           <BookOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <p className="text-gray-600 mb-4">Nenhum devocional cadastrado</p>
-          <button onClick={() => navigate('/devotionals/new')} className="btn-primary">
+          <button onClick={() => navigate('/app/devotionals/new')} className="btn-primary">
             Criar Primeiro Devocional
           </button>
         </div>
@@ -74,7 +74,7 @@ export default function Devotionals() {
             <div
               key={devotional.id}
               className="card hover:shadow-lg transition-shadow cursor-pointer"
-              onClick={() => navigate(`/devotionals/${devotional.id}`)}
+              onClick={() => navigate(`/app/devotionals/${devotional.id}`)}
             >
               <h3 className="text-xl font-semibold mb-2">{devotional.title}</h3>
               <p className="text-sm text-gray-600 mb-3 font-medium">{devotional.passage}</p>

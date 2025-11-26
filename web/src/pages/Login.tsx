@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import toast from 'react-hot-toast'
+import { jwtDecode } from 'jwt-decode'
 import api from '../api/api'
 import { useAuthStore } from '../stores/authStore'
 
@@ -24,7 +25,17 @@ export default function Login() {
       
       setUserFromToken(token)
       toast.success('Login realizado com sucesso!')
-      navigate('/app/dashboard')
+      
+      // Verifica se o onboarding foi completado
+      // Decodifica o token para verificar se tem branchId e role
+      const decoded = jwtDecode<{ branchId?: string | null; role?: string | null }>(token)
+      
+      // Se não tem branchId ou role, ainda está no onboarding
+      if (!decoded.branchId || !decoded.role) {
+        navigate('/onboarding/start')
+      } else {
+        navigate('/app/dashboard')
+      }
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Erro ao fazer login. Verifique seus dados.')
     } finally {

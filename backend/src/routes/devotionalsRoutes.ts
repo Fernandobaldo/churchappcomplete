@@ -9,6 +9,8 @@ export async function devotionalsRoutes(app: FastifyInstance) {
 
   app.get('/', { preHandler: [app.authenticate] }, controller.getAll.bind(controller))
 
+  app.get('/:id', { preHandler: [app.authenticate] }, controller.getById.bind(controller))
+
   app.post('/', {
     preHandler: [
       app.authenticate,

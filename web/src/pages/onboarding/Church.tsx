@@ -5,6 +5,7 @@ import toast from 'react-hot-toast'
 import { jwtDecode } from 'jwt-decode'
 import api from '../../api/api'
 import { useAuthStore } from '../../stores/authStore'
+import OnboardingHeader from '../../components/OnboardingHeader'
 
 interface ChurchForm {
   name: string
@@ -44,7 +45,21 @@ export default function Church() {
         const churches = response.data
         
         if (churches && Array.isArray(churches) && churches.length > 0) {
-          const church = churches[0]
+          // Se o usuário tem branchId, usa a igreja da branch do usuário
+          // Caso contrário, usa a primeira igreja (compatibilidade com onboarding)
+          let church = churches[0]
+          
+          if (user?.branchId) {
+            // Procura a igreja que contém a branch do usuário
+            const userChurch = churches.find((c: any) => 
+              c.Branch && Array.isArray(c.Branch) && 
+              c.Branch.some((b: any) => b.id === user.branchId)
+            )
+            if (userChurch) {
+              church = userChurch
+            }
+          }
+          
           setChurchId(church.id)
           setValue('name', church.name || '')
           setValue('logoUrl', church.logoUrl || '')
@@ -57,7 +72,7 @@ export default function Church() {
     }
 
     loadChurchData()
-  }, [setValue])
+  }, [setValue, user?.branchId])
 
   const onSubmit = async (data: ChurchForm) => {
     setLoading(true)
@@ -123,7 +138,9 @@ export default function Church() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-8">
+    <div className="min-h-screen bg-gray-50">
+      <OnboardingHeader />
+      <div className="flex items-center justify-center px-4 py-8">
       <div className="max-w-2xl w-full">
         <div className="bg-white rounded-lg shadow-lg p-8">
           <div className="mb-6">
@@ -269,6 +286,7 @@ export default function Church() {
             </div>
           </form>
         </div>
+      </div>
       </div>
     </div>
   )

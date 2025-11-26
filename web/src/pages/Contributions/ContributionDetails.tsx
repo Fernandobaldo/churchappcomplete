@@ -33,7 +33,7 @@ export default function ContributionDetails() {
       setContribution(response.data)
     } catch (error) {
       toast.error('Erro ao carregar contribuição')
-      navigate('/contributions')
+      navigate('/app/contributions')
     } finally {
       setLoading(false)
     }

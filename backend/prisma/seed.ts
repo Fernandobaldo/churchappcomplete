@@ -1,5 +1,13 @@
 // prisma/seed.ts
 import { PrismaClient } from '@prisma/client'
+import dotenv from 'dotenv'
+
+// Carrega variáveis de ambiente do arquivo .env
+// Se não existir, tenta .env.test
+dotenv.config()
+if (!process.env.DATABASE_URL) {
+  dotenv.config({ path: '.env.test' })
+}
 
 const prisma = new PrismaClient()
 

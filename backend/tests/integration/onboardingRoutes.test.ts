@@ -14,6 +14,7 @@ import { prisma } from '../../src/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { resetTestDatabase } from '../utils/resetTestDatabase'
 import { seedTestDatabase } from '../utils/seedTestDatabase'
+import { authenticate } from '../../src/middlewares/authenticate'
 
 describe('Onboarding Routes - Fluxo Completo', () => {
   const app = Fastify()
@@ -26,13 +27,8 @@ describe('Onboarding Routes - Fluxo Completo', () => {
       secret: 'churchapp-secret-key',
     })
 
-    app.decorate('authenticate', async function (request: any, reply: any) {
-      try {
-        await request.jwtVerify()
-      } catch (err) {
-        return reply.status(401).send({ message: 'Token inválido' })
-      }
-    })
+    // Usa o middleware authenticate do projeto que popula request.user corretamente
+    app.decorate('authenticate', authenticate)
 
     await registerRoutes(app)
     await app.ready()
@@ -163,6 +159,116 @@ describe('Onboarding Routes - Fluxo Completo', () => {
       })
 
       expect(response.status).toBe(401)
+    })
+  })
+
+  describe('GET /churches - Buscar Igrejas', () => {
+    it('deve retornar array vazio quando usuário não tem branchId (sem igreja configurada)', async () => {
+      const response = await request(app.server)
+        .get('/churches')
+        .set('Authorization', `Bearer ${userToken}`)
+
+      expect(response.status).toBe(200)
+      expect(response.body).toEqual([])
+    })
+
+    it('deve retornar apenas a igreja do usuário quando tem branchId', async () => {
+      // Primeiro cria uma igreja para o usuário
+      const churchResponse = await request(app.server)
+        .post('/churches')
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({
+          name: 'Igreja do Usuário',
+          withBranch: true,
+          branchName: 'Sede',
+        })
+
+      expect(churchResponse.status).toBe(201)
+      const memberToken = churchResponse.body.token
+
+      // Agora busca as igrejas com o token que tem branchId
+      const response = await request(app.server)
+        .get('/churches')
+        .set('Authorization', `Bearer ${memberToken}`)
+
+      expect(response.status).toBe(200)
+      expect(Array.isArray(response.body)).toBe(true)
+      expect(response.body.length).toBe(1)
+      expect(response.body[0]).toHaveProperty('id')
+      expect(response.body[0].name).toBe('Igreja do Usuário')
+    })
+
+    it('não deve retornar igrejas de outros usuários', async () => {
+      // Cria uma segunda igreja com outro usuário
+      const hashedPassword2 = await bcrypt.hash('password123', 10)
+      const user2 = await prisma.user.create({
+        data: {
+          name: 'Outro Usuário',
+          email: `otheruser-${Date.now()}@test.com`,
+          password: hashedPassword2,
+        },
+      })
+
+      const freePlan = await prisma.plan.findFirst({ where: { name: 'free' } })
+      if (freePlan) {
+        await prisma.subscription.create({
+          data: {
+            userId: user2.id,
+            planId: freePlan.id,
+            status: 'active',
+          },
+        })
+      }
+
+      const tokenPayload2 = {
+        sub: user2.id,
+        email: user2.email,
+        name: user2.name,
+        type: 'user' as const,
+        role: null,
+        branchId: null,
+        permissions: [],
+      }
+
+      const userToken2 = app.jwt.sign(tokenPayload2, { expiresIn: '7d' })
+
+      // Cria igreja para o segundo usuário
+      const churchResponse2 = await request(app.server)
+        .post('/churches')
+        .set('Authorization', `Bearer ${userToken2}`)
+        .send({
+          name: 'Igreja do Outro Usuário',
+          withBranch: true,
+          branchName: 'Sede',
+        })
+
+      expect(churchResponse2.status).toBe(201)
+      const memberToken2 = churchResponse2.body.token
+
+      // Cria igreja para o primeiro usuário
+      const churchResponse1 = await request(app.server)
+        .post('/churches')
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({
+          name: 'Igreja do Primeiro Usuário',
+          withBranch: true,
+          branchName: 'Sede',
+        })
+
+      expect(churchResponse1.status).toBe(201)
+      const memberToken1 = churchResponse1.body.token
+
+      // Busca igrejas com token do primeiro usuário
+      const response = await request(app.server)
+        .get('/churches')
+        .set('Authorization', `Bearer ${memberToken1}`)
+
+      expect(response.status).toBe(200)
+      expect(Array.isArray(response.body)).toBe(true)
+      expect(response.body.length).toBe(1)
+      expect(response.body[0].name).toBe('Igreja do Primeiro Usuário')
+      // Não deve conter a igreja do outro usuário
+      expect(response.body.find((c: any) => c.name === 'Igreja do Outro Usuário')).toBeUndefined()
     })
   })
 

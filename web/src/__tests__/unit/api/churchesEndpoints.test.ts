@@ -30,14 +30,54 @@ describe('Churches Endpoints - Unit Tests', () => {
   })
 
   describe('GET /churches', () => {
-    it('deve buscar todas as igrejas com sucesso', async () => {
+    it('deve retornar array vazio quando usuário não tem igreja configurada (sem branchId)', async () => {
+      useAuthStore.setState({ 
+        token: 'mock-token', 
+        user: { 
+          id: 'user-123',
+          email: 'test@example.com',
+          name: 'Test User',
+          role: '',
+          branchId: '',
+          permissions: [],
+          token: 'mock-token',
+        } 
+      })
+
+      const mockResponse = {
+        data: [],
+      }
+
+      vi.mocked(api.get).mockResolvedValue(mockResponse)
+
+      const response = await api.get('/churches')
+
+      expect(api.get).toHaveBeenCalledWith('/churches')
+      expect(response.data).toEqual([])
+    })
+
+    it('deve retornar apenas a igreja do usuário quando tem branchId', async () => {
+      useAuthStore.setState({ 
+        token: 'mock-token', 
+        user: { 
+          id: 'user-123',
+          email: 'test@example.com',
+          name: 'Test User',
+          role: 'ADMINGERAL',
+          branchId: 'branch-123',
+          permissions: [],
+          token: 'mock-token',
+        } 
+      })
+
       const mockResponse = {
         data: [
           {
-            id: 'church-1',
-            name: 'Igreja Teste',
+            id: 'church-123',
+            name: 'Igreja do Usuário',
             logoUrl: 'https://example.com/logo.png',
             isActive: true,
+            Branch: [{ id: 'branch-123', name: 'Sede' }],
           },
         ],
       }
@@ -48,20 +88,43 @@ describe('Churches Endpoints - Unit Tests', () => {
 
       expect(api.get).toHaveBeenCalledWith('/churches')
       expect(response.data).toBeInstanceOf(Array)
+      expect(response.data.length).toBe(1)
       expect(response.data[0]).toHaveProperty('id')
-      expect(response.data[0]).toHaveProperty('name')
+      expect(response.data[0].name).toBe('Igreja do Usuário')
     })
 
-    it('deve retornar array vazio quando não há igrejas', async () => {
+    it('não deve retornar igrejas de outros usuários', async () => {
+      useAuthStore.setState({ 
+        token: 'mock-token', 
+        user: { 
+          id: 'user-123',
+          email: 'test@example.com',
+          name: 'Test User',
+          role: 'ADMINGERAL',
+          branchId: 'branch-123',
+          permissions: [],
+          token: 'mock-token',
+        } 
+      })
+
       const mockResponse = {
-        data: [],
+        data: [
+          {
+            id: 'church-123',
+            name: 'Igreja do Usuário',
+            Branch: [{ id: 'branch-123', name: 'Sede' }],
+          },
+        ],
       }
 
       vi.mocked(api.get).mockResolvedValue(mockResponse)
 
       const response = await api.get('/churches')
 
-      expect(response.data).toEqual([])
+      expect(response.data.length).toBe(1)
+      expect(response.data[0].name).toBe('Igreja do Usuário')
+      // Não deve conter igrejas de outros usuários
+      expect(response.data.find((c: any) => c.id === 'church-other')).toBeUndefined()
     })
   })
 

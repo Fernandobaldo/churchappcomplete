@@ -10,7 +10,8 @@ interface Event {
   id: string
   title: string
   description: string
-  date: string
+  startDate: string
+  endDate: string
   location: string
   imageUrl?: string
   hasDonation: boolean
@@ -51,7 +52,7 @@ export default function Events() {
           <h1 className="text-3xl font-bold text-gray-900">Eventos</h1>
           <p className="text-gray-600 mt-1">Gerencie os eventos da igreja</p>
         </div>
-        <button onClick={() => navigate('/events/new')} className="btn-primary flex items-center gap-2">
+        <button onClick={() => navigate('/app/events/new')} className="btn-primary flex items-center gap-2">
           <Plus className="w-5 h-5" />
           Novo Evento
         </button>
@@ -61,7 +62,7 @@ export default function Events() {
         <div className="card text-center py-12">
           <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <p className="text-gray-600 mb-4">Nenhum evento cadastrado</p>
-          <button onClick={() => navigate('/events/new')} className="btn-primary">
+          <button onClick={() => navigate('/app/events/new')} className="btn-primary">
             Criar Primeiro Evento
           </button>
         </div>
@@ -71,7 +72,7 @@ export default function Events() {
             <div
               key={event.id}
               className="card hover:shadow-lg transition-shadow cursor-pointer"
-              onClick={() => navigate(`/events/${event.id}`)}
+              onClick={() => navigate(`/app/events/${event.id}`)}
             >
               {event.imageUrl && (
                 <img
@@ -88,7 +89,9 @@ export default function Events() {
                 <div className="flex items-center gap-2 text-gray-600">
                   <Calendar className="w-4 h-4" />
                   <span className="text-sm">
-                    {format(new Date(event.date), "dd 'de' MMMM 'de' yyyy 'às' HH:mm", { locale: ptBR })}
+                    {event.startDate && !isNaN(new Date(event.startDate).getTime())
+                      ? format(new Date(event.startDate), "dd 'de' MMMM 'de' yyyy 'às' HH:mm", { locale: ptBR })
+                      : 'Data inválida'}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 text-gray-600">

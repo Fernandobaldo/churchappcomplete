@@ -1,4 +1,5 @@
 import { FastifyRequest, FastifyReply } from 'fastify'
+import { ZodError } from 'zod'
 import { ContributionService } from '../services/contributionService'
 import { createContributionBodySchema } from '../schemas/contributionSchemas'
 
@@ -15,15 +16,40 @@ export class ContributionController {
   }
 
   async create(request: FastifyRequest, reply: FastifyReply) {
-    const data = createContributionBodySchema.parse(request.body)
-    const user = request.user
+    try {
+      const data = createContributionBodySchema.parse(request.body)
+      const user = request.user
 
-    const created = await this.service.create({
-      ...data,
-      branchId: user.branchId
-    })
+      // branchId já foi validado pelo middleware checkBranchId
 
-    return reply.code(201).send(created)
+      // Converte data YYYY-MM-DD para ISO 8601 se necessário
+      let dateValue = data.date
+      if (/^\d{4}-\d{2}-\d{2}$/.test(data.date)) {
+        // Se for apenas data (YYYY-MM-DD), adiciona hora para ISO 8601
+        dateValue = `${data.date}T00:00:00.000Z`
+      }
+
+      const created = await this.service.create({
+        ...data,
+        date: dateValue,
+        branchId: user.branchId
+      })
+
+      return reply.code(201).send(created)
+    } catch (error: any) {
+      // Erros de validação do Zod retornam 400 (Bad Request)
+      if (error instanceof ZodError) {
+        return reply.status(400).send({ 
+          error: 'Dados inválidos', 
+          message: error.errors?.[0]?.message || 'Erro de validação',
+          details: error.errors 
+        })
+      }
+
+      // Outros erros retornam 500
+      console.error('❌ Erro ao criar contribuição:', error)
+      return reply.status(500).send({ error: 'Erro interno ao criar contribuição', details: error.message })
+    }
   }
 
   async getTypes(_: FastifyRequest, reply: FastifyReply) {

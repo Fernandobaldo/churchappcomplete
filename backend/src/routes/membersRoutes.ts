@@ -190,6 +190,10 @@ Atualiza um membro.
             id: { type: 'string' },
             name: { type: 'string' },
             email: { type: 'string' },
+            phone: { type: 'string', nullable: true },
+            address: { type: 'string', nullable: true },
+            avatarUrl: { type: 'string', nullable: true },
+            birthDate: { type: 'string', nullable: true },
           },
         },
         400: {

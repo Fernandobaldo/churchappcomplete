@@ -10,6 +10,7 @@ import { prisma } from '../../src/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { resetTestDatabase } from '../utils/resetTestDatabase'
 import { seedTestDatabase } from '../utils/seedTestDatabase'
+import { authenticate } from '../../src/middlewares/authenticate'
 
 describe('Member Registration - Validações de Segurança', () => {
   const app = Fastify()
@@ -24,14 +25,8 @@ describe('Member Registration - Validações de Segurança', () => {
       secret: 'churchapp-secret-key',
     })
 
-    // Decora método de autenticação
-    app.decorate('authenticate', async function (request: any, reply: any) {
-      try {
-        await request.jwtVerify()
-      } catch (err) {
-        return reply.status(401).send({ message: 'Token inválido' })
-      }
-    })
+    // Usa o middleware authenticate do projeto que popula request.user corretamente
+    app.decorate('authenticate', authenticate)
 
     // Registra todas as rotas da aplicação
     await registerRoutes(app)
@@ -76,11 +71,11 @@ describe('Member Registration - Validações de Segurança', () => {
     adminBranchId = branch.id
     adminUserId = adminUser.id
 
+    // NOVO MODELO: Member não tem senha (usa senha do User)
     const adminMember = await prisma.member.create({
       data: {
         name: 'Admin Geral',
         email: 'admin@example.com',
-        password: await bcrypt.hash('password123', 10),
         role: 'ADMINGERAL',
         branchId: branch.id,
         userId: adminUser.id,
@@ -113,11 +108,11 @@ describe('Member Registration - Validações de Segurança', () => {
       },
     })
 
+    // NOVO MODELO: Member não tem senha (usa senha do User)
     const adminFilialMember = await prisma.member.create({
       data: {
         name: 'Admin Filial',
         email: 'adminfilial@example.com',
-        password: await bcrypt.hash('password123', 10),
         role: 'ADMINFILIAL',
         branchId: branch.id,
         userId: adminFilialUser.id,
@@ -290,14 +285,24 @@ describe('Member Registration - Validações de Segurança', () => {
         data: { maxMembers: newLimit },
       })
 
-      // Criar 1 membro para atingir o limite
+      // NOVO MODELO: Criar User primeiro, depois Member associado
+      const memberEmail = `membro1-${Date.now()}@example.com`
+      const memberUser = await prisma.user.create({
+        data: {
+          name: 'Membro 1',
+          email: memberEmail,
+          password: await bcrypt.hash('password123', 10),
+        },
+      })
+
+      // Criar Member associado ao User (sem senha)
       await prisma.member.create({
         data: {
           name: 'Membro 1',
-          email: `membro1-${Date.now()}@example.com`,
-          password: await bcrypt.hash('password123', 10),
+          email: memberEmail,
           role: 'MEMBER',
           branchId: adminBranchId,
+          userId: memberUser.id,
         },
       })
 

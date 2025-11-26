@@ -3,6 +3,13 @@ import { prisma } from '../../lib/prisma'
 import bcrypt from 'bcryptjs'
 import { env } from '../../env'
 import jwt from 'jsonwebtoken'
+import dotenv from 'dotenv'
+
+// Garante que as variáveis de ambiente estão carregadas
+dotenv.config()
+if (!process.env.DATABASE_URL) {
+  dotenv.config({ path: '.env.test' })
+}
 
 export async function publicRegisterUserService(data: {
   name: string
@@ -47,11 +54,17 @@ export async function publicRegisterUserService(data: {
     },
   })
 
-  // Gera o token JWT
+  // Gera o token JWT com type: 'user' (sem Member ainda)
+  // Omite campos de Member (não inclui no payload) quando não há Member associado
   const token = jwt.sign(
     {
       sub: user.id,
       email: user.email,
+      name: user.name,
+      type: 'user' as const,
+      // Não inclui memberId, role, branchId, churchId quando não há Member
+      // Isso indica que o onboarding não foi completado
+      permissions: [],
     },
     env.JWT_SECRET,
     {

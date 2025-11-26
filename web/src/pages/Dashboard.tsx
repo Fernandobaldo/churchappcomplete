@@ -8,7 +8,7 @@ import toast from 'react-hot-toast'
 interface NextEvent {
   id: string
   title: string
-  date: string
+  startDate: string
   location: string
 }
 
@@ -113,7 +113,7 @@ export default function Dashboard() {
             <div className="flex-1">
               <h3 className="font-semibold text-lg">{nextEvent.title}</h3>
               <p className="text-gray-600">
-                {new Date(nextEvent.date).toLocaleDateString('pt-BR', {
+                {new Date(nextEvent.startDate).toLocaleDateString('pt-BR', {
                   day: 'numeric',
                   month: 'long',
                   year: 'numeric',

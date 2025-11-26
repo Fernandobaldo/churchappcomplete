@@ -1,11 +1,14 @@
 import { useNavigate } from 'react-router-dom'
 import { CheckCircle } from 'lucide-react'
+import OnboardingHeader from '../../components/OnboardingHeader'
 
 export default function Concluido() {
   const navigate = useNavigate()
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+    <div className="min-h-screen bg-gray-50">
+      <OnboardingHeader />
+      <div className="flex items-center justify-center px-4 py-8">
       <div className="max-w-2xl w-full">
         <div className="bg-white rounded-lg shadow-lg p-8 md:p-12 text-center">
           <div className="mb-8">
@@ -34,6 +37,7 @@ export default function Concluido() {
             </button>
           </div>
         </div>
+      </div>
       </div>
     </div>
   )

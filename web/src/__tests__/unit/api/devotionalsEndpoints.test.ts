@@ -135,6 +135,7 @@ describe('Devotionals Endpoints - Unit Tests', () => {
 
       const devotionalData = {
         title: 'Novo Devocional',
+        passage: 'João 3:16',
         content: 'Conteúdo do novo devocional...',
       }
 

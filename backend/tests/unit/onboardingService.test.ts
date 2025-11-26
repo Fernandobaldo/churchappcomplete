@@ -23,6 +23,7 @@ vi.mock('../../src/lib/prisma', () => {
     member: {
       create: vi.fn(),
       findUnique: vi.fn(),
+      findFirst: vi.fn(), // Adicionado para verificar por userId ou email
       update: vi.fn(),
     },
     user: {
@@ -36,6 +37,7 @@ vi.mock('../../src/lib/prisma', () => {
     },
     permission: {
       findMany: vi.fn(),
+      createMany: vi.fn(),
     },
     $transaction: vi.fn((fn) => fn(mock)),
   }
@@ -88,10 +90,12 @@ describe('ChurchService - Onboarding', () => {
 
     vi.mocked(prisma.church.create).mockResolvedValue(mockChurch as any)
     vi.mocked(prisma.branch.create).mockResolvedValue(mockBranch as any)
+    vi.mocked(prisma.member.findFirst).mockResolvedValue(null) // Não existe, então cria novo
     vi.mocked(prisma.member.create).mockResolvedValue(mockMember as any)
     vi.mocked(prisma.member.update).mockResolvedValue(mockMember as any)
     vi.mocked(prisma.user.findUnique).mockResolvedValue(mockUserData as any)
     vi.mocked(prisma.permission.findMany).mockResolvedValue([])
+    vi.mocked(prisma.permission.createMany).mockResolvedValue({ count: 0 })
 
     const result = await service.createChurchWithMainBranch(
       {
@@ -144,12 +148,14 @@ describe('ChurchService - Onboarding', () => {
       id: 'branch-123',
       name: 'Sede',
     } as any)
+    vi.mocked(prisma.member.findFirst).mockResolvedValue(null) // Não existe, então cria novo
     vi.mocked(prisma.member.create).mockResolvedValue({
       id: 'member-123',
       role: 'ADMINGERAL',
     } as any)
     vi.mocked(prisma.user.findUnique).mockResolvedValue(mockUserData as any)
     vi.mocked(prisma.permission.findMany).mockResolvedValue(mockPermissions as any)
+    vi.mocked(prisma.permission.createMany).mockResolvedValue({ count: 2 })
 
     await service.createChurchWithMainBranch(
       {
@@ -160,7 +166,7 @@ describe('ChurchService - Onboarding', () => {
       mockUserData
     )
 
-    expect(prisma.permission.findMany).toHaveBeenCalled()
+    expect(prisma.permission.createMany).toHaveBeenCalled()
   })
 
   it('deve usar nome padrão "Sede" se branchName não for fornecido', async () => {
@@ -172,11 +178,13 @@ describe('ChurchService - Onboarding', () => {
       id: 'branch-123',
       name: 'Sede',
     } as any)
+    vi.mocked(prisma.member.findFirst).mockResolvedValue(null) // Não existe, então cria novo
     vi.mocked(prisma.member.create).mockResolvedValue({
       id: 'member-123',
     } as any)
     vi.mocked(prisma.user.findUnique).mockResolvedValue(mockUserData as any)
     vi.mocked(prisma.permission.findMany).mockResolvedValue([])
+    vi.mocked(prisma.permission.createMany).mockResolvedValue({ count: 0 })
 
     await service.createChurchWithMainBranch(
       {

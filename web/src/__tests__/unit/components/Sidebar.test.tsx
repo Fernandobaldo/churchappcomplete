@@ -60,13 +60,31 @@ describe('Sidebar', () => {
     useAuthStore.setState({ user: mockUser, token: 'token' })
 
     render(
-      <MemoryRouter initialEntries={['/dashboard']}>
+      <MemoryRouter initialEntries={['/app/dashboard']}>
         <Sidebar />
       </MemoryRouter>
     )
 
     const dashboardLink = screen.getByText('Dashboard').closest('a')
     expect(dashboardLink).toHaveClass('bg-primary', 'text-white')
+  })
+
+  it('deve ter paths corretos com prefixo /app', () => {
+    useAuthStore.setState({ user: mockUser, token: 'token' })
+
+    render(
+      <MemoryRouter>
+        <Sidebar />
+      </MemoryRouter>
+    )
+
+    // Verifica que os links têm o prefixo /app
+    expect(screen.getByText('Dashboard').closest('a')).toHaveAttribute('href', '/app/dashboard')
+    expect(screen.getByText('Eventos').closest('a')).toHaveAttribute('href', '/app/events')
+    expect(screen.getByText('Contribuições').closest('a')).toHaveAttribute('href', '/app/contributions')
+    expect(screen.getByText('Devocionais').closest('a')).toHaveAttribute('href', '/app/devotionals')
+    expect(screen.getByText('Membros').closest('a')).toHaveAttribute('href', '/app/members')
+    expect(screen.getByText('Perfil').closest('a')).toHaveAttribute('href', '/app/profile')
   })
 })
 

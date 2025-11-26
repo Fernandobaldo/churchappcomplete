@@ -17,6 +17,7 @@ import { execSync } from 'child_process'
 import { registerRoutes } from '../../src/routes/registerRoutes'
 import { prisma } from '../../src/lib/prisma'
 import { resetTestDatabase } from '../utils/resetTestDatabase'
+import { authenticate } from '../../src/middlewares/authenticate'
 import {
   registerUser,
   loginUser,
@@ -66,14 +67,8 @@ describe('E2E: Fluxo Completo - Registro até Contribuição', () => {
       secret: process.env.JWT_SECRET || 'churchapp-secret-key',
     })
 
-    // Decora método de autenticação
-    app.decorate('authenticate', async function (request, reply) {
-      try {
-        await request.jwtVerify()
-      } catch (err) {
-        return reply.status(401).send({ message: 'Token inválido' })
-      }
-    })
+    // Usa o middleware authenticate do projeto que popula request.user corretamente
+    app.decorate('authenticate', authenticate)
 
     // Registra todas as rotas da aplicação
     await registerRoutes(app)

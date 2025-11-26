@@ -28,7 +28,7 @@ export default function AddContribution() {
         value: parseFloat(data.value.toString()),
       })
       toast.success('Contribuição adicionada com sucesso!')
-      navigate('/contributions')
+      navigate('/app/contributions')
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Erro ao adicionar contribuição')
     }
@@ -37,7 +37,8 @@ export default function AddContribution() {
   return (
     <div className="space-y-6">
       <button
-        onClick={() => navigate('/contributions')}
+        data-testid="back-button"
+        onClick={() => navigate('/app/contributions')}
         className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
       >
         <ArrowLeft className="w-5 h-5" />
@@ -53,6 +54,7 @@ export default function AddContribution() {
               Título *
             </label>
             <input
+              data-testid="title-input"
               {...register('title', { required: 'Título é obrigatório' })}
               className="input"
               placeholder="Ex: Oferta de Domingo"
@@ -67,6 +69,7 @@ export default function AddContribution() {
               Descrição
             </label>
             <textarea
+              data-testid="description-input"
               {...register('description')}
               className="input"
               rows={3}
@@ -80,9 +83,14 @@ export default function AddContribution() {
                 Valor *
               </label>
               <input
+                data-testid="value-input"
                 type="number"
                 step="0.01"
-                {...register('value', { required: 'Valor é obrigatório', min: 0 })}
+                {...register('value', { 
+                  required: 'Valor é obrigatório', 
+                  min: 0,
+                  valueAsNumber: true,
+                })}
                 className="input"
                 placeholder="0.00"
               />
@@ -96,6 +104,7 @@ export default function AddContribution() {
                 Data *
               </label>
               <input
+                data-testid="date-input"
                 type="date"
                 {...register('date', { required: 'Data é obrigatória' })}
                 className="input"
@@ -111,6 +120,7 @@ export default function AddContribution() {
               Tipo *
             </label>
             <select
+              data-testid="type-select"
               {...register('type', { required: 'Tipo é obrigatório' })}
               className="input"
             >
@@ -125,13 +135,14 @@ export default function AddContribution() {
 
           <div className="flex gap-4 pt-4">
             <button
+              data-testid="cancel-button"
               type="button"
-              onClick={() => navigate('/contributions')}
+              onClick={() => navigate('/app/contributions')}
               className="btn-secondary flex-1"
             >
               Cancelar
             </button>
-            <button type="submit" className="btn-primary flex-1">
+            <button data-testid="submit-button" type="submit" className="btn-primary flex-1">
               Adicionar Contribuição
             </button>
           </div>

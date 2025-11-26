@@ -22,8 +22,19 @@ describe('ProtectedRoute', () => {
     expect(screen.queryByText('Conteúdo Protegido')).not.toBeInTheDocument()
   })
 
-  it('deve renderizar children quando há token', () => {
-    useAuthStore.setState({ token: 'valid-token' })
+  it('deve redirecionar para /onboarding/start quando tem token mas não tem branchId', () => {
+    useAuthStore.setState({
+      token: 'valid-token',
+      user: {
+        id: 'user-123',
+        name: 'Test',
+        email: 'test@example.com',
+        role: '', // Sem role
+        branchId: '', // Sem branchId
+        permissions: [],
+        token: 'valid-token',
+      },
+    })
 
     render(
       <MemoryRouter>
@@ -33,10 +44,37 @@ describe('ProtectedRoute', () => {
       </MemoryRouter>
     )
 
-    expect(screen.getByText('Conteúdo Protegido')).toBeInTheDocument()
+    // Verifica se redirecionou (não mostra o conteúdo)
+    expect(screen.queryByText('Conteúdo Protegido')).not.toBeInTheDocument()
   })
 
-  it('deve renderizar children quando há token e usuário', () => {
+  it('deve redirecionar para /onboarding/start quando tem token mas não tem role', () => {
+    useAuthStore.setState({
+      token: 'valid-token',
+      user: {
+        id: 'user-123',
+        name: 'Test',
+        email: 'test@example.com',
+        role: '', // Sem role
+        branchId: 'branch-123',
+        permissions: [],
+        token: 'valid-token',
+      },
+    })
+
+    render(
+      <MemoryRouter>
+        <ProtectedRoute>
+          <div>Conteúdo Protegido</div>
+        </ProtectedRoute>
+      </MemoryRouter>
+    )
+
+    // Verifica se redirecionou (não mostra o conteúdo)
+    expect(screen.queryByText('Conteúdo Protegido')).not.toBeInTheDocument()
+  })
+
+  it('deve renderizar children quando há token e usuário com onboarding completo', () => {
     useAuthStore.setState({
       token: 'valid-token',
       user: {

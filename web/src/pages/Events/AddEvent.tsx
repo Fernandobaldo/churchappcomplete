@@ -27,9 +27,17 @@ export default function AddEvent() {
 
   const onSubmit = async (data: EventForm) => {
     try {
-      await api.post('/events', data)
+      // Converte date (datetime-local) para startDate e endDate (ISO)
+      const dateValue = data.date ? new Date(data.date).toISOString() : ''
+      
+      await api.post('/events', {
+        ...data,
+        startDate: dateValue,
+        endDate: dateValue, // Por padrão, usa a mesma data para início e fim
+        date: undefined, // Remove o campo date
+      })
       toast.success('Evento criado com sucesso!')
-      navigate('/events')
+      navigate('/app/events')
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Erro ao criar evento')
     }
@@ -38,7 +46,8 @@ export default function AddEvent() {
   return (
     <div className="space-y-6">
       <button
-        onClick={() => navigate('/events')}
+        data-testid="back-button"
+        onClick={() => navigate('/app/events')}
         className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
       >
         <ArrowLeft className="w-5 h-5" />
@@ -55,6 +64,7 @@ export default function AddEvent() {
             </label>
             <input
               id="title"
+              data-testid="title-input"
               {...register('title', { required: 'Título é obrigatório' })}
               className="input"
               placeholder="Ex: Culto de Domingo"
@@ -70,6 +80,7 @@ export default function AddEvent() {
             </label>
             <textarea
               id="description"
+              data-testid="description-input"
               {...register('description')}
               className="input"
               rows={4}
@@ -84,6 +95,7 @@ export default function AddEvent() {
               </label>
               <input
                 id="date"
+                data-testid="date-input"
                 type="datetime-local"
                 {...register('date', { required: 'Data é obrigatória' })}
                 className="input"
@@ -99,6 +111,7 @@ export default function AddEvent() {
               </label>
               <input
                 id="location"
+                data-testid="location-input"
                 {...register('location', { required: 'Local é obrigatório' })}
                 className="input"
                 placeholder="Ex: Templo Principal"
@@ -126,6 +139,7 @@ export default function AddEvent() {
             <input
               type="checkbox"
               id="hasDonation"
+              data-testid="has-donation-checkbox"
               {...register('hasDonation')}
               className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
             />
@@ -165,13 +179,14 @@ export default function AddEvent() {
 
           <div className="flex gap-4 pt-4">
             <button
+              data-testid="cancel-button"
               type="button"
-              onClick={() => navigate('/events')}
+              onClick={() => navigate('/app/events')}
               className="btn-secondary flex-1"
             >
               Cancelar
             </button>
-            <button type="submit" className="btn-primary flex-1">
+            <button data-testid="submit-button" type="submit" className="btn-primary flex-1">
               Criar Evento
             </button>
           </div>

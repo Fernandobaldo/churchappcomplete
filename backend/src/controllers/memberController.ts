@@ -19,11 +19,16 @@ export async function getAllMembers(request: FastifyRequest, reply: FastifyReply
       return reply.status(404).send({ error: 'Membro não encontrado' })
     }
 
-    const churchId = currentMember.branch.churchId
+    if (!currentMember.Branch) {
+      return reply.status(404).send({ error: 'Filial do membro não encontrada' })
+    }
+
+    const churchId = currentMember.Branch.churchId
     const branchId = user.branchId || currentMember.branchId
     const userRole = user.role || currentMember.role
+    const memberId = user.memberId || currentMember.id
 
-    const members = await findAllMembers(branchId, churchId, userRole)
+    const members = await findAllMembers(branchId, churchId, userRole, memberId)
     return reply.send(members)
   } catch (error: any) {
     return reply.status(500).send({ error: error.message })
@@ -50,9 +55,17 @@ export async function getMemberById(request: FastifyRequest, reply: FastifyReply
       return reply.status(404).send({ error: 'Membro atual não encontrado' })
     }
 
+    if (!currentMember.Branch) {
+      return reply.status(404).send({ error: 'Filial do membro atual não encontrada' })
+    }
+
+    if (!member.branch) {
+      return reply.status(404).send({ error: 'Filial do membro não encontrada' })
+    }
+
     // ADMINGERAL pode ver qualquer membro da igreja
     if (currentMember.role === 'ADMINGERAL') {
-      if (member.branch.churchId !== currentMember.branch.churchId) {
+      if (member.branch.churchId !== currentMember.Branch.churchId) {
         return reply.status(403).send({ error: 'Você só pode visualizar membros da sua igreja' })
       }
     }
@@ -79,16 +92,25 @@ export async function getMemberById(request: FastifyRequest, reply: FastifyReply
 }
 
 export async function getMyProfile(request: FastifyRequest, reply: FastifyReply) {
-  const userId = request.user.sub
-  const user = await findMemberById(userId)
-
+  const user = request.user
   if (!user) {
-    return reply.code(404).send({ message: 'Usuário não encontrado' })
+    return reply.status(401).send({ message: 'Usuário não autenticado.' })
+  }
+  
+  // Se o usuário não tem memberId, significa que não tem membro associado
+  if (!user.memberId) {
+    return reply.status(404).send({ message: 'Membro não encontrado' })
+  }
+  
+  const member = await findMemberById(user.memberId)
+
+  if (!member) {
+    return reply.code(404).send({ message: 'Membro não encontrado' })
   }
 
   return reply.send({
-    ...user,
-    birthDate: formatDate(user.birthDate),
+    ...member,
+    birthDate: formatDate(member.birthDate),
   })
 }
 
@@ -126,9 +148,30 @@ export async function updateMemberById(request: FastifyRequest, reply: FastifyRe
 
     return reply.send(updated)
   } catch (error: any) {
-    if (error.message?.includes('permissão') || error.message?.includes('não pode')) {
+    // Erros de permissão/autorização
+    if (error.message?.includes('permissão') || 
+        error.message?.includes('não pode') ||
+        error.message?.includes('só pode') ||
+        error.message?.includes('Apenas') ||
+        error.message?.includes('Você não pode') ||
+        error.message?.includes('Você só pode')) {
       return reply.status(403).send({ error: error.message })
     }
-    return reply.status(500).send({ error: error.message })
+    
+    // Erro quando membro não encontrado (do validateMemberEditPermission ou do Prisma)
+    if (error.code === 'P2025' || 
+        error.message?.includes('Record to update not found') ||
+        error.message?.includes('Membro alvo não encontrado') ||
+        error.message?.includes('Membro editor não encontrado') ||
+        error.message?.includes('não encontrado')) {
+      return reply.status(404).send({ error: 'Membro não encontrado' })
+    }
+    
+    // Erro de validação do Zod
+    if (error.name === 'ZodError') {
+      return reply.status(400).send({ error: 'Dados inválidos', details: error.errors })
+    }
+    
+    return reply.status(500).send({ error: error.message || 'Erro ao atualizar membro' })
   }
 }

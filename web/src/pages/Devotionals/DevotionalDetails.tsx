@@ -40,7 +40,7 @@ export default function DevotionalDetails() {
       setDevotional(response.data)
     } catch (error) {
       toast.error('Erro ao carregar devocional')
-      navigate('/devotionals')
+      navigate('/app/devotionals')
     } finally {
       setLoading(false)
     }
@@ -76,7 +76,7 @@ export default function DevotionalDetails() {
   return (
     <div className="space-y-6">
       <button
-        onClick={() => navigate('/devotionals')}
+        onClick={() => navigate('/app/devotionals')}
         className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
       >
         <ArrowLeft className="w-5 h-5" />

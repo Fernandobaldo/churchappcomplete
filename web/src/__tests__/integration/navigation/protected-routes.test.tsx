@@ -63,7 +63,7 @@ describe('Protected Routes Integration', () => {
   })
 
   it('deve redirecionar para login quando não autenticado', async () => {
-    testInitialEntries = ['/dashboard']
+    testInitialEntries = ['/app/dashboard']
     render(<App />)
 
     // Deve mostrar página de login (verifica pelo título "Login")
@@ -78,7 +78,7 @@ describe('Protected Routes Integration', () => {
       user: mockUser,
     })
 
-    testInitialEntries = ['/dashboard']
+    testInitialEntries = ['/app/dashboard']
     render(<App />)
 
     // Deve mostrar Dashboard quando autenticado
@@ -102,6 +102,59 @@ describe('Protected Routes Integration', () => {
     // Deve redirecionar para dashboard (não deve mostrar login)
     await waitFor(() => {
       expect(screen.queryByText(/login/i)).not.toBeInTheDocument()
+    }, { timeout: 3000 })
+  })
+
+  it('deve redirecionar para onboarding quando autenticado mas sem onboarding completo', async () => {
+    useAuthStore.setState({
+      token: 'valid-token',
+      user: {
+        ...mockUser,
+        branchId: '', // Sem branchId
+        role: '', // Sem role
+      },
+    })
+
+    testInitialEntries = ['/app/dashboard']
+    render(<App />)
+
+    // Deve redirecionar para onboarding (não deve mostrar dashboard)
+    await waitFor(() => {
+      expect(screen.queryByText('Dashboard Page')).not.toBeInTheDocument()
+    }, { timeout: 3000 })
+  })
+
+  it('deve redirecionar para onboarding quando tenta acessar rotas protegidas sem onboarding completo', async () => {
+    useAuthStore.setState({
+      token: 'valid-token',
+      user: {
+        ...mockUser,
+        branchId: '', // Sem branchId
+        role: '', // Sem role
+      },
+    })
+
+    testInitialEntries = ['/app/events']
+    render(<App />)
+
+    // Deve redirecionar para onboarding
+    await waitFor(() => {
+      expect(screen.queryByText('Dashboard Page')).not.toBeInTheDocument()
+    }, { timeout: 3000 })
+  })
+
+  it('deve permitir acesso quando autenticado e onboarding completo', async () => {
+    useAuthStore.setState({
+      token: 'valid-token',
+      user: mockUser, // Com branchId e role
+    })
+
+    testInitialEntries = ['/app/dashboard']
+    render(<App />)
+
+    // Deve mostrar Dashboard quando onboarding completo
+    await waitFor(() => {
+      expect(screen.getByText('Dashboard Page')).toBeInTheDocument()
     }, { timeout: 3000 })
   })
 })

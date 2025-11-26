@@ -4,6 +4,8 @@ import { useForm } from 'react-hook-form'
 import toast from 'react-hot-toast'
 import api from '../../api/api'
 import { Plus, X } from 'lucide-react'
+import OnboardingHeader from '../../components/OnboardingHeader'
+import { useAuthStore } from '../../stores/authStore'
 
 interface Branch {
   id?: string
@@ -16,6 +18,7 @@ interface Branch {
 
 export default function Branches() {
   const navigate = useNavigate()
+  const { user } = useAuthStore()
   const [loading, setLoading] = useState(false)
   const [branches, setBranches] = useState<Branch[]>([
     { name: 'Sede', city: '', country: 'BR', primaryColor: '#3B82F6', address: '' },
@@ -28,7 +31,22 @@ export default function Branches() {
         const response = await api.get('/churches')
         const churches = response.data
         if (churches && churches.length > 0) {
-          setChurchId(churches[0].id)
+          // Se o usuário tem branchId, usa a igreja da branch do usuário
+          // Caso contrário, usa a primeira igreja (compatibilidade com onboarding)
+          let church = churches[0]
+          
+          if (user?.branchId) {
+            // Procura a igreja que contém a branch do usuário
+            const userChurch = churches.find((c: any) => 
+              c.Branch && Array.isArray(c.Branch) && 
+              c.Branch.some((b: any) => b.id === user.branchId)
+            )
+            if (userChurch) {
+              church = userChurch
+            }
+          }
+          
+          setChurchId(church.id)
           
           // Carrega filiais existentes
           const branchesResponse = await api.get('/branches')
@@ -51,7 +69,7 @@ export default function Branches() {
       }
     }
     loadChurch()
-  }, [])
+  }, [user?.branchId])
 
   const addBranch = () => {
     setBranches([
@@ -126,7 +144,9 @@ export default function Branches() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-8">
+    <div className="min-h-screen bg-gray-50">
+      <OnboardingHeader />
+      <div className="flex items-center justify-center px-4 py-8">
       <div className="max-w-4xl w-full">
         <div className="bg-white rounded-lg shadow-lg p-8">
           <div className="mb-6">
@@ -247,6 +267,7 @@ export default function Branches() {
             </div>
           </form>
         </div>
+      </div>
       </div>
     </div>
   )

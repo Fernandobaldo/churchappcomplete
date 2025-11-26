@@ -14,11 +14,12 @@ vi.mock('bcryptjs', () => ({
 // Mock do prisma
 vi.mock('../../src/lib/prisma', () => ({
   prisma: {
-    member: {
+    user: {
       findUnique: vi.fn(),
       findMany: vi.fn().mockResolvedValue([]),
     },
-    user: {
+    member: {
+      findFirst: vi.fn(),
       findUnique: vi.fn(),
       findMany: vi.fn().mockResolvedValue([]),
     },
@@ -28,70 +29,150 @@ vi.mock('../../src/lib/prisma', () => ({
 
 const authService = new AuthService()
 
-describe('AuthService', () => {
-  const mockMember = {
-    id: 'member-1',
+describe('AuthService - Novo Modelo User + Member', () => {
+  const mockUserWithMember = {
+    id: 'user-1',
     email: 'member@example.com',
+    name: 'Membro Teste',
     password: 'hashed_password',
-    permissions: [{ type: 'members_manage' }],
+    Member: {
+      id: 'member-1',
+      email: 'member@example.com',
+      name: 'Membro Teste',
+      role: 'ADMINGERAL',
+      branchId: 'branch-1',
+      Permission: [
+        { type: 'members_manage' },
+        { type: 'events_manage' },
+      ],
+      Branch: {
+        id: 'branch-1',
+        Church: {
+          id: 'church-1',
+          name: 'Igreja Teste',
+        },
+      },
+    },
   }
 
-  const mockUser = {
-    id: 'user-1',
+  const mockUserWithoutMember = {
+    id: 'user-2',
     email: 'admin@example.com',
+    name: 'Admin SaaS',
     password: 'hashed_password',
+    Member: null,
   }
 
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  it('deve retornar token e usuário ao fazer login com member válido', async () => {
-    prisma.member.findUnique.mockResolvedValue(mockMember)
-    prisma.user.findUnique.mockResolvedValue(null)
-    ;(bcrypt.compare as vi.Mock).mockResolvedValue(true)
+  describe('validateCredentials', () => {
+    it('deve retornar null se User não existir', async () => {
+      prisma.user.findUnique.mockResolvedValue(null)
 
-    const result = await authService.login('member@example.com', '123456')
+      const result = await authService.validateCredentials('naoexiste@example.com', '123456')
 
-    expect(result).toHaveProperty('token')
-    expect(result).toHaveProperty('user')
-    expect(result.user.email).toBe('member@example.com')
-    expect(result.type).toBe('member')
+      expect(result).toBeNull()
+      expect(prisma.user.findUnique).toHaveBeenCalledWith({
+        where: { email: 'naoexiste@example.com' },
+        include: {
+          Member: {
+            include: {
+              Permission: true,
+              Branch: {
+                include: {
+                  Church: true,
+                },
+              },
+            },
+          },
+        },
+      })
+    })
+
+    it('deve retornar null se senha do User estiver incorreta', async () => {
+      prisma.user.findUnique.mockResolvedValue(mockUserWithMember)
+      ;(bcrypt.compare as vi.Mock).mockResolvedValue(false)
+
+      const result = await authService.validateCredentials('member@example.com', 'wrongpass')
+
+      expect(result).toBeNull()
+    })
+
+    it('deve retornar type: member quando User tem Member associado', async () => {
+      prisma.user.findUnique.mockResolvedValue(mockUserWithMember)
+      ;(bcrypt.compare as vi.Mock).mockResolvedValue(true)
+
+      const result = await authService.validateCredentials('member@example.com', '123456')
+
+      expect(result).not.toBeNull()
+      expect(result?.type).toBe('member')
+      expect(result?.user).toBeDefined()
+      expect(result?.member).toBeDefined()
+      expect(result?.member?.id).toBe('member-1')
+      expect(result?.member?.role).toBe('ADMINGERAL')
+    })
+
+    it('deve retornar type: user quando User não tem Member associado', async () => {
+      prisma.user.findUnique.mockResolvedValue(mockUserWithoutMember)
+      ;(bcrypt.compare as vi.Mock).mockResolvedValue(true)
+
+      const result = await authService.validateCredentials('admin@example.com', '123456')
+
+      expect(result).not.toBeNull()
+      expect(result?.type).toBe('user')
+      expect(result?.user).toBeDefined()
+      expect(result?.member).toBeNull()
+    })
   })
 
-  it('deve retornar token e usuário ao fazer login com user válido', async () => {
-    prisma.member.findUnique.mockResolvedValue(null)
-    prisma.user.findUnique.mockResolvedValue(mockUser)
-    ;(bcrypt.compare as vi.Mock).mockResolvedValue(true)
+  describe('login', () => {
+    it('deve retornar token com contexto de Member quando User tem Member', async () => {
+      prisma.user.findUnique.mockResolvedValue(mockUserWithMember)
+      ;(bcrypt.compare as vi.Mock).mockResolvedValue(true)
 
-    const result = await authService.login('admin@example.com', '123456')
+      const result = await authService.login('member@example.com', '123456')
 
-    expect(result).toHaveProperty('token')
-    expect(result).toHaveProperty('user')
-    expect(result.user.email).toBe('admin@example.com')
-    expect(result.type).toBe('user')
-  })
+      expect(result).toHaveProperty('token')
+      expect(result).toHaveProperty('user')
+      expect(result).toHaveProperty('type')
+      expect(result.type).toBe('member')
+      expect(result.user.email).toBe('member@example.com')
+      expect(result.user.memberId).toBe('member-1')
+      expect(result.user.role).toBe('ADMINGERAL')
+      expect(result.user.branchId).toBe('branch-1')
+      expect(result.user.churchId).toBe('church-1')
+      expect(result.user.permissions).toHaveLength(2)
+    })
 
-  it('deve lançar erro se e-mail não existir', async () => {
-    prisma.member.findUnique.mockResolvedValue(null)
-    prisma.user.findUnique.mockResolvedValue(null)
+    it('deve retornar token sem contexto de Member quando User não tem Member', async () => {
+      prisma.user.findUnique.mockResolvedValue(mockUserWithoutMember)
+      prisma.member.findFirst.mockResolvedValue(null) // Não encontra Member associado
+      prisma.member.findUnique.mockResolvedValue(null)
+      ;(bcrypt.compare as vi.Mock).mockResolvedValue(true)
 
-    await expect(authService.login('naoexiste@example.com', '123456')).rejects.toThrow('Credenciais inválidas')
-  })
+      const result = await authService.login('admin@example.com', '123456')
 
-  it('deve lançar erro se senha estiver incorreta para member', async () => {
-    prisma.member.findUnique.mockResolvedValue(mockMember)
-    prisma.user.findUnique.mockResolvedValue(null)
-    ;(bcrypt.compare as vi.Mock).mockResolvedValue(false)
+      expect(result).toHaveProperty('token')
+      expect(result).toHaveProperty('user')
+      expect(result).toHaveProperty('type')
+      expect(result.type).toBe('user')
+      expect(result.user.email).toBe('admin@example.com')
+      expect(result.user.memberId).toBeUndefined()
+      expect(result.user.role).toBeUndefined()
+      expect(result.user.branchId).toBeUndefined()
+      expect(result.user.churchId).toBeUndefined()
+      // Permissions deve ser array vazio, não undefined
+      expect(result.user.permissions).toBeDefined()
+      expect(Array.isArray(result.user.permissions)).toBe(true)
+      expect(result.user.permissions.length).toBe(0)
+    })
 
-    await expect(authService.login('member@example.com', 'wrongpass')).rejects.toThrow('Credenciais inválidas')
-  })
+    it('deve lançar erro se credenciais forem inválidas', async () => {
+      prisma.user.findUnique.mockResolvedValue(null)
 
-  it('deve lançar erro se senha estiver incorreta para user', async () => {
-    prisma.member.findUnique.mockResolvedValue(null)
-    prisma.user.findUnique.mockResolvedValue(mockUser)
-    ;(bcrypt.compare as vi.Mock).mockResolvedValue(false)
-
-    await expect(authService.login('admin@example.com', 'wrongpass')).rejects.toThrow('Credenciais inválidas')
+      await expect(authService.login('naoexiste@example.com', '123456')).rejects.toThrow('Credenciais inválidas')
+    })
   })
 })

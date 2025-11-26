@@ -9,8 +9,14 @@ title: z.string().min(1, 'Título obrigatório'),
   description: z.string().optional(),
   hasDonation: z.boolean().optional(),
   donationReason: z.string().optional(),
-  donationLink: z.string().url('Link inválido').optional(),
-  imageUrl: z.string().url('URL da imagem inválida').optional(),
+  donationLink: z.preprocess(
+    (val) => (val === '' || val === null ? undefined : val),
+    z.string().url('Link inválido').optional()
+  ),
+  imageUrl: z.preprocess(
+    (val) => (val === '' || val === null ? undefined : val),
+    z.string().url('URL da imagem inválida').optional()
+  ),
 })
 
 // Schema completo com validação condicional

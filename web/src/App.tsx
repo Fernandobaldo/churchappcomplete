@@ -33,9 +33,14 @@ import ProtectedRoute from './components/ProtectedRoute'
 
 // Componente para rotas públicas que redirecionam se já autenticado
 function PublicRoute({ children }: { children: React.ReactNode }) {
-  const { token } = useAuthStore()
+  const { token, user } = useAuthStore()
   
   if (token) {
+    // Se tem token mas não completou onboarding, redireciona para onboarding
+    if (!user?.branchId || !user?.role) {
+      return <Navigate to="/onboarding/start" replace />
+    }
+    // Se completou onboarding, redireciona para dashboard
     return <Navigate to="/app/dashboard" replace />
   }
   

@@ -5,6 +5,7 @@ import {
   deleteBranchHandler,
 } from '../controllers/branchController';
 import { authenticate } from '../middlewares/authenticate';
+import { checkRole } from '../middlewares/checkRole';
 
 export async function branchesRoutes(app: FastifyInstance) {
   app.post('/', {
@@ -98,7 +99,10 @@ Cria uma nova filial (branch).
   }, listBranchesHandler);
 
   app.delete('/:id', {
-    preHandler: [authenticate],
+    preHandler: [
+      authenticate,
+      checkRole(['ADMINGERAL', 'ADMINFILIAL']), // Apenas admins podem deletar branches
+    ],
     schema: {
       description: 'Deleta uma filial. Não é permitido deletar a filial principal (isMainBranch: true)',
       tags: ['Filiais'],

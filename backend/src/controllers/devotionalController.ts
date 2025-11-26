@@ -1,6 +1,6 @@
 import { FastifyRequest, FastifyReply } from 'fastify'
-import { z } from 'zod'
-import { createDevotionalSchema } from '../schemas/devotionalSchemas'
+import { z, ZodError } from 'zod'
+import { createDevotionalBodySchema } from '../schemas/devotionalSchemas'
 import { DevotionalService } from '../services/devotionalService'
 
 export class DevotionalController {
@@ -11,47 +11,109 @@ export class DevotionalController {
     if (!user?.branchId) {
       return reply.status(400).send({ message: 'Usuário não vinculado a uma filial.' })
     }
-    const result = await this.service.getAll(user.sub || user.id, user.branchId)
+    const memberId = user.memberId || null
+    const result = await this.service.getAll(memberId, user.branchId)
     return reply.send(result)
   }
 
-  async create(request: FastifyRequest, reply: FastifyReply) {
-    const data = createDevotionalSchema.body.parse(request.body)
+  async getById(request: FastifyRequest, reply: FastifyReply) {
+    const paramsSchema = z.object({ id: z.string().cuid() })
+    const { id } = paramsSchema.parse(request.params)
     const user = request.user
+    const memberId = user?.memberId || null
 
-    if (!user.branchId) {
-      return reply.code(400).send({ message: 'Usuário não vinculado a uma filial.' })
+    const devotional = await this.service.getById(id, memberId)
+
+    if (!devotional) {
+      return reply.status(404).send({ message: 'Devocional não encontrado.' })
     }
 
-    const devotional = await this.service.create({
-      ...data,
-      authorId: user.sub,
-      branchId: user.branchId,
-    })
+    return reply.send(devotional)
+  }
 
-    return reply.code(201).send(devotional)
+  async create(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const data = createDevotionalBodySchema.parse(request.body)
+      const user = request.user
+
+      if (!user.branchId) {
+        return reply.code(400).send({ message: 'Usuário não vinculado a uma filial.' })
+      }
+
+      if (!user.memberId) {
+        return reply.code(400).send({ message: 'Usuário não possui um membro associado.' })
+      }
+
+      const devotional = await this.service.create({
+        ...data,
+        authorId: user.memberId,
+        branchId: user.branchId,
+      })
+
+      return reply.code(201).send(devotional)
+    } catch (error: any) {
+      // Erros de validação do Zod retornam 400 (Bad Request)
+      if (error instanceof ZodError) {
+        return reply.status(400).send({ 
+          error: 'Dados inválidos', 
+          message: error.errors?.[0]?.message || 'Erro de validação',
+          details: error.errors 
+        })
+      }
+
+      // Outros erros retornam 500
+      console.error('❌ Erro ao criar devocional:', error)
+      return reply.status(500).send({ error: 'Erro interno ao criar devocional', details: error.message })
+    }
   }
 
   async like(request: FastifyRequest, reply: FastifyReply) {
     const paramsSchema = z.object({ id: z.string().cuid() })
     const { id } = paramsSchema.parse(request.params)
-    const userId = request.user.sub
+    const user = request.user
+    
+    if (!user?.memberId) {
+      return reply.status(401).send({ message: 'Usuário não possui um membro associado.' })
+    }
 
     try {
-      await this.service.like(id, userId)
+      await this.service.like(id, user.memberId)
     } catch {
       return reply.code(400).send({ message: 'Você já curtiu esse devocional.' })
     }
 
-    return reply.send({ success: true })
+    // Retorna os dados atualizados do devocional
+    const devotional = await this.service.getById(id, user.memberId)
+    if (!devotional) {
+      return reply.status(404).send({ message: 'Devocional não encontrado.' })
+    }
+
+    return reply.send({
+      likes: devotional.likes,
+      liked: devotional.liked,
+    })
   }
 
   async unlike(request: FastifyRequest, reply: FastifyReply) {
     const paramsSchema = z.object({ id: z.string().cuid() })
     const { id } = paramsSchema.parse(request.params)
-    const userId = request.user.sub
+    const user = request.user
+    
+    if (!user?.memberId) {
+      return reply.status(401).send({ message: 'Usuário não possui um membro associado.' })
+    }
 
-    await this.service.unlike(id, userId)
-    return reply.send({ success: true })
+    await this.service.unlike(id, user.memberId)
+
+    // Retorna os dados atualizados do devocional
+    const devotional = await this.service.getById(id, user.memberId)
+    if (!devotional) {
+      return reply.status(404).send({ message: 'Devocional não encontrado.' })
+    }
+
+    return reply.send({
+      likes: devotional.likes,
+      liked: devotional.liked,
+    })
   }
 }

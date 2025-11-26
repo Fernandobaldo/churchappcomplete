@@ -59,7 +59,7 @@ export default function Members() {
           <p className="text-gray-600 mt-1">Gerencie os membros da igreja</p>
         </div>
         <button 
-          onClick={() => navigate('/members/new')} 
+          onClick={() => navigate('/app/members/new')} 
           className="btn-primary flex items-center gap-2"
         >
           <UserPlus className="w-5 h-5" />
@@ -82,7 +82,7 @@ export default function Members() {
           <div className="text-center py-12">
             <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <p className="text-gray-600 mb-4">Nenhum membro cadastrado</p>
-            <button onClick={() => navigate('/members/new')} className="btn-primary">
+            <button onClick={() => navigate('/app/members/new')} className="btn-primary">
               Adicionar Primeiro Membro
             </button>
           </div>
@@ -92,7 +92,7 @@ export default function Members() {
               <div
                 key={member.id}
                 className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
-                onClick={() => navigate(`/members/${member.id}`)}
+                onClick={() => navigate(`/app/members/${member.id}`)}
               >
                 <div className="flex items-center gap-4 mb-4">
                   {member.avatarUrl ? (

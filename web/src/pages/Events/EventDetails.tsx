@@ -11,7 +11,8 @@ interface Event {
   id: string
   title: string
   description: string
-  date: string
+  startDate: string
+  endDate: string
   location: string
   imageUrl?: string
   hasDonation: boolean
@@ -38,7 +39,7 @@ export default function EventDetails() {
       setEvent(response.data)
     } catch (error) {
       toast.error('Erro ao carregar evento')
-      navigate('/events')
+      navigate('/app/events')
     } finally {
       setLoading(false)
     }
@@ -50,7 +51,7 @@ export default function EventDetails() {
     try {
       await api.delete(`/events/${id}`)
       toast.success('Evento excluído com sucesso!')
-      navigate('/events')
+      navigate('/app/events')
     } catch (error) {
       toast.error('Erro ao excluir evento')
     }
@@ -73,7 +74,7 @@ export default function EventDetails() {
   return (
     <div className="space-y-6">
       <button
-        onClick={() => navigate('/events')}
+        onClick={() => navigate('/app/events')}
         className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
       >
         <ArrowLeft className="w-5 h-5" />
@@ -94,7 +95,7 @@ export default function EventDetails() {
           {canEdit && (
             <div className="flex gap-2">
               <button
-                onClick={() => navigate(`/events/${id}/edit`)}
+                onClick={() => navigate(`/app/events/${id}/edit`)}
                 className="btn-secondary flex items-center gap-2"
               >
                 <Edit className="w-4 h-4" />
@@ -115,7 +116,7 @@ export default function EventDetails() {
           <div className="flex items-center gap-2 text-gray-600">
             <Calendar className="w-5 h-5" />
             <span>
-              {format(new Date(event.date), "dd 'de' MMMM 'de' yyyy 'às' HH:mm", { locale: ptBR })}
+              {format(new Date(event.startDate), "dd 'de' MMMM 'de' yyyy 'às' HH:mm", { locale: ptBR })}
             </span>
           </div>
 

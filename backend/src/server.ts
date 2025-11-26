@@ -7,7 +7,38 @@ import fastifySwagger from '@fastify/swagger';
 import fastifySwaggerUi from '@fastify/swagger-ui';
 import dotenv from 'dotenv';
 import { env } from './env.js';
+import { authenticate } from './middlewares/authenticate.js';
+import { authenticate } from './middlewares/authenticate.js';
+
+// Se dotenv-cli carregou .env.test, detecta pelo DATABASE_URL
+// Carrega .env primeiro
 dotenv.config();
+
+// Se DATABASE_URL aponta para banco de teste, assume modo E2E
+const isTestDb = process.env.DATABASE_URL?.includes('churchapp_test') || process.env.DATABASE_URL?.includes('_test');
+if (isTestDb) {
+  console.log('[SERVER] 🧪 Detectado banco de teste - modo E2E ativado');
+}
+
+// Se DATABASE_URL não estiver definida, tenta carregar .env.test
+if (!process.env.DATABASE_URL) {
+  console.log('[SERVER] DATABASE_URL não encontrada no .env, tentando .env.test...');
+  dotenv.config({ path: '.env.test' });
+  
+  if (process.env.DATABASE_URL) {
+    console.log('[SERVER] ✅ DATABASE_URL carregada do .env.test');
+  } else {
+    console.warn('[SERVER] ⚠️ DATABASE_URL não encontrada em .env nem .env.test');
+    console.warn('[SERVER] ⚠️ Configure a DATABASE_URL em um dos arquivos para o servidor funcionar');
+  }
+}
+
+// Valida se está usando banco de teste
+if (isTestDb && process.env.DATABASE_URL) {
+  console.log('[SERVER] ✅ Modo E2E: Usando banco de teste');
+} else if (process.env.DATABASE_URL && !isTestDb) {
+  console.log('[SERVER] ℹ️ Usando banco de desenvolvimento/produção');
+}
 const app = fastify({ logger: true });
 
 app.register(fastifyCors, { origin: true });
@@ -16,16 +47,8 @@ app.register(fastifyJwt, {
     secret: env.JWT_SECRET,
 });
 
-app.decorate('authenticate', async function (
-    request: FastifyRequest,
-    reply: FastifyReply
-) {
-    try {
-        await request.jwtVerify();
-    } catch (err) {
-        return reply.send(err);
-    }
-});
+// Usa o middleware authenticate que popula request.user corretamente
+app.decorate('authenticate', authenticate);
 
 app.register(fastifySwagger, {
     openapi: {

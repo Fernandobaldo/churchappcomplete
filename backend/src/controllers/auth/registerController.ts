@@ -52,13 +52,13 @@ export async function registerController(request: FastifyRequest, reply: Fastify
           })
         }
         
+        // Não inclui campos de Member no token quando não há Member associado
+        // Isso mantém o token limpo e permite que o frontend verifique com toBeUndefined()
         const tokenPayload = {
           sub: user.id,
           email: user.email,
           name: user.name,
           type: 'user' as const,
-          role: null, // Usuário não tem role (apenas membros têm)
-          branchId: null, // Usuário não tem branchId (apenas membros têm)
           permissions: [], // Usuário não tem permissões (apenas membros têm)
         }
         
