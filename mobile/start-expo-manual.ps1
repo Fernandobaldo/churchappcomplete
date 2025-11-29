@@ -27,3 +27,6 @@ Write-Host ""
 npx expo start --lan --clear
 
 
+
+
+

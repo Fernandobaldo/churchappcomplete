@@ -1,6 +1,7 @@
 import { prisma } from '../../lib/prisma'
 import bcrypt from 'bcryptjs'
 import { Role } from '@prisma/client'
+import { parse, isValid } from 'date-fns'
 import { ALL_PERMISSION_TYPES } from '../../constants/permissions'
 import { checkPlanMembersLimit } from '../../utils/planLimits'
 import {
@@ -8,6 +9,9 @@ import {
   getMemberFromUserId,
 } from '../../utils/authorization'
 import { AuditLogger } from '../../utils/auditHelper'
+import { validateInviteLink, incrementLinkUsage } from '../inviteLinkService'
+import { sendWelcomeEmail, sendMemberRegistrationAttemptNotification } from '../emailService'
+import { AuditAction } from '@prisma/client'
 
 interface RegisterUserInput {
   name: string
@@ -22,6 +26,7 @@ interface RegisterUserInput {
   avatarUrl?: string
   fromLandingPage?: boolean // ← usado para distinguir cadastro externo
   creatorUserId?: string // ID do usuário que está criando (para validações)
+  inviteToken?: string // Token do link de convite
 }
 
 export async function registerUserService(data: RegisterUserInput) {
@@ -38,9 +43,123 @@ export async function registerUserService(data: RegisterUserInput) {
     avatarUrl,
     fromLandingPage,
     creatorUserId,
+    inviteToken,
   } = data
 
   const hashedPassword = await bcrypt.hash(password, 10)
+
+  // 🔗 Se for registro via link de convite
+  if (inviteToken) {
+    // 1. Validar o link de convite
+    const validation = await validateInviteLink(inviteToken)
+    
+    if (!validation.valid) {
+      if (validation.error === 'LIMIT_REACHED') {
+        throw new Error('LIMIT_REACHED')
+      }
+      throw new Error(validation.error || 'Link de convite inválido')
+    }
+
+    const inviteLink = validation.inviteLink!
+
+    // 2. Verificar se email já existe
+    const existingUser = await prisma.user.findUnique({ where: { email } })
+    if (existingUser) {
+      throw new Error('Email já cadastrado como usuário.')
+    }
+
+    const existingMember = await prisma.member.findUnique({ where: { email } })
+    if (existingMember) {
+      throw new Error('Email já cadastrado como membro.')
+    }
+
+    // 3. Criar User
+    const newUser = await prisma.user.create({
+      data: {
+        name,
+        email,
+        password: hashedPassword,
+      },
+    })
+
+    // 4. Parse da data de nascimento
+    let parsedBirthDate: Date | undefined = undefined
+    if (birthDate) {
+      const isoDate = new Date(birthDate)
+      if (!isNaN(isoDate.getTime())) {
+        parsedBirthDate = isoDate
+      } else {
+        const parsedDate = parse(birthDate.trim(), 'dd/MM/yyyy', new Date())
+        if (isValid(parsedDate)) {
+          parsedBirthDate = parsedDate
+        }
+      }
+    }
+
+    // 5. Criar Member vinculado ao link
+    const member = await prisma.member.create({
+      data: {
+        name,
+        email,
+        role: Role.MEMBER, // Sempre MEMBER para registro via link
+        branchId: inviteLink.branchId,
+        userId: newUser.id,
+        inviteLinkId: inviteLink.id,
+        birthDate: parsedBirthDate,
+        phone,
+        address,
+        avatarUrl,
+      },
+    })
+
+    // 5.1. Adicionar permissão members_view automaticamente para todos os membros
+    await prisma.permission.create({
+      data: {
+        memberId: member.id,
+        type: 'members_view',
+      },
+    })
+
+    // 6. Incrementar uso do link
+    await incrementLinkUsage(inviteToken)
+
+    // 7. Enviar email de boas-vindas (não deve quebrar o registro se falhar)
+    try {
+      await sendWelcomeEmail(email, name, inviteLink.Branch.Church.name)
+    } catch (error) {
+      console.error('❌ Erro ao enviar email de boas-vindas:', error)
+      // Não lança erro - o registro foi bem-sucedido mesmo se o email falhar
+    }
+
+    // 8. Notificar admins sobre novo registro (não deve quebrar o registro se falhar)
+    try {
+      const admins = await prisma.member.findMany({
+        where: {
+          Branch: {
+            churchId: inviteLink.Branch.churchId,
+          },
+          role: {
+            in: ['ADMINGERAL', 'ADMINFILIAL'],
+          },
+        },
+      })
+
+      const adminEmails = admins.map((a) => a.email).filter(Boolean) as string[]
+      if (adminEmails.length > 0) {
+        await sendMemberRegistrationAttemptNotification(
+          adminEmails,
+          inviteLink.Branch.Church.name,
+          name,
+          email
+        )
+      }
+    } catch (error) {
+      console.error('❌ Erro ao notificar admins:', error)
+      // Não lança erro - o registro foi bem-sucedido mesmo se a notificação falhar
+    }
+
+    return member
+  }
 
   // ⚙️ Se for landing page → cria User e assina plano Free
   if (fromLandingPage) {
@@ -80,6 +199,8 @@ export async function registerUserService(data: RegisterUserInput) {
 
   // 🧱 Caso seja criação de membro interno
   // Validações de segurança
+  // IMPORTANTE: Se chegou aqui, fromLandingPage é false ou undefined
+  // então é criação de membro interno e precisa de branchId
   if (!branchId) {
     throw new Error('branchId é obrigatório para criação de membros internos')
   }
@@ -128,6 +249,24 @@ export async function registerUserService(data: RegisterUserInput) {
   })
 
   // 7. Criar Member associado ao User (SEM senha - usa senha do User)
+  // Parse da data de nascimento (aceita ISO ou dd/MM/yyyy)
+  let parsedBirthDate: Date | undefined = undefined
+  if (birthDate) {
+    // Tenta parse ISO primeiro
+    const isoDate = new Date(birthDate)
+    if (!isNaN(isoDate.getTime())) {
+      parsedBirthDate = isoDate
+    } else {
+      // Tenta parse dd/MM/yyyy
+      const parsedDate = parse(birthDate.trim(), 'dd/MM/yyyy', new Date())
+      if (isValid(parsedDate)) {
+        parsedBirthDate = parsedDate
+      } else {
+        throw new Error('Data de nascimento inválida. Use o formato YYYY-MM-DD ou dd/MM/yyyy.')
+      }
+    }
+  }
+
   const member = await prisma.member.create({
     data: {
       name,
@@ -135,7 +274,7 @@ export async function registerUserService(data: RegisterUserInput) {
       role: finalRole,
       branchId,
       userId: newUser.id, // Associa ao User criado
-      birthDate: birthDate ? new Date(birthDate) : undefined,
+      birthDate: parsedBirthDate,
       phone,
       address,
       avatarUrl,
@@ -148,11 +287,14 @@ export async function registerUserService(data: RegisterUserInput) {
       ? ALL_PERMISSION_TYPES
       : permissions ?? []
 
-  if (typesToAssign.length > 0) {
+  // Garantir que members_view sempre seja incluído para todos os membros
+  const permissionsToCreate = [...new Set([...typesToAssign, 'members_view'])]
+
+  if (permissionsToCreate.length > 0) {
     // Cria as permissões diretamente para o member
     // Permission tem memberId obrigatório, então não pode existir sem um member
     await prisma.permission.createMany({
-      data: typesToAssign.map((type) => ({
+      data: permissionsToCreate.map((type) => ({
         memberId: member.id,
         type,
       })),

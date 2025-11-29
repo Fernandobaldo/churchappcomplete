@@ -70,6 +70,15 @@ export default function MembersListScreen() {
 
                 }}
             />
+            <View style={styles.actionsContainer}>
+                <TouchableOpacity
+                    style={styles.actionButton}
+                    onPress={() => navigation.navigate('InviteLinks' as never)}
+                >
+                    <Ionicons name="link" size={20} color="#4F46E5" />
+                    <Text style={styles.actionButtonText}>Links de Convite</Text>
+                </TouchableOpacity>
+            </View>
             <TextInput
                 style={styles.searchInput}
                 placeholder="Buscar membros"
@@ -107,6 +116,29 @@ export default function MembersListScreen() {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#fff'},
+    actionsContainer: {
+        flexDirection: 'row',
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+        gap: 12,
+    },
+    actionButton: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#eef2ff',
+        padding: 12,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#4F46E5',
+    },
+    actionButtonText: {
+        marginLeft: 8,
+        color: '#4F46E5',
+        fontWeight: '500',
+        fontSize: 14,
+    },
     icon: {
         width: 26,
         alignItems: 'flex-start',

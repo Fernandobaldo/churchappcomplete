@@ -1,6 +1,7 @@
 import { NavigationContainer } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import LoginScreen from '../screens/LoginScreen'
+import RegisterScreen from '../screens/RegisterScreen'
 import DashboardScreen from '../screens/DashboardScreen'
 import EventsScreen from '../screens/EventsScreen'
 import AddEventScreen from '../screens/AddEventScreen'
@@ -17,7 +18,9 @@ import PermissionsScreen from '../screens/PermissionsScreen'
 import ManagePermissionsScreen from '../screens/ManagePermissionsScreen'
 import EditMemberPermissionsScreen from '../screens/EditMemberPermissionsScreen'
 import MemberRegistrationScreen from '../screens/MemberRegistrationScreen'
-import InviteLinkScreen from '../screens/InviteLinkScreen'
+import InviteLinksScreen from '../screens/InviteLinksScreen'
+import RegisterInviteScreen from '../screens/RegisterInviteScreen'
+import MemberLimitReachedScreen from '../screens/MemberLimitReachedScreen'
 import TabNavigator from './TabNavigator'
 import MoreScreen from '../screens/MoreScreen'
 import AddContributions from '../screens/AddContributionsScreen'
@@ -26,6 +29,12 @@ import MembersListScreen from '../screens/MembersListScreen'
 import EditProfileScreen from '../screens/EditProfileScreen'
 import EventDetailsScreen from '../screens/EventDetailsScreen'
 import EditEventScreen from '../screens/EditEventScreen'
+import StartOnboardingScreen from '../screens/onboarding/StartScreen'
+import ChurchOnboardingScreen from '../screens/onboarding/ChurchScreen'
+import BranchesOnboardingScreen from '../screens/onboarding/BranchesScreen'
+import ConcluidoOnboardingScreen from '../screens/onboarding/ConcluidoScreen'
+import ChurchSettingsScreen from '../screens/ChurchSettingsScreen'
+import ServiceScheduleFormScreen from '../screens/ServiceScheduleFormScreen'
 
 
 
@@ -38,6 +47,7 @@ export default function AppNavigator() {
         <NavigationContainer>
             <Stack.Navigator initialRouteName="Login" screenOptions={{animation: 'slide_from_right', headerShown: false }}>
                 <Stack.Screen name="Login" component={LoginScreen} />
+                <Stack.Screen name="Register" component={RegisterScreen} />
                 <Stack.Screen name="Dashboard" component={DashboardScreen} />
                 <Stack.Screen name="Events" component={EventsScreen} />
                 <Stack.Screen name="AddEvent" component={AddEventScreen} />
@@ -58,7 +68,9 @@ export default function AppNavigator() {
                 <Stack.Screen name="ManagePermissions" component={ManagePermissionsScreen} />
                 <Stack.Screen name="EditMemberPermissions" component={EditMemberPermissionsScreen} />
                 <Stack.Screen name="MemberRegistrationScreen" component={MemberRegistrationScreen} />
-                <Stack.Screen name="InviteLink" component={InviteLinkScreen} />
+                <Stack.Screen name="InviteLinks" component={InviteLinksScreen} />
+                <Stack.Screen name="RegisterInvite" component={RegisterInviteScreen} />
+                <Stack.Screen name="MemberLimitReached" component={MemberLimitReachedScreen} />
                 <Stack.Screen name="Main" component={TabNavigator} />
                 <Stack.Screen name="More" component={MoreScreen} />
                 <Stack.Screen name="AddContributions" component={AddContributions} />
@@ -67,6 +79,12 @@ export default function AppNavigator() {
                 <Stack.Screen name="EditProfileScreen" component={EditProfileScreen} />
                 <Stack.Screen name="EventDetails" component={EventDetailsScreen} options={{ headerShown: false }} />
                 <Stack.Screen name="EditEventScreen" component={EditEventScreen}  />
+                <Stack.Screen name="StartOnboarding" component={StartOnboardingScreen} />
+                <Stack.Screen name="ChurchOnboarding" component={ChurchOnboardingScreen} />
+                <Stack.Screen name="BranchesOnboarding" component={BranchesOnboardingScreen} />
+                <Stack.Screen name="ConcluidoOnboarding" component={ConcluidoOnboardingScreen} />
+                <Stack.Screen name="ChurchSettings" component={ChurchSettingsScreen} />
+                <Stack.Screen name="ServiceScheduleForm" component={ServiceScheduleFormScreen} />
 
 
 

@@ -35,9 +35,31 @@ export default function EditEvent() {
       const event = response.data
       setValue('title', event.title)
       setValue('description', event.description || '')
-      // Usa startDate se disponível, senão usa date (compatibilidade)
-      const eventDate = event.startDate || event.date
-      setValue('date', eventDate ? new Date(eventDate).toISOString().slice(0, 16) : '')
+      
+      // Combina startDate com time para preencher o campo datetime-local corretamente
+      let dateTimeValue = ''
+      if (event.startDate) {
+        const startDate = new Date(event.startDate)
+        
+        // Se houver campo time separado, usa ele para definir a hora
+        if (event.time) {
+          const [hours, minutes] = event.time.split(':').map(Number)
+          startDate.setHours(hours || 0, minutes || 0, 0, 0)
+        }
+        
+        // Formata para datetime-local (YYYY-MM-DDTHH:mm)
+        const year = startDate.getFullYear()
+        const month = String(startDate.getMonth() + 1).padStart(2, '0')
+        const day = String(startDate.getDate()).padStart(2, '0')
+        const hours = String(startDate.getHours()).padStart(2, '0')
+        const mins = String(startDate.getMinutes()).padStart(2, '0')
+        dateTimeValue = `${year}-${month}-${day}T${hours}:${mins}`
+      } else if (event.date) {
+        // Fallback para compatibilidade
+        dateTimeValue = new Date(event.date).toISOString().slice(0, 16)
+      }
+      
+      setValue('date', dateTimeValue)
       setValue('location', event.location)
       setValue('hasDonation', event.hasDonation || false)
       setValue('donationLink', event.donationLink || '')

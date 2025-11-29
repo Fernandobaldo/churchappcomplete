@@ -6,6 +6,21 @@ export class ContributionService {
             orderBy: { date: 'desc' }
         });
     }
+    async getById(id) {
+        const contribution = await prisma.contribution.findUnique({
+            where: { id },
+            include: {
+                Branch: {
+                    select: {
+                        id: true,
+                        name: true,
+                        churchId: true,
+                    },
+                },
+            },
+        });
+        return contribution;
+    }
     async create(data) {
         const contribution = await prisma.contribution.create({
             data: {

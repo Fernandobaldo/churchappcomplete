@@ -99,8 +99,7 @@ Cria um novo membro ou usuário.
           },
           birthDate: {
             type: 'string',
-            format: 'date',
-            description: 'Data de nascimento (formato ISO ou dd/MM/yyyy)',
+            description: 'Data de nascimento (formato ISO YYYY-MM-DD ou dd/MM/yyyy)',
           },
           phone: {
             type: 'string',
@@ -111,9 +110,8 @@ Cria um novo membro ou usuário.
             description: 'Endereço do membro',
           },
           avatarUrl: {
-            type: 'string',
-            format: 'uri',
-            description: 'URL do avatar do membro',
+            type: ['string', 'null'],
+            description: 'URL do avatar do membro (pode ser null ou string vazia). Se fornecido, deve ser uma URI válida.',
           },
           fromLandingPage: {
             type: 'boolean',

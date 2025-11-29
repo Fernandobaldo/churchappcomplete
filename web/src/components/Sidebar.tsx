@@ -6,27 +6,36 @@ import {
   BookOpen, 
   Users, 
   Shield,
-  User
+  User,
+  DollarSign,
+  Bell,
+  Settings
 } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
+import { hasAccess, hasRole } from '../utils/authUtils'
 
 const menuItems = [
   { path: '/app/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { path: '/app/events', icon: Calendar, label: 'Eventos' },
   { path: '/app/contributions', icon: Heart, label: 'Contribuições' },
   { path: '/app/devotionals', icon: BookOpen, label: 'Devocionais' },
+  { path: '/app/finances', icon: DollarSign, label: 'Finanças' },
+  { path: '/app/notices', icon: Bell, label: 'Avisos' },
   { path: '/app/members', icon: Users, label: 'Membros' },
+  { path: '/app/church-settings', icon: Settings, label: 'Configurações da Igreja', permission: 'church_manage' },
   { path: '/app/permissions', icon: Shield, label: 'Permissões' },
   { path: '/app/profile', icon: User, label: 'Perfil' },
 ]
 
 export default function Sidebar() {
   const { user } = useAuthStore()
-  const permissions = user?.permissions?.map((p) => p.type) || []
 
   const filteredMenuItems = menuItems.filter((item) => {
     if (item.path === '/app/permissions') {
-      return permissions.includes('MANAGE_PERMISSIONS') || user?.role === 'ADMINGERAL'
+      return hasAccess(user, 'MANAGE_PERMISSIONS') || hasRole(user, 'ADMINGERAL')
+    }
+    if (item.permission) {
+      return hasAccess(user, item.permission)
     }
     return true
   })

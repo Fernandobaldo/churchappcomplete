@@ -59,11 +59,18 @@ Use este token no header \`Authorization: Bearer <token>\` para acessar endpoint
                                 id: { type: 'string' },
                                 email: { type: 'string' },
                                 name: { type: 'string' },
+                                memberId: { type: 'string', nullable: true },
                                 role: { type: 'string', nullable: true },
                                 branchId: { type: 'string', nullable: true },
+                                churchId: { type: 'string', nullable: true },
                                 permissions: {
                                     type: 'array',
-                                    items: { type: 'string' },
+                                    items: {
+                                        type: 'object',
+                                        properties: {
+                                            type: { type: 'string' },
+                                        },
+                                    },
                                     nullable: true,
                                 },
                             },

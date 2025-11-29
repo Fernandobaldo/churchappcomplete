@@ -3,9 +3,13 @@ import { useAuthStore } from '../stores/authStore'
 
 interface ProtectedRouteProps {
   children: React.ReactNode
+  requireOnboarding?: boolean
 }
 
-export default function ProtectedRoute({ children }: ProtectedRouteProps) {
+export default function ProtectedRoute({ 
+  children, 
+  requireOnboarding = true 
+}: ProtectedRouteProps) {
   const { token, user } = useAuthStore()
 
   if (!token) {
@@ -13,7 +17,7 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   }
 
   // Se tem token mas não completou onboarding, redireciona para onboarding
-  if (!user?.branchId || !user?.role) {
+  if (requireOnboarding && (!user?.branchId || !user?.role)) {
     return <Navigate to="/onboarding/start" replace />
   }
 

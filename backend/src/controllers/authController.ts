@@ -50,6 +50,39 @@ export async function loginHandler(request: FastifyRequest, reply: FastifyReply)
       user,
     })
   } catch (error: any) {
+    // Verifica se é erro de usuário não encontrado
+    if (error.message && error.message.includes('Usuário não encontrado')) {
+      await logAudit(
+        request,
+        AuditAction.UNAUTHORIZED_ACCESS_ATTEMPT,
+        'Auth',
+        `Tentativa de login falhada: ${email} - Usuário não encontrado`,
+        { 
+          metadata: { email, reason: 'Usuário não encontrado' },
+          userId: 'system',
+          userEmail: email,
+        }
+      )
+      return reply.status(404).send({ message: error.message })
+    }
+    
+    // Verifica se é erro de senha incorreta
+    if (error.message && error.message.includes('Senha incorreta')) {
+      await logAudit(
+        request,
+        AuditAction.UNAUTHORIZED_ACCESS_ATTEMPT,
+        'Auth',
+        `Tentativa de login falhada: ${email} - Senha incorreta`,
+        { 
+          metadata: { email, reason: 'Senha incorreta' },
+          userId: 'system',
+          userEmail: email,
+        }
+      )
+      return reply.status(401).send({ message: error.message })
+    }
+    
+    // Erro genérico de credenciais inválidas
     if (error.message === 'Credenciais inválidas') {
       await logAudit(
         request,

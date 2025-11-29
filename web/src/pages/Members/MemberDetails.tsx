@@ -4,6 +4,8 @@ import { ArrowLeft, Mail, Phone, MapPin, Calendar, Shield } from 'lucide-react'
 import api from '../../api/api'
 import toast from 'react-hot-toast'
 import { useAuthStore } from '../../stores/authStore'
+import { hasAccess } from '../../utils/authUtils'
+import PermissionGuard from '../../components/PermissionGuard'
 
 interface Member {
   id: string
@@ -65,6 +67,7 @@ export default function MemberDetails() {
   }
 
   const canManagePermissions = user?.permissions?.some(p => p.type === 'MANAGE_PERMISSIONS') || user?.role === 'ADMINGERAL'
+  const canViewSensitiveData = hasAccess(user, 'members_manage')
 
   return (
     <div className="space-y-6">
@@ -110,32 +113,36 @@ export default function MemberDetails() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <Mail className="w-5 h-5 text-gray-400" />
-              <div>
-                <p className="text-sm text-gray-600">Email</p>
-                <p className="font-medium">{member.email}</p>
-              </div>
-            </div>
-
-            {member.phone && (
-              <div className="flex items-center gap-3">
-                <Phone className="w-5 h-5 text-gray-400" />
-                <div>
-                  <p className="text-sm text-gray-600">Telefone</p>
-                  <p className="font-medium">{member.phone}</p>
+            {canViewSensitiveData && (
+              <>
+                <div className="flex items-center gap-3">
+                  <Mail className="w-5 h-5 text-gray-400" />
+                  <div>
+                    <p className="text-sm text-gray-600">Email</p>
+                    <p className="font-medium">{member.email}</p>
+                  </div>
                 </div>
-              </div>
-            )}
 
-            {member.address && (
-              <div className="flex items-center gap-3">
-                <MapPin className="w-5 h-5 text-gray-400" />
-                <div>
-                  <p className="text-sm text-gray-600">Endereço</p>
-                  <p className="font-medium">{member.address}</p>
-                </div>
-              </div>
+                {member.phone && (
+                  <div className="flex items-center gap-3">
+                    <Phone className="w-5 h-5 text-gray-400" />
+                    <div>
+                      <p className="text-sm text-gray-600">Telefone</p>
+                      <p className="font-medium">{member.phone}</p>
+                    </div>
+                  </div>
+                )}
+
+                {member.address && (
+                  <div className="flex items-center gap-3">
+                    <MapPin className="w-5 h-5 text-gray-400" />
+                    <div>
+                      <p className="text-sm text-gray-600">Endereço</p>
+                      <p className="font-medium">{member.address}</p>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
 
             {member.birthDate && (

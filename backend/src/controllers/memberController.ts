@@ -2,7 +2,7 @@ import { FastifyReply, FastifyRequest } from 'fastify'
 import { memberIdParamSchema, updateMemberBodySchema } from '../schemas/memberSchemas'
 import { findAllMembers, findMemberById, formatDate, updateMember } from '../services/memberService'
 import { parse } from 'date-fns'
-import { getMemberFromUserId, validateMemberEditPermission } from '../utils/authorization'
+import { getMemberFromUserId, validateMemberEditPermission, hasAccess } from '../utils/authorization'
 import { AuditLogger } from '../utils/auditHelper'
 
 export async function getAllMembers(request: FastifyRequest, reply: FastifyReply) {
@@ -28,7 +28,14 @@ export async function getAllMembers(request: FastifyRequest, reply: FastifyReply
     const userRole = user.role || currentMember.role
     const memberId = user.memberId || currentMember.id
 
-    const members = await findAllMembers(branchId, churchId, userRole, memberId)
+    // Verifica se o usuário tem permissão members_manage para ver dados sensíveis
+    // getMemberFromUserId já inclui Permission
+    const hasManagePermission = hasAccess(
+      { role: currentMember.role, Permission: currentMember.Permission || [] },
+      'members_manage'
+    )
+
+    const members = await findAllMembers(branchId, churchId, userRole, memberId, hasManagePermission)
     return reply.send(members)
   } catch (error: any) {
     return reply.status(500).send({ error: error.message })
@@ -69,22 +76,28 @@ export async function getMemberById(request: FastifyRequest, reply: FastifyReply
         return reply.status(403).send({ error: 'Você só pode visualizar membros da sua igreja' })
       }
     }
-    // ADMINFILIAL e COORDINATOR só podem ver membros da sua filial
-    else if (currentMember.role === 'ADMINFILIAL' || currentMember.role === 'COORDINATOR') {
+    // ADMINFILIAL, COORDINATOR e MEMBER podem ver membros da sua filial
+    else if (currentMember.role === 'ADMINFILIAL' || currentMember.role === 'COORDINATOR' || currentMember.role === 'MEMBER') {
       if (member.branchId !== currentMember.branchId) {
         return reply.status(403).send({ error: 'Você só pode visualizar membros da sua filial' })
       }
     }
-    // MEMBER só pode ver a si mesmo
-    else {
-      if (member.id !== currentMember.id) {
-        return reply.status(403).send({ error: 'Você só pode visualizar seu próprio perfil' })
-      }
+
+    // Verifica se o usuário tem permissão members_manage para ver dados sensíveis
+    // getMemberFromUserId já inclui Permission
+    const hasManagePermission = hasAccess(
+      { role: currentMember.role, Permission: currentMember.Permission || [] },
+      'members_manage'
+    )
+    const memberData = await findMemberById(id, hasManagePermission)
+
+    if (!memberData) {
+      return reply.code(404).send({ message: 'Membro não encontrado' })
     }
 
     return reply.send({
-      ...member,
-      birthDate: formatDate(member.birthDate),
+      ...memberData,
+      birthDate: formatDate(memberData.birthDate),
     })
   } catch (error: any) {
     return reply.status(500).send({ error: error.message })

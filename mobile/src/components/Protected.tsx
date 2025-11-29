@@ -1,6 +1,7 @@
 import React from 'react'
-import { View, Text } from 'react-native'
+import { View, Text, StyleSheet } from 'react-native'
 import { useAuthStore } from '../stores/authStore'
+import { hasAccess } from '../utils/authUtils'
 
 type ProtectedProps = {
     permission: string
@@ -10,13 +11,29 @@ type ProtectedProps = {
 export default function Protected({ permission, children }: ProtectedProps) {
     const user = useAuthStore((s) => s.user)
 
-    if (!user?.permissions?.includes(permission)) {
+    if (!hasAccess(user, permission)) {
         return (
-            <View style={{ padding: 20 }}>
-                <Text style={{ color: 'red' }}>Você não tem permissão para acessar esta área.</Text>
+            <View style={styles.container}>
+                <Text style={styles.message}>
+                    Você não tem permissão para acessar esta área.
+                </Text>
             </View>
         )
     }
 
     return <>{children}</>
 }
+
+const styles = StyleSheet.create({
+    container: {
+        padding: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+        flex: 1,
+    },
+    message: {
+        color: '#ef4444',
+        fontSize: 16,
+        textAlign: 'center',
+    },
+})

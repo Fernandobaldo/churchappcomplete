@@ -2,75 +2,103 @@ import { z } from 'zod';
 import { ChurchService } from '../services/churchService';
 import { AuditLogger } from '../utils/auditHelper';
 import { prisma } from '../lib/prisma';
+import { getMemberFromUserId } from '../utils/authorization';
 export class ChurchController {
     constructor() {
         this.service = new ChurchService();
     }
     async create(request, reply) {
-        const bodySchema = z.object({
-            name: z.string(),
-            logoUrl: z.string().url().optional(),
-            withBranch: z.boolean().optional(),
-            branchName: z.string().optional(),
-            pastorName: z.string().optional(),
-        });
-        const data = bodySchema.parse(request.body);
-        // Obtém o usuário logado a partir do token JWT
-        const user = request.user;
-        // Busca os dados do usuário no banco para ter nome, senha, etc
-        const dbUser = await this.service.getUserData(user.sub);
-        if (!dbUser) {
-            return reply.code(401).send({ message: 'Usuário não encontrado.' });
-        }
-        const result = await this.service.createChurchWithMainBranch(data, dbUser);
-        // Busca o User com Member associado para gerar o token atualizado
-        let newToken = null;
-        if (result.member) {
-            // Busca User com Member associado (incluindo Branch e Church)
-            const userWithMember = await prisma.user.findUnique({
-                where: { id: dbUser.id },
-                include: {
-                    Member: {
-                        include: {
-                            Permission: true,
-                            Branch: {
-                                include: {
-                                    Church: true,
+        try {
+            const bodySchema = z.object({
+                name: z.string(),
+                logoUrl: z.string().url().optional(),
+                withBranch: z.boolean().optional(),
+                branchName: z.string().optional(),
+                pastorName: z.string().optional(),
+            });
+            const data = bodySchema.parse(request.body);
+            // Obtém o usuário logado a partir do token JWT
+            const user = request.user;
+            if (!user) {
+                return reply.code(401).send({ message: 'Usuário não autenticado.' });
+            }
+            // Busca os dados do usuário no banco para ter nome, senha, etc
+            const userId = user.userId || user.id;
+            const dbUser = await this.service.getUserData(userId);
+            if (!dbUser) {
+                return reply.code(401).send({ message: 'Usuário não encontrado.' });
+            }
+            const result = await this.service.createChurchWithMainBranch(data, dbUser);
+            // Busca o User com Member associado para gerar o token atualizado
+            let newToken = null;
+            if (result.member) {
+                // Busca User com Member associado (incluindo Branch e Church)
+                const userWithMember = await prisma.user.findUnique({
+                    where: { id: dbUser.id },
+                    include: {
+                        Member: {
+                            include: {
+                                Permission: true,
+                                Branch: {
+                                    include: {
+                                        Church: true,
+                                    },
                                 },
                             },
                         },
                     },
-                },
-            });
-            if (userWithMember?.Member) {
-                const member = userWithMember.Member;
-                const tokenPayload = {
-                    sub: userWithMember.id,
-                    email: userWithMember.email,
-                    name: userWithMember.name,
-                    type: 'member',
-                    memberId: member.id,
-                    role: member.role,
-                    branchId: member.branchId,
-                    churchId: member.Branch?.Church?.id || null,
-                    permissions: member.Permission.map(p => p.type),
-                };
-                newToken = request.server.jwt.sign(tokenPayload, { expiresIn: '7d' });
-                console.log(`[CHURCH] ✅ Token gerado para member ${member.id} com role ${member.role} e ${member.Permission.length} permissões`);
+                });
+                if (userWithMember?.Member) {
+                    const member = userWithMember.Member;
+                    const tokenPayload = {
+                        sub: userWithMember.id,
+                        email: userWithMember.email,
+                        name: userWithMember.name,
+                        type: 'member',
+                        memberId: member.id,
+                        role: member.role,
+                        branchId: member.branchId,
+                        churchId: member.Branch?.Church?.id || null,
+                        permissions: member.Permission.map(p => p.type),
+                    };
+                    newToken = request.server.jwt.sign(tokenPayload, { expiresIn: '7d' });
+                    console.log(`[CHURCH] ✅ Token gerado para member ${member.id} com role ${member.role} e ${member.Permission.length} permissões`);
+                }
+                else {
+                    console.warn(`[CHURCH] ⚠️ Member não encontrado após criação para user ${dbUser.id}`);
+                }
             }
             else {
-                console.warn(`[CHURCH] ⚠️ Member não encontrado após criação para user ${dbUser.id}`);
+                console.warn('[CHURCH] ⚠️ Member não foi criado (withBranch pode ser false)');
             }
+            // Log de auditoria
+            await AuditLogger.churchCreated(request, result.church.id, result.church.name);
+            return reply.code(201).send({
+                church: {
+                    id: result.church.id,
+                    name: result.church.name,
+                    logoUrl: result.church.logoUrl,
+                    isActive: result.church.isActive,
+                },
+                branch: result.branch,
+                member: result.member,
+                token: newToken, // Retorna o novo token (pode ser null se não criou member)
+            });
         }
-        else {
-            console.warn('[CHURCH] ⚠️ Member não foi criado (withBranch pode ser false)');
+        catch (error) {
+            // Trata erros de validação Zod
+            if (error.name === 'ZodError' || error.issues) {
+                return reply.code(400).send({
+                    message: 'Dados inválidos',
+                    errors: error.errors || error.issues
+                });
+            }
+            // Outros erros
+            console.error('Erro ao criar igreja:', error);
+            return reply.code(500).send({
+                message: error.message || 'Erro ao criar igreja'
+            });
         }
-        // Log de auditoria
-        await AuditLogger.churchCreated(request, result.church.id, result.church.name);
-        return reply.code(201).send({
-            ...result,
-            token: newToken, // Retorna o novo token (pode ser null se não criou member)
-        });
     }
     async getAll(request, reply) {
         try {
@@ -88,58 +116,162 @@ export class ChurchController {
         }
     }
     async getById(request, reply) {
-        const { id } = z.object({ id: z.string().cuid() }).parse(request.params);
-        const church = await this.service.getChurchById(id);
-        if (!church) {
-            return reply.code(404).send({ message: 'Igreja não encontrada.' });
+        try {
+            const { id } = z.object({ id: z.string().cuid() }).parse(request.params);
+            const church = await this.service.getChurchById(id);
+            if (!church) {
+                return reply.code(404).send({ message: 'Igreja não encontrada.' });
+            }
+            return reply.send(church);
         }
-        return reply.send(church);
+        catch (error) {
+            if (error.name === 'ZodError' || error.issues) {
+                return reply.code(400).send({
+                    message: 'ID inválido',
+                    errors: error.errors || error.issues
+                });
+            }
+            return reply.code(500).send({ message: error.message || 'Erro ao buscar igreja' });
+        }
     }
     async update(request, reply) {
-        const { id } = z.object({ id: z.string().cuid() }).parse(request.params);
-        const data = z
-            .object({
-            name: z.string(),
-            logoUrl: z.string().url().optional(),
-            withBranch: z.boolean().optional(),
-            branchName: z.string().optional(),
-            pastorName: z.string().optional(),
-        })
-            .parse(request.body);
-        const church = await this.service.updateChurch(id, data);
-        return reply.send(church);
+        try {
+            const { id } = z.object({ id: z.string().cuid() }).parse(request.params);
+            const data = z
+                .object({
+                name: z.string(),
+                logoUrl: z.string().url().optional(),
+                withBranch: z.boolean().optional(),
+                branchName: z.string().optional(),
+                pastorName: z.string().optional(),
+            })
+                .parse(request.body);
+            const user = request.user;
+            if (!user) {
+                return reply.code(401).send({ message: 'Usuário não autenticado.' });
+            }
+            // Verifica se o usuário tem permissão church_manage ou é ADMINGERAL/ADMINFILIAL
+            const hasPermission = user.permissions?.includes('church_manage');
+            const hasRole = user.role === 'ADMINGERAL' || user.role === 'ADMINFILIAL';
+            if (!hasPermission && !hasRole) {
+                return reply.code(403).send({
+                    message: 'Você não tem permissão para editar a igreja.',
+                });
+            }
+            // Verifica se o usuário pertence à igreja
+            if (user.branchId) {
+                const { prisma } = await import('../lib/prisma');
+                const branch = await prisma.branch.findUnique({
+                    where: { id: user.branchId },
+                });
+                if (!branch || branch.churchId !== id) {
+                    // Se não for da mesma igreja, verifica se é ADMINGERAL
+                    if (user.role !== 'ADMINGERAL') {
+                        return reply.code(403).send({
+                            message: 'Você só pode editar sua própria igreja.',
+                        });
+                    }
+                }
+            }
+            const church = await this.service.updateChurch(id, data);
+            return reply.send(church);
+        }
+        catch (error) {
+            // Trata erro do Prisma quando a igreja não existe
+            if (error.code === 'P2025' || error.message?.includes('Record to update not found')) {
+                return reply.code(404).send({ message: 'Igreja não encontrada.' });
+            }
+            // Trata erros de validação Zod
+            if (error.name === 'ZodError' || error.issues) {
+                return reply.code(400).send({
+                    message: 'Dados inválidos',
+                    errors: error.errors || error.issues
+                });
+            }
+            return reply.code(500).send({ message: error.message || 'Erro ao atualizar igreja' });
+        }
     }
     async delete(request, reply) {
-        const { id } = request.params;
-        const user = request.user;
-        const userId = request.user?.id;
-        if (!user || user.role !== 'SAASADMIN') {
-            return reply.status(403).send({ error: 'Apenas o administrador do sistema pode deletar uma igreja.' });
+        try {
+            const { id } = request.params;
+            const user = request.user;
+            if (!user || !user.memberId) {
+                return reply.status(401).send({ error: 'Autenticação necessária' });
+            }
+            // Verificar se a igreja existe PRIMEIRO (antes de buscar o membro)
+            const church = await this.service.getChurchById(id);
+            if (!church) {
+                return reply.status(404).send({ error: 'Igreja não encontrada.' });
+            }
+            // Buscar dados do membro para verificar role e churchId
+            const member = await getMemberFromUserId(user.userId || user.id);
+            if (!member) {
+                return reply.status(404).send({ error: 'Membro não encontrado' });
+            }
+            // Verificar se o membro tem Branch associada
+            if (!member.Branch) {
+                return reply.status(400).send({ error: 'Membro não está associado a uma filial.' });
+            }
+            // Apenas ADMINGERAL pode deletar igrejas
+            if (member.role !== 'ADMINGERAL') {
+                return reply.status(403).send({ error: 'Apenas Administradores Gerais podem deletar igrejas.' });
+            }
+            // Verificar se a igreja pertence ao membro
+            if (member.Branch.churchId !== id) {
+                return reply.status(403).send({ error: 'Você só pode deletar sua própria igreja.' });
+            }
+            await this.service.deleteChurch(id);
+            return reply.status(200).send({ message: 'Igreja deletada com sucesso.' });
         }
-        const church = await this.service.getChurchById(id);
-        if (!church) {
-            return reply.status(404).send({ error: 'Igreja não encontrada.' });
+        catch (error) {
+            // Trata erro do Prisma quando a igreja não existe
+            if (error.code === 'P2025' || error.message?.includes('Record to delete does not exist') || error.message?.includes('Record to update not found')) {
+                return reply.status(404).send({ error: 'Igreja não encontrada.' });
+            }
+            return reply.status(500).send({ error: error.message || 'Erro ao deletar igreja' });
         }
-        //  validar se o usuário é o administrador da igreja
-        if (church.ownerId !== userId)
-            return reply.status(403).send({ error: 'Acesso negado.' });
-        await this.service.deleteChurch(id);
-        return reply.status(200).send({ message: 'Igreja deletada com sucesso.' });
     }
     async deactivate(request, reply) {
-        const { id } = request.params;
-        const user = request.user;
-        const church = await this.service.getChurchById(id);
-        if (!church) {
-            return reply.status(404).send({ error: 'Igreja não encontrada.' });
+        try {
+            const { id } = request.params;
+            const user = request.user;
+            if (!user || !user.memberId) {
+                return reply.status(401).send({ error: 'Autenticação necessária' });
+            }
+            // Verificar se a igreja existe PRIMEIRO (antes de buscar o membro)
+            const church = await this.service.getChurchById(id);
+            if (!church) {
+                return reply.status(404).send({ error: 'Igreja não encontrada.' });
+            }
+            // Buscar dados do membro para verificar role e churchId
+            const member = await getMemberFromUserId(user.userId || user.id);
+            if (!member) {
+                return reply.status(404).send({ error: 'Membro não encontrado' });
+            }
+            // Verificar se o membro tem Branch associada
+            if (!member.Branch) {
+                return reply.status(400).send({ error: 'Membro não está associado a uma filial.' });
+            }
+            // Apenas ADMINGERAL pode desativar igrejas
+            if (member.role !== 'ADMINGERAL') {
+                return reply.status(403).send({ error: 'Apenas Administradores Gerais podem desativar igrejas.' });
+            }
+            // Verificar se a igreja pertence ao membro
+            if (member.Branch.churchId !== id) {
+                return reply.status(403).send({ error: 'Você só pode desativar sua própria igreja.' });
+            }
+            const updatedChurch = await this.service.deactivateChurch(id);
+            if (!updatedChurch) {
+                return reply.status(404).send({ error: 'Igreja não encontrada.' });
+            }
+            return reply.status(200).send(updatedChurch);
         }
-        // Permitir se for SAASADMIN ou ADMINGERAL dessa igreja
-        const isSaasAdmin = user.role === 'SAASADMIN';
-        const isChurchOwner = user.role === 'ADMINGERAL' && church.Branch?.some(branch => branch.members?.some(member => member.userId === user.id));
-        if (!isSaasAdmin && !isChurchOwner) {
-            return reply.status(403).send({ error: 'Apenas o administrador da igreja ou do sistema pode desativar.' });
+        catch (error) {
+            // Trata erro do Prisma quando a igreja não existe
+            if (error.code === 'P2025' || error.message?.includes('Record to update not found')) {
+                return reply.status(404).send({ error: 'Igreja não encontrada.' });
+            }
+            return reply.status(500).send({ error: error.message || 'Erro ao desativar igreja' });
         }
-        await this.service.deactivateChurch(id);
-        return reply.status(200).send({ message: 'Igreja desativada com sucesso.' });
     }
 }

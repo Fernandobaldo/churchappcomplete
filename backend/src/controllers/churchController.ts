@@ -162,6 +162,38 @@ export class ChurchController {
         })
         .parse(request.body)
 
+      const user = request.user
+      if (!user) {
+        return reply.code(401).send({ message: 'Usuário não autenticado.' })
+      }
+
+      // Verifica se o usuário tem permissão church_manage ou é ADMINGERAL/ADMINFILIAL
+      const hasPermission = user.permissions?.includes('church_manage')
+      const hasRole = user.role === 'ADMINGERAL' || user.role === 'ADMINFILIAL'
+
+      if (!hasPermission && !hasRole) {
+        return reply.code(403).send({
+          message: 'Você não tem permissão para editar a igreja.',
+        })
+      }
+
+      // Verifica se o usuário pertence à igreja
+      if (user.branchId) {
+        const { prisma } = await import('../lib/prisma')
+        const branch = await prisma.branch.findUnique({
+          where: { id: user.branchId },
+        })
+
+        if (!branch || branch.churchId !== id) {
+          // Se não for da mesma igreja, verifica se é ADMINGERAL
+          if (user.role !== 'ADMINGERAL') {
+            return reply.code(403).send({
+              message: 'Você só pode editar sua própria igreja.',
+            })
+          }
+        }
+      }
+
       const church = await this.service.updateChurch(id, data)
       return reply.send(church)
     } catch (error: any) {

@@ -6,6 +6,7 @@ import fastifySwagger from '@fastify/swagger';
 import fastifySwaggerUi from '@fastify/swagger-ui';
 import dotenv from 'dotenv';
 import { env } from './env.js';
+import { authenticate } from './middlewares/authenticate.js';
 // Se dotenv-cli carregou .env.test, detecta pelo DATABASE_URL
 // Carrega .env primeiro
 dotenv.config();
@@ -38,14 +39,8 @@ app.register(fastifyCors, { origin: true });
 app.register(fastifyJwt, {
     secret: env.JWT_SECRET,
 });
-app.decorate('authenticate', async function (request, reply) {
-    try {
-        await request.jwtVerify();
-    }
-    catch (err) {
-        return reply.send(err);
-    }
-});
+// Usa o middleware authenticate que popula request.user corretamente
+app.decorate('authenticate', authenticate);
 app.register(fastifySwagger, {
     openapi: {
         openapi: '3.0.0',
@@ -168,6 +163,10 @@ Authorization: Bearer <seu-token>
             {
                 name: 'Auditoria',
                 description: 'Logs de auditoria de ações administrativas',
+            },
+            {
+                name: 'Links de Convite',
+                description: 'Gerenciamento de links de convite para registro de membros',
             },
         ],
     },

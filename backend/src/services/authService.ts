@@ -57,7 +57,8 @@ export class AuthService {
       if (process.env.NODE_ENV === 'test' || process.env.VITEST) {
         console.log(`[AUTH DEBUG] ❌ User NÃO encontrado para: ${email}`)
       }
-      return null
+      // Retorna um objeto especial para indicar que o usuário não existe
+      return { userNotFound: true }
     }
 
     if (process.env.NODE_ENV === 'test' || process.env.VITEST) {
@@ -118,7 +119,8 @@ export class AuthService {
     }
 
     if (!passwordMatch) {
-      return null
+      // Retorna um objeto especial para indicar que a senha está incorreta
+      return { invalidPassword: true }
     }
 
     // Se User tem Member associado, retorna dados do Member
@@ -155,7 +157,21 @@ export class AuthService {
 
   async login(email: string, password: string) {
     const result = await this.validateCredentials(email, password)
-    if (!result) throw new Error('Credenciais inválidas')
+    
+    // Verifica se o usuário não foi encontrado
+    if (result && 'userNotFound' in result && result.userNotFound) {
+      throw new Error('Usuário não encontrado. Verifique se o email está correto ou crie uma conta.')
+    }
+    
+    // Verifica se a senha está incorreta
+    if (result && 'invalidPassword' in result && result.invalidPassword) {
+      throw new Error('Senha incorreta. Verifique sua senha e tente novamente.')
+    }
+    
+    // Se result não é um objeto válido com user, lança erro genérico
+    if (!result || !('user' in result)) {
+      throw new Error('Credenciais inválidas')
+    }
 
     const { type, user, member } = result
 

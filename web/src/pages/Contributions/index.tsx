@@ -5,6 +5,7 @@ import api from '../../api/api'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
 import ptBR from 'date-fns/locale/pt-BR'
+import PermissionGuard from '../../components/PermissionGuard'
 
 interface Contribution {
   id: string
@@ -72,10 +73,12 @@ export default function Contributions() {
           <h1 className="text-3xl font-bold text-gray-900">Contribuições</h1>
           <p className="text-gray-600 mt-1">Gerencie as contribuições da igreja</p>
         </div>
-        <button onClick={() => navigate('/app/contributions/new')} className="btn-primary flex items-center gap-2">
-          <Plus className="w-5 h-5" />
-          Nova Contribuição
-        </button>
+        <PermissionGuard permission="contributions_manage">
+          <button onClick={() => navigate('/app/contributions/new')} className="btn-primary flex items-center gap-2">
+            <Plus className="w-5 h-5" />
+            Nova Contribuição
+          </button>
+        </PermissionGuard>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -126,9 +129,11 @@ export default function Contributions() {
         <div className="card text-center py-12">
           <Heart className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <p className="text-gray-600 mb-4">Nenhuma contribuição cadastrada</p>
-          <button onClick={() => navigate('/app/contributions/new')} className="btn-primary">
-            Adicionar Primeira Contribuição
-          </button>
+          <PermissionGuard permission="contributions_manage">
+            <button onClick={() => navigate('/app/contributions/new')} className="btn-primary">
+              Adicionar Primeira Contribuição
+            </button>
+          </PermissionGuard>
         </div>
       ) : (
         <div className="card">

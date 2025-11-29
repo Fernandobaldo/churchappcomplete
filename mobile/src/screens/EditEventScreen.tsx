@@ -61,11 +61,21 @@ export default function EditEventScreen() {
             const res = await api.get(`/events/${id}`)
             const e = res.data
 
+            // Combina startDate com time para preencher o campo time corretamente
+            let timeValue = e.time || ''
+            if (e.startDate && !timeValue) {
+                // Se não houver time separado, extrai do startDate
+                const startDate = new Date(e.startDate)
+                const hours = String(startDate.getHours()).padStart(2, '0')
+                const minutes = String(startDate.getMinutes()).padStart(2, '0')
+                timeValue = `${hours}:${minutes}`
+            }
+
             setForm({
                 title: e.title || '',
                 startDate: e.startDate ? format(new Date(e.startDate), 'dd/MM/yyyy') : '',
                 endDate: e.endDate ? format(new Date(e.endDate), 'dd/MM/yyyy') : '',
-                time: e.time || '',
+                time: timeValue,
                 description: e.description || '',
                 location: e.location || '',
                 hasDonation: e.hasDonation || false,

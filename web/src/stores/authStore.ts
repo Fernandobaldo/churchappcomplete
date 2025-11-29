@@ -10,6 +10,7 @@ export type User = {
   email: string
   role: string
   branchId: string
+  memberId?: string
   permissions: Permission[]
   token: string
 }
@@ -42,25 +43,38 @@ export const useAuthStore = create<AuthStore>()(
       user: null,
       token: null,
       setUserFromToken: (token) => {
-        const decoded = jwtDecode<DecodedToken>(token)
+        try {
+          const decoded = jwtDecode<DecodedToken>(token)
 
-        // Log para debug
-        if (!decoded.branchId) {
-          console.warn('⚠️ ATENÇÃO: branchId não está presente no token!', decoded)
-        }
+          // Log para debug
+          if (!decoded.branchId) {
+            console.warn('⚠️ ATENÇÃO: branchId não está presente no token!', decoded)
+          }
 
-        set({
-          user: {
-            id: decoded.sub,
-            name: decoded.name || '',
-            email: decoded.email,
-            role: decoded.role || '',
-            branchId: decoded.branchId || '',
-            permissions: (decoded.permissions || []).map((type) => ({ type })),
+          // Garante que permissions seja sempre um array
+          const permissions = decoded.permissions || []
+          const permissionsArray = Array.isArray(permissions)
+            ? permissions.map((type) => ({ type }))
+            : []
+
+          set({
+            user: {
+              id: decoded.sub,
+              name: decoded.name || '',
+              email: decoded.email,
+              role: decoded.role || '',
+              branchId: decoded.branchId || '',
+              memberId: decoded.memberId || undefined,
+              permissions: permissionsArray,
+              token,
+            },
             token,
-          },
-          token,
-        })
+          })
+        } catch (error) {
+          console.error('Erro ao decodificar token:', error)
+          // Em caso de erro, ainda salva o token
+          set({ token })
+        }
       },
       logout: () => set({ user: null, token: null }),
       setToken: (token) => set({ token }),

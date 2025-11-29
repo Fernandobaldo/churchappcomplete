@@ -19,11 +19,15 @@ export async function createBranch(data) {
         if (creatorMember.role !== 'ADMINGERAL') {
             throw new Error('Apenas Administradores Gerais podem criar filiais');
         }
-        // 4. Verificar se a igreja pertence ao criador
+        // 4. Verificar se o criador tem Branch associada
+        if (!creatorMember.Branch) {
+            throw new Error('Membro criador não está associado a uma filial.');
+        }
+        // 5. Verificar se a igreja pertence ao criador
         if (creatorMember.Branch.churchId !== churchId) {
             throw new Error('Você não pode criar filiais para outras igrejas');
         }
-        // 5. Validar limite de plano
+        // 6. Validar limite de plano
         await checkPlanBranchesLimit(creatorUserId);
     }
     // Remove creatorUserId antes de criar (não é campo do modelo)

@@ -17,25 +17,36 @@ export async function getAllPermissionsController(request: FastifyRequest, reply
 export async function assignPermissionsController(request: FastifyRequest, reply: FastifyReply) {
   const paramsSchema = z.object({ id: z.string().cuid() })
   const bodySchema = z.object({
-    permissions: z.array(z.string()).min(1),
+    permissions: z.array(z.string()), // Permite array vazio para remover todas as permissões
   })
 
   const { id } = paramsSchema.parse(request.params)
   const { permissions } = bodySchema.parse(request.body)
 
-  const result = await prisma.permission.createMany({
-    data: permissions.map((type) => ({
-      memberId: id,
-      type,
-    })),
-    skipDuplicates: true,
+  // Primeiro, remove todas as permissões existentes do membro
+  await prisma.permission.deleteMany({
+    where: { memberId: id },
   })
+
+  // Depois, adiciona as novas permissões (se houver)
+  let added = 0
+  if (permissions.length > 0) {
+    const result = await prisma.permission.createMany({
+      data: permissions.map((type) => ({
+        memberId: id,
+        type,
+      })),
+      skipDuplicates: true,
+    })
+    added = result.count
+  }
 
   // Log de auditoria
   await AuditLogger.memberPermissionsChanged(request, id, permissions)
 
   return reply.send({
     success: true,
-    added: result.count,
+    added,
+    removed: true, // Indica que todas as permissões anteriores foram removidas
   })
 }

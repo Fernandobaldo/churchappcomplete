@@ -7,7 +7,7 @@ import { checkRole } from '../../middlewares/checkRole'
 
 export async function permissionsRoutes(app: FastifyInstance) {
   app.get('/all', {
-    preHandler: [app.authenticate],
+    preHandler: [app.authenticate, checkRole(['ADMINGERAL', 'ADMINFILIAL', 'COORDINATOR'])],
   }, getAllPermissionsController)
 
   app.post('/:id', {

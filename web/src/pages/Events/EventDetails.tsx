@@ -5,7 +5,7 @@ import api from '../../api/api'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
 import ptBR from 'date-fns/locale/pt-BR'
-import { useAuthStore } from '../../stores/authStore'
+import PermissionGuard from '../../components/PermissionGuard'
 
 interface Event {
   id: string
@@ -69,8 +69,6 @@ export default function EventDetails() {
     return null
   }
 
-  const canEdit = user?.permissions?.some(p => p.type === 'MANAGE_EVENTS') || user?.role === 'ADMINGERAL'
-
   return (
     <div className="space-y-6">
       <button
@@ -92,7 +90,7 @@ export default function EventDetails() {
       <div className="card">
         <div className="flex justify-between items-start mb-4">
           <h1 className="text-3xl font-bold">{event.title}</h1>
-          {canEdit && (
+          <PermissionGuard permission="events_manage">
             <div className="flex gap-2">
               <button
                 onClick={() => navigate(`/app/events/${id}/edit`)}
@@ -109,7 +107,7 @@ export default function EventDetails() {
                 Excluir
               </button>
             </div>
-          )}
+          </PermissionGuard>
         </div>
 
         <div className="space-y-4">

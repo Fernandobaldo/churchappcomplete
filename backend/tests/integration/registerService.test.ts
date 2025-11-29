@@ -6,7 +6,7 @@ dotenv.config({ path: '.env.test' })
 process.env.NODE_ENV = 'test'
 process.env.VITEST = 'true'
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
 import { prisma } from '../../src/lib/prisma'
 import { registerUserService } from '../../src/services/auth/registerService'
 import { resetTestDatabase } from '../utils/resetTestDatabase'
@@ -79,6 +79,110 @@ describe('RegisterService - Novo Modelo User + Member', () => {
 
   afterAll(async () => {
     await resetTestDatabase()
+  })
+
+  describe('Registro via Link de Convite', () => {
+    let inviteLink: any
+
+    beforeEach(async () => {
+      // Criar link de convite para os testes
+      inviteLink = await prisma.memberInviteLink.create({
+        data: {
+          token: `inv_test_${Date.now()}`,
+          branchId,
+          createdBy: adminUser.id,
+          maxUses: 10,
+          currentUses: 0,
+          isActive: true,
+        },
+      })
+    })
+
+    it('deve criar membro via link de convite com sucesso', async () => {
+      const newEmail = `invitemember-${Date.now()}@test.com`
+
+      const result = await registerUserService({
+        name: 'Membro via Link',
+        email: newEmail,
+        password: 'senha123456',
+        inviteToken: inviteLink.token,
+      })
+
+      expect(result).toBeDefined()
+      expect(result.id).toBeDefined()
+      expect(result.email).toBe(newEmail)
+      expect(result.role).toBe('MEMBER')
+      expect(result.branchId).toBe(branchId)
+      expect(result.inviteLinkId).toBe(inviteLink.id)
+
+      // Verificar que o uso do link foi incrementado
+      const updatedLink = await prisma.memberInviteLink.findUnique({
+        where: { id: inviteLink.id },
+      })
+      expect(updatedLink?.currentUses).toBe(1)
+    })
+
+    it('deve lançar erro se link não for encontrado', async () => {
+      await expect(
+        registerUserService({
+          name: 'Membro Teste',
+          email: 'test@test.com',
+          password: 'senha123456',
+          inviteToken: 'invalid_token',
+        })
+      ).rejects.toThrow('Link de convite não encontrado')
+    })
+
+    it('deve lançar erro se link estiver desativado', async () => {
+      await prisma.memberInviteLink.update({
+        where: { id: inviteLink.id },
+        data: { isActive: false },
+      })
+
+      await expect(
+        registerUserService({
+          name: 'Membro Teste',
+          email: 'test@test.com',
+          password: 'senha123456',
+          inviteToken: inviteLink.token,
+        })
+      ).rejects.toThrow('Este link de convite foi desativado')
+    })
+
+    it('deve lançar erro se link expirou', async () => {
+      const expiredDate = new Date()
+      expiredDate.setDate(expiredDate.getDate() - 1)
+
+      await prisma.memberInviteLink.update({
+        where: { id: inviteLink.id },
+        data: { expiresAt: expiredDate },
+      })
+
+      await expect(
+        registerUserService({
+          name: 'Membro Teste',
+          email: 'test@test.com',
+          password: 'senha123456',
+          inviteToken: inviteLink.token,
+        })
+      ).rejects.toThrow('Este link de convite expirou')
+    })
+
+    it('deve lançar erro se limite de usos foi atingido', async () => {
+      await prisma.memberInviteLink.update({
+        where: { id: inviteLink.id },
+        data: { currentUses: 10 },
+      })
+
+      await expect(
+        registerUserService({
+          name: 'Membro Teste',
+          email: 'test@test.com',
+          password: 'senha123456',
+          inviteToken: inviteLink.token,
+        })
+      ).rejects.toThrow('Este link de convite atingiu o limite de usos')
+    })
   })
 
   describe('Criação de Member Interno', () => {

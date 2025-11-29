@@ -44,13 +44,15 @@ export async function validateMemberCreationPermission(
       Permission: true,
     },
   })
-
   if (!creator) {
     throw new Error('Membro criador não encontrado')
   }
 
   // 2. Verificar se o criador tem permissão baseada no role
-  if (creator.role === Role.MEMBER) {
+  // ADMINGERAL e ADMINFILIAL têm permissão implícita (não precisam de permissão explícita)
+  if (creator.role === Role.ADMINGERAL || creator.role === Role.ADMINFILIAL) {
+    // Admins têm permissão implícita, pode continuar
+  } else if (creator.role === Role.MEMBER) {
     // MEMBER só pode criar se tiver permissão members_manage
     const hasPermission = creator.Permission.some(
       (p) => p.type === 'members_manage'
@@ -58,10 +60,8 @@ export async function validateMemberCreationPermission(
     if (!hasPermission) {
       throw new Error('Você não tem permissão para criar membros')
     }
-  }
-
-  // COORDINATOR só pode criar se tiver permissão members_manage
-  if (creator.role === Role.COORDINATOR) {
+  } else if (creator.role === Role.COORDINATOR) {
+    // COORDINATOR só pode criar se tiver permissão members_manage
     const hasPermission = creator.Permission.some(
       (p) => p.type === 'members_manage'
     )
@@ -186,5 +186,21 @@ export async function validateMemberEditPermission(
   if (editor.id !== target.id) {
     throw new Error('Você só pode editar seu próprio perfil')
   }
+}
+
+/**
+ * Verifica se um membro tem uma permissão específica
+ * @param member Membro com Permission incluído
+ * @param permission Tipo de permissão a verificar
+ * @returns true se tiver permissão, false caso contrário
+ */
+export function hasAccess(member: { role: Role; Permission: Array<{ type: string }> }, permission: string): boolean {
+  // ADMINGERAL e ADMINFILIAL têm acesso a tudo
+  if (member.role === Role.ADMINGERAL || member.role === Role.ADMINFILIAL) {
+    return true
+  }
+  
+  // Verifica se tem a permissão específica
+  return member.Permission.some((p) => p.type === permission)
 }
 

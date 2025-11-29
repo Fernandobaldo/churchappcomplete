@@ -157,3 +157,6 @@ npx expo start --lan --port 8082
 - Certifique-se de que o backend está rodando na porta 3333
 
 
+
+
+

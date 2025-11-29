@@ -12,6 +12,10 @@ import { subscriptionRoutes } from './subscriptionRoutes';
 import { adminRoutes } from './adminRoutes';
 import { publicRegisterRoute } from './public/register';
 import { auditRoutes } from './auditRoutes';
+import { noticesRoutes } from './noticesRoutes';
+import { financesRoutes } from './financesRoutes';
+import { serviceScheduleRoutes } from './serviceScheduleRoutes.js';
+import { inviteLinkRoutes } from './inviteLinkRoutes.js';
 export async function registerRoutes(app) {
     app.register(authRoutes, { prefix: '/auth' });
     app.register(branchesRoutes, { prefix: '/branches' });
@@ -26,6 +30,10 @@ export async function registerRoutes(app) {
     app.register(subscriptionRoutes, { prefix: '/subscriptions' });
     app.register(adminRoutes);
     app.register(publicRegisterRoute, { prefix: '/public' });
+    app.register(noticesRoutes, { prefix: '/notices' });
+    app.register(financesRoutes, { prefix: '/finances' });
+    app.register(serviceScheduleRoutes, { prefix: '/service-schedules' });
     // loginRoute já está registrado dentro de authRoutes, não precisa registrar novamente
     app.register(auditRoutes, { prefix: '/audit' });
+    app.register(inviteLinkRoutes);
 }

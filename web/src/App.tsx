@@ -28,8 +28,17 @@ import MemberDetails from './pages/Members/MemberDetails'
 import AddMember from './pages/Members/AddMember'
 import Permissions from './pages/Permissions'
 import Profile from './pages/Profile'
+import Finances from './pages/Finances'
+import AddTransaction from './pages/Finances/AddTransaction'
+import Notices from './pages/Notices'
+import AddNotice from './pages/Notices/AddNotice'
+import ChurchSettings from './pages/ChurchSettings'
+import RegisterInvite from './pages/RegisterInvite'
+import MemberLimitReached from './pages/MemberLimitReached'
+import InviteLinks from './pages/Members/InviteLinks'
 import Layout from './components/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
+import PermissionProtectedRoute from './components/PermissionProtectedRoute'
 
 // Componente para rotas públicas que redirecionam se já autenticado
 function PublicRoute({ children }: { children: React.ReactNode }) {
@@ -78,6 +87,8 @@ function App() {
       <Routes>
         {/* Rotas públicas (registro e login) - redirecionam se já autenticado */}
         <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
+        <Route path="/register/invite/:token" element={<RegisterInvite />} />
+        <Route path="/member-limit-reached" element={<MemberLimitReached />} />
         <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
         
         {/* Rotas de onboarding - permitem acesso mesmo com token se onboarding não completo */}
@@ -104,19 +115,25 @@ function App() {
           <Route index element={<Navigate to="/app/dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="events" element={<Events />} />
-          <Route path="events/new" element={<AddEvent />} />
+          <Route path="events/new" element={<PermissionProtectedRoute permission="events_manage"><AddEvent /></PermissionProtectedRoute>} />
           <Route path="events/:id" element={<EventDetails />} />
-          <Route path="events/:id/edit" element={<EditEvent />} />
+          <Route path="events/:id/edit" element={<PermissionProtectedRoute permission="events_manage"><EditEvent /></PermissionProtectedRoute>} />
           <Route path="contributions" element={<Contributions />} />
-          <Route path="contributions/new" element={<AddContribution />} />
+          <Route path="contributions/new" element={<PermissionProtectedRoute permission="contributions_manage"><AddContribution /></PermissionProtectedRoute>} />
           <Route path="contributions/:id" element={<ContributionDetails />} />
           <Route path="devotionals" element={<Devotionals />} />
-          <Route path="devotionals/new" element={<AddDevotional />} />
+          <Route path="devotionals/new" element={<PermissionProtectedRoute permission="devotional_manage"><AddDevotional /></PermissionProtectedRoute>} />
           <Route path="devotionals/:id" element={<DevotionalDetails />} />
           <Route path="members" element={<Members />} />
-          <Route path="members/new" element={<AddMember />} />
+          <Route path="members/new" element={<PermissionProtectedRoute permission="members_manage"><AddMember /></PermissionProtectedRoute>} />
+          <Route path="members/invite-links" element={<PermissionProtectedRoute permission="members_manage"><InviteLinks /></PermissionProtectedRoute>} />
           <Route path="members/:id" element={<MemberDetails />} />
-          <Route path="permissions" element={<Permissions />} />
+          <Route path="finances" element={<Finances />} />
+          <Route path="finances/new" element={<PermissionProtectedRoute permission="finances_manage"><AddTransaction /></PermissionProtectedRoute>} />
+          <Route path="notices" element={<Notices />} />
+          <Route path="notices/new" element={<AddNotice />} />
+          <Route path="church-settings" element={<PermissionProtectedRoute permission="church_manage"><ChurchSettings /></PermissionProtectedRoute>} />
+          <Route path="permissions" element={<PermissionProtectedRoute role={['ADMINGERAL', 'ADMINFILIAL', 'COORDINATOR']}><Permissions /></PermissionProtectedRoute>} />
           <Route path="profile" element={<Profile />} />
         </Route>
 

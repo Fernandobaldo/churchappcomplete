@@ -23,9 +23,14 @@ export class ChurchService {
                         isMainBranch: true,
                     },
                 });
-                // Verifica se já existe um Member com esse email
-                let existingMember = await tx.member.findUnique({
-                    where: { email: user.email },
+                // Verifica se já existe um Member com esse userId ou email
+                let existingMember = await tx.member.findFirst({
+                    where: {
+                        OR: [
+                            { userId: user.id },
+                            { email: user.email },
+                        ],
+                    },
                 });
                 if (existingMember) {
                     // Se já existe, atualiza para associar à nova branch e role
@@ -112,16 +117,34 @@ export class ChurchService {
         return prisma.church.update({
             where: { id },
             data: { isActive: false },
+            select: {
+                id: true,
+                name: true,
+                logoUrl: true,
+                isActive: true,
+            },
         });
     }
     // Hard delete apenas para admin do SaaS
     async deleteChurch(id) {
         return prisma.$transaction(async (tx) => {
-            // Apaga membros relacionados a branches da igreja
+            // Busca todas as branches da igreja
             const branches = await tx.branch.findMany({
                 where: { churchId: id },
+                include: {
+                    Member: true, // Inclui membros para deletar permissões primeiro
+                },
             });
+            // Para cada branch, deleta permissões dos membros e depois os membros
             for (const branch of branches) {
+                // Deleta permissões dos membros da branch
+                const memberIds = branch.Member.map(m => m.id);
+                if (memberIds.length > 0) {
+                    await tx.permission.deleteMany({
+                        where: { memberId: { in: memberIds } },
+                    });
+                }
+                // Deleta membros da branch
                 await tx.member.deleteMany({ where: { branchId: branch.id } });
             }
             // Apaga branches da igreja

@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Calendar, Heart, BookOpen, Church, Plus } from 'lucide-react'
+import { Calendar, Heart, BookOpen, Church, Plus, DollarSign, Bell, Eye } from 'lucide-react'
 import api from '../api/api'
 import { useAuthStore } from '../stores/authStore'
 import toast from 'react-hot-toast'
+import PermissionGuard from '../components/PermissionGuard'
 
 interface NextEvent {
   id: string
@@ -63,6 +64,20 @@ export default function Dashboard() {
       icon: Church,
       path: '/app/members',
       color: 'bg-purple-500',
+    },
+    {
+      id: 'finances',
+      title: 'Finanças',
+      icon: DollarSign,
+      path: '/app/finances',
+      color: 'bg-yellow-500',
+    },
+    {
+      id: 'notices',
+      title: 'Avisos',
+      icon: Bell,
+      path: '/app/notices',
+      color: 'bg-indigo-500',
     },
   ]
 
@@ -139,26 +154,53 @@ export default function Dashboard() {
             <h2 className="text-xl font-semibold">Ações Rápidas</h2>
           </div>
           <div className="space-y-2">
+            <PermissionGuard permission="events_manage">
+              <button
+                onClick={() => navigate('/app/events/new')}
+                className="w-full flex items-center gap-2 px-4 py-2 text-left hover:bg-gray-50 rounded-lg transition-colors"
+              >
+                <Plus className="w-5 h-5 text-primary" />
+                <span>Criar Novo Evento</span>
+              </button>
+            </PermissionGuard>
             <button
-              onClick={() => navigate('/app/events/new')}
+              onClick={() => navigate('/app/events')}
               className="w-full flex items-center gap-2 px-4 py-2 text-left hover:bg-gray-50 rounded-lg transition-colors"
             >
-              <Plus className="w-5 h-5 text-primary" />
-              <span>Criar Novo Evento</span>
+              <Eye className="w-5 h-5 text-gray-600" />
+              <span>Ver Eventos</span>
             </button>
+            <PermissionGuard permission="contributions_manage">
+              <button
+                onClick={() => navigate('/app/contributions/new')}
+                className="w-full flex items-center gap-2 px-4 py-2 text-left hover:bg-gray-50 rounded-lg transition-colors"
+              >
+                <Plus className="w-5 h-5 text-primary" />
+                <span>Adicionar Contribuição</span>
+              </button>
+            </PermissionGuard>
             <button
-              onClick={() => navigate('/app/contributions/new')}
+              onClick={() => navigate('/app/contributions')}
               className="w-full flex items-center gap-2 px-4 py-2 text-left hover:bg-gray-50 rounded-lg transition-colors"
             >
-              <Plus className="w-5 h-5 text-primary" />
-              <span>Adicionar Contribuição</span>
+              <Eye className="w-5 h-5 text-gray-600" />
+              <span>Ver Contribuições</span>
             </button>
+            <PermissionGuard permission="devotional_manage">
+              <button
+                onClick={() => navigate('/app/devotionals/new')}
+                className="w-full flex items-center gap-2 px-4 py-2 text-left hover:bg-gray-50 rounded-lg transition-colors"
+              >
+                <Plus className="w-5 h-5 text-primary" />
+                <span>Criar Devocional</span>
+              </button>
+            </PermissionGuard>
             <button
-              onClick={() => navigate('/app/devotionals/new')}
+              onClick={() => navigate('/app/devotionals')}
               className="w-full flex items-center gap-2 px-4 py-2 text-left hover:bg-gray-50 rounded-lg transition-colors"
             >
-              <Plus className="w-5 h-5 text-primary" />
-              <span>Criar Devocional</span>
+              <Eye className="w-5 h-5 text-gray-600" />
+              <span>Ver Devocionais</span>
             </button>
           </div>
         </div>

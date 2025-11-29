@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Users, UserPlus, Mail, Phone } from 'lucide-react'
+import { Users, UserPlus, Mail, Phone, Link } from 'lucide-react'
 import api from '../../api/api'
 import toast from 'react-hot-toast'
+import { useAuthStore } from '../../stores/authStore'
+import { hasAccess } from '../../utils/authUtils'
+import PermissionGuard from '../../components/PermissionGuard'
 
 interface Member {
   id: string
@@ -15,8 +18,12 @@ interface Member {
 
 export default function Members() {
   const navigate = useNavigate()
+  const { user } = useAuthStore()
   const [members, setMembers] = useState<Member[]>([])
   const [loading, setLoading] = useState(true)
+  
+  // Verifica se o usuário pode ver dados sensíveis
+  const canViewSensitiveData = hasAccess(user, 'members_manage')
 
   useEffect(() => {
     fetchMembers()
@@ -58,13 +65,24 @@ export default function Members() {
           <h1 className="text-3xl font-bold text-gray-900">Membros</h1>
           <p className="text-gray-600 mt-1">Gerencie os membros da igreja</p>
         </div>
-        <button 
-          onClick={() => navigate('/app/members/new')} 
-          className="btn-primary flex items-center gap-2"
-        >
-          <UserPlus className="w-5 h-5" />
-          Novo Membro
-        </button>
+        <PermissionGuard permission="members_manage">
+          <div className="flex gap-2">
+            <button 
+              onClick={() => navigate('/app/members/invite-links')} 
+              className="btn-secondary flex items-center gap-2"
+            >
+              <Link className="w-5 h-5" />
+              Links de Convite
+            </button>
+            <button 
+              onClick={() => navigate('/app/members/new')} 
+              className="btn-primary flex items-center gap-2"
+            >
+              <UserPlus className="w-5 h-5" />
+              Novo Membro
+            </button>
+          </div>
+        </PermissionGuard>
       </div>
 
       <div className="card">
@@ -82,9 +100,11 @@ export default function Members() {
           <div className="text-center py-12">
             <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <p className="text-gray-600 mb-4">Nenhum membro cadastrado</p>
-            <button onClick={() => navigate('/app/members/new')} className="btn-primary">
-              Adicionar Primeiro Membro
-            </button>
+            <PermissionGuard permission="members_manage">
+              <button onClick={() => navigate('/app/members/new')} className="btn-primary">
+                Adicionar Primeiro Membro
+              </button>
+            </PermissionGuard>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -115,18 +135,20 @@ export default function Members() {
                     </span>
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-gray-600 text-sm">
-                    <Mail className="w-4 h-4" />
-                    <span>{member.email}</span>
-                  </div>
-                  {member.phone && (
+                {canViewSensitiveData && (
+                  <div className="space-y-2">
                     <div className="flex items-center gap-2 text-gray-600 text-sm">
-                      <Phone className="w-4 h-4" />
-                      <span>{member.phone}</span>
+                      <Mail className="w-4 h-4" />
+                      <span>{member.email}</span>
                     </div>
-                  )}
-                </div>
+                    {member.phone && (
+                      <div className="flex items-center gap-2 text-gray-600 text-sm">
+                        <Phone className="w-4 h-4" />
+                        <span>{member.phone}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>

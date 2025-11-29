@@ -46,8 +46,18 @@ export default function LoginScreen() {
       // Salva o token e dados do usuário no store
       setUserFromToken(token)
       
-      Toast.show({ type: 'success', text1: 'Login realizado!' })
-      navigation.navigate('Dashboard' as never)
+      // Aguarda um pouco para o store atualizar
+      setTimeout(() => {
+        // Verifica se precisa completar onboarding (sem branchId ou role)
+        const userData = useAuthStore.getState().user
+        if (!userData?.branchId || !userData?.role) {
+          Toast.show({ type: 'info', text1: 'Complete a configuração inicial' })
+          navigation.navigate('StartOnboarding' as never)
+        } else {
+          Toast.show({ type: 'success', text1: 'Login realizado!' })
+          navigation.navigate('Dashboard' as never)
+        }
+      }, 100)
     } catch (error: any) {
       console.error('Erro no login:', error)
       
@@ -99,6 +109,15 @@ export default function LoginScreen() {
           <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={loading}>
             <Text style={styles.buttonText}>{loading ? 'Entrando...' : 'Entrar'}</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.linkButton}
+            onPress={() => navigation.navigate('Register' as never)}
+          >
+            <Text style={styles.linkText}>
+              Não tem uma conta? <Text style={styles.linkTextBold}>Criar conta</Text>
+            </Text>
+          </TouchableOpacity>
         </View>
       </TouchableWithoutFeedback>
     </KeyboardAvoidingView>
@@ -139,5 +158,17 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#fff',
     fontWeight: 'bold',
+  },
+  linkButton: {
+    marginTop: 16,
+    alignItems: 'center',
+  },
+  linkText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  linkTextBold: {
+    fontWeight: 'bold',
+    color: '#333',
   },
 })

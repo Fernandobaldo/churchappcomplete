@@ -27,8 +27,20 @@ export default function Profile() {
   const onSubmit = async (data: ProfileForm) => {
     if (!user) return
 
+    // Usa memberId se disponível, caso contrário busca do endpoint /members/me
+    let memberId = user.memberId
+    if (!memberId) {
+      try {
+        const profileResponse = await api.get('/members/me')
+        memberId = profileResponse.data.id
+      } catch (error: any) {
+        toast.error('Não foi possível obter o ID do membro. Faça login novamente.')
+        return
+      }
+    }
+
     try {
-      await api.put(`/members/${user.id}`, data)
+      await api.put(`/members/${memberId}`, data)
       toast.success('Perfil atualizado com sucesso!')
       // Recarrega os dados do usuário
       const profileResponse = await api.get('/members/me')
@@ -36,7 +48,7 @@ export default function Profile() {
       // Por enquanto, apenas recarregamos a página para refletir as mudanças
       window.location.reload()
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Erro ao atualizar perfil')
+      toast.error(error.response?.data?.error || error.response?.data?.message || 'Erro ao atualizar perfil')
     }
   }
 

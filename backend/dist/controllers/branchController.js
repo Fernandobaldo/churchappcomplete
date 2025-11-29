@@ -40,11 +40,27 @@ export async function createBranchHandler(request, reply) {
             }
             return reply.status(403).send({ error: error.message });
         }
-        // Retorna erro 400 para erros de validação
+        // Retorna erro 400 para erros de validação (incluindo recursos não encontrados fornecidos pelo usuário)
         if (error.message?.includes('obrigatório') ||
-            error.message?.includes('não encontrado') ||
-            error.message?.includes('não encontrada') ||
-            error.message?.includes('já cadastrado')) {
+            error.message?.includes('já cadastrado') ||
+            error.message?.includes('Igreja não encontrada') ||
+            error.message?.includes('Filial não encontrada') ||
+            error.message?.includes('não está associado a uma filial') ||
+            error.message?.includes('Plano não encontrado')) {
+            return reply.status(400).send({ error: error.message });
+        }
+        // Retorna erro 404 para recursos não encontrados em operações de leitura
+        // Mas apenas se não for um erro de validação de dados do usuário
+        if ((error.message?.includes('não encontrado') ||
+            error.message?.includes('não encontrada')) &&
+            !error.message?.includes('Igreja não encontrada') &&
+            !error.message?.includes('Filial não encontrada') &&
+            !error.message?.includes('Membro criador não encontrado') &&
+            !error.message?.includes('Plano não encontrado')) {
+            return reply.status(404).send({ error: error.message });
+        }
+        // Trata erro quando membro criador não é encontrado (pode ser 400 ou 404 dependendo do contexto)
+        if (error.message?.includes('Membro criador não encontrado')) {
             return reply.status(400).send({ error: error.message });
         }
         return reply.status(500).send({ error: 'Erro ao criar filial', details: error.message });

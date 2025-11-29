@@ -179,7 +179,10 @@ Atualiza um membro.
           },
           phone: { type: 'string' },
           address: { type: 'string' },
-          avatarUrl: { type: 'string', format: 'uri' },
+          avatarUrl: { 
+            type: ['string', 'null'],
+            description: 'URL do avatar do membro (pode ser null ou string vazia). Se fornecido, deve ser uma URI válida.',
+          },
         },
       },
       response: {

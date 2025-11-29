@@ -58,7 +58,8 @@ export async function financesRoutes(app: FastifyInstance) {
       checkRole(['ADMINGERAL', 'ADMINFILIAL', 'COORDINATOR']),
       checkPermission(['finances_manage']),
     ],
-    schema: createTransactionSchema,
+    // Schema removido - validação feita no controller com Zod
+    // Isso permite que o controller retorne o formato de erro correto
   }, controller.create.bind(controller))
 }
 

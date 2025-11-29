@@ -41,15 +41,19 @@ export async function validateMemberCreationPermission(creatorMemberId, targetBr
         throw new Error('Membro criador não encontrado');
     }
     // 2. Verificar se o criador tem permissão baseada no role
-    if (creator.role === Role.MEMBER) {
+    // ADMINGERAL e ADMINFILIAL têm permissão implícita (não precisam de permissão explícita)
+    if (creator.role === Role.ADMINGERAL || creator.role === Role.ADMINFILIAL) {
+        // Admins têm permissão implícita, pode continuar
+    }
+    else if (creator.role === Role.MEMBER) {
         // MEMBER só pode criar se tiver permissão members_manage
         const hasPermission = creator.Permission.some((p) => p.type === 'members_manage');
         if (!hasPermission) {
             throw new Error('Você não tem permissão para criar membros');
         }
     }
-    // COORDINATOR só pode criar se tiver permissão members_manage
-    if (creator.role === Role.COORDINATOR) {
+    else if (creator.role === Role.COORDINATOR) {
+        // COORDINATOR só pode criar se tiver permissão members_manage
         const hasPermission = creator.Permission.some((p) => p.type === 'members_manage');
         if (!hasPermission) {
             throw new Error('Você não tem permissão para criar membros. É necessária a permissão members_manage');

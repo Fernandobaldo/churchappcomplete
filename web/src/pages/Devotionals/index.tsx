@@ -5,6 +5,7 @@ import api from '../../api/api'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
 import ptBR from 'date-fns/locale/pt-BR'
+import PermissionGuard from '../../components/PermissionGuard'
 
 interface Devotional {
   id: string
@@ -54,19 +55,23 @@ export default function Devotionals() {
           <h1 className="text-3xl font-bold text-gray-900">Devocionais</h1>
           <p className="text-gray-600 mt-1">Estudos bíblicos e devocionais</p>
         </div>
-        <button onClick={() => navigate('/app/devotionals/new')} className="btn-primary flex items-center gap-2">
-          <Plus className="w-5 h-5" />
-          Novo Devocional
-        </button>
+        <PermissionGuard permission="devotional_manage">
+          <button onClick={() => navigate('/app/devotionals/new')} className="btn-primary flex items-center gap-2">
+            <Plus className="w-5 h-5" />
+            Novo Devocional
+          </button>
+        </PermissionGuard>
       </div>
 
       {devotionals.length === 0 ? (
         <div className="card text-center py-12">
           <BookOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <p className="text-gray-600 mb-4">Nenhum devocional cadastrado</p>
-          <button onClick={() => navigate('/app/devotionals/new')} className="btn-primary">
-            Criar Primeiro Devocional
-          </button>
+          <PermissionGuard permission="devotional_manage">
+            <button onClick={() => navigate('/app/devotionals/new')} className="btn-primary">
+              Criar Primeiro Devocional
+            </button>
+          </PermissionGuard>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

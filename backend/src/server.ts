@@ -173,6 +173,10 @@ Authorization: Bearer <seu-token>
                 name: 'Auditoria',
                 description: 'Logs de auditoria de ações administrativas',
             },
+            {
+                name: 'Links de Convite',
+                description: 'Gerenciamento de links de convite para registro de membros',
+            },
         ],
     },
 });

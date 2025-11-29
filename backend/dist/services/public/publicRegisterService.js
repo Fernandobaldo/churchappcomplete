@@ -43,10 +43,16 @@ export async function publicRegisterUserService(data) {
             },
         },
     });
-    // Gera o token JWT
+    // Gera o token JWT com type: 'user' (sem Member ainda)
+    // Omite campos de Member (não inclui no payload) quando não há Member associado
     const token = jwt.sign({
         sub: user.id,
         email: user.email,
+        name: user.name,
+        type: 'user',
+        // Não inclui memberId, role, branchId, churchId quando não há Member
+        // Isso indica que o onboarding não foi completado
+        permissions: [],
     }, env.JWT_SECRET, {
         expiresIn: '7d',
     });
