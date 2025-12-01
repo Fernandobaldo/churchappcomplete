@@ -70,6 +70,7 @@ export default function MembersListScreen() {
 
                 }}
             />
+            <View style={styles.contentContainer}>
             <View style={styles.actionsContainer}>
                 <TouchableOpacity
                     style={styles.actionButton}
@@ -89,11 +90,11 @@ export default function MembersListScreen() {
             <FlatList
                 data={filteredMembers}
                 keyExtractor={(item) => item.id}
+                style={styles.list}
                 renderItem={({ item }) => (
                     <TouchableOpacity
                         style={styles.memberRow}
-                        onPress={() => navigation.navigate('ProfileScreen'as never, { memberId: item.id } as never)}
-
+                        onPress={() => navigation.navigate('MemberDetails' as never, { id: item.id } as never)}
                     >
                         <Image
                             source={{ uri: item.avatarUrl || 'https://via.placeholder.com/50' }}
@@ -110,12 +111,19 @@ export default function MembersListScreen() {
                 refreshing={refreshing}
                 onRefresh={handleRefresh}
             />
+            </View>
         </View>
     )
 }
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#fff'},
+    contentContainer: {
+        marginTop: 110, // Altura do header fixo
+    },
+    list: {
+        marginTop: 0, // Removido porque contentContainer já tem o espaçamento
+    },
     actionsContainer: {
         flexDirection: 'row',
         paddingHorizontal: 20,

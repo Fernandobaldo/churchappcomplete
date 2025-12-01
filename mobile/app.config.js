@@ -31,7 +31,10 @@ module.exports = {
     // Variáveis de ambiente
     extra: {
       // URL da API - pode ser sobrescrita por variável de ambiente do sistema
-      apiUrl: process.env.EXPO_PUBLIC_API_URL || "http://192.168.1.23:3333",
+      // IMPORTANTE: Atualize este IP com o IP da sua máquina na rede local
+      // Para descobrir: ifconfig (macOS/Linux) ou ipconfig (Windows)
+      // IP atual detectado: 192.168.1.7
+      apiUrl: process.env.EXPO_PUBLIC_API_URL || "http://192.168.1.7:3333",
     }
   }
 };

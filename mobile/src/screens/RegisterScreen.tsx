@@ -198,43 +198,55 @@ export default function RegisterScreen() {
             <Text style={styles.subtitle}>Crie sua conta para começar</Text>
 
             <View style={styles.form}>
-              <Text style={styles.label}>Nome completo *</Text>
+              <Text style={styles.label}>
+                Nome completo <Text style={styles.required}>*</Text>
+              </Text>
               <TextInput
                 style={styles.input}
                 placeholder="Seu nome completo"
                 value={name}
                 onChangeText={setName}
                 autoCapitalize="words"
+                placeholderTextColor="#999"
               />
 
-              <Text style={styles.label}>Email *</Text>
+              <Text style={styles.label}>
+                Email <Text style={styles.required}>*</Text>
+              </Text>
               <TextInput
                 style={styles.input}
-                placeholder="seu@email.com"
+                placeholder="exemplo@email.com"
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
+                placeholderTextColor="#999"
               />
 
-              <Text style={styles.label}>Senha *</Text>
+              <Text style={styles.label}>
+                Senha <Text style={styles.required}>*</Text>
+              </Text>
               <TextInput
                 style={styles.input}
-                placeholder="••••••••"
+                placeholder="Mínimo 6 caracteres"
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry
                 autoCapitalize="none"
+                placeholderTextColor="#999"
               />
 
-              <Text style={styles.label}>Nome da igreja *</Text>
+              <Text style={styles.label}>
+                Nome da igreja <Text style={styles.required}>*</Text>
+              </Text>
               <TextInput
                 style={styles.input}
-                placeholder="Igreja Exemplo"
+                placeholder="Ex: Igreja Exemplo"
                 value={churchName}
                 onChangeText={setChurchName}
                 autoCapitalize="words"
+                placeholderTextColor="#999"
               />
 
               <TouchableOpacity
@@ -304,6 +316,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333',
     marginBottom: 4,
+  },
+  required: {
+    color: '#e74c3c',
+    fontWeight: 'bold',
   },
   input: {
     borderWidth: 1,

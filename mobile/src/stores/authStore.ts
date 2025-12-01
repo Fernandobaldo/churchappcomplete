@@ -14,6 +14,7 @@ export type User = {
     role: string
     branchId: string
     memberId?: string
+    churchId?: string | null
     permissions: Permission[]
     token: string
 }
@@ -65,6 +66,7 @@ export const useAuthStore = create<AuthStore>()(
                             role: decoded.role || '',
                             branchId: decoded.branchId || '',
                             memberId: decoded.memberId || undefined,
+                            churchId: decoded.churchId || null,
                             permissions: permissionsArray,
                             token,
                         },

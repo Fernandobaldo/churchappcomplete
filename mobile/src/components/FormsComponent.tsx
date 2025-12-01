@@ -16,15 +16,26 @@ import {
 import * as ImagePicker from 'expo-image-picker'
 import DateTimePickerModal from 'react-native-modal-datetime-picker'
 import { format } from 'date-fns'
-import {useNavigation} from "@react-navigation/native";
+import {useNavigation} from "@react-navigation/native"
+import ModalSelector from 'react-native-modal-selector'
+import TimePicker from './TimePicker'
+
+type SelectOption = {
+    key: string
+    label: string
+    value: string
+}
 
 type Field = {
     key: string
     label: string
     placeholder?: string
     secure?: boolean
-    type?: 'string' | 'number' | 'email' | 'password' | 'date' | 'image' | 'toggle'
+    required?: boolean
+    type?: 'string' | 'number' | 'email' | 'password' | 'date' | 'time' | 'image' | 'toggle' | 'select'
     dependsOn?: string // opcional: define de qual campo booleano o campo depende
+    options?: SelectOption[] // opções para tipo select
+    error?: string // mensagem de erro para validação
 }
 
 type MemberFormProps = {
@@ -44,10 +55,26 @@ export default function FormsComponent({
                                        }: MemberFormProps) {
     const [isDatePickerVisible, setDatePickerVisible] = useState(false)
     const [activeDateKey, setActiveDateKey] = useState<string | null>(null)
+    const [selectedDate, setSelectedDate] = useState<Date>(new Date())
     const navigation = useNavigation()
 
     const showDatePicker = (key: string) => {
         setActiveDateKey(key)
+        // Se já existe uma data no form, usa ela, senão usa a data atual
+        if (form[key]) {
+            try {
+                const parsedDate = new Date(form[key].split('/').reverse().join('-'))
+                if (!isNaN(parsedDate.getTime())) {
+                    setSelectedDate(parsedDate)
+                } else {
+                    setSelectedDate(new Date())
+                }
+            } catch {
+                setSelectedDate(new Date())
+            }
+        } else {
+            setSelectedDate(new Date())
+        }
         setDatePickerVisible(true)
     }
 
@@ -86,75 +113,115 @@ export default function FormsComponent({
             <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={styles.container}>
             {fields.map((field) => {
+                // Verifica dependências
+                if (field.dependsOn && !form[field.dependsOn]) return null
+
+                // Renderiza label com indicador de obrigatório
+                const renderLabel = () => (
+                    <Text style={styles.label}>
+                        {field.label}
+                        {field.required && <Text style={styles.required}> *</Text>}
+                    </Text>
+                )
+
+                // Determina estilo do input baseado em erro
+                const getInputStyle = (baseStyle: any) => [
+                    baseStyle,
+                    field.error && styles.inputError
+                ]
+
                 if (field.type === 'date') {
                     return (
                         <View key={field.key}>
-                            <Text style={styles.label}>{field.label}</Text>
+                            {renderLabel()}
                             <TouchableOpacity
-                                style={styles.input}
+                                style={getInputStyle(styles.input)}
                                 onPress={() => showDatePicker(field.key)}
                             >
-                                <Text>{form[field.key] || 'Selecionar data'}</Text>
+                                <Text style={form[field.key] ? styles.inputText : styles.placeholderText}>
+                                    {form[field.key] || field.placeholder || 'DD/MM/AAAA'}
+                                </Text>
                             </TouchableOpacity>
+                            {field.error && <Text style={styles.errorText}>{field.error}</Text>}
+                        </View>
+                    )
+                }
+
+                if (field.type === 'time') {
+                    return (
+                        <View key={field.key}>
+                            {renderLabel()}
+                            <TimePicker
+                                value={form[field.key]}
+                                onChange={(time) => setForm((prev) => ({ ...prev, [field.key]: time }))}
+                                placeholder={field.placeholder || 'HH:mm'}
+                            />
+                            {field.error && <Text style={styles.errorText}>{field.error}</Text>}
                         </View>
                     )
                 }
 
                 if (field.type === 'image') {
-                    if (field.key === 'avatar') {
-                        return (
-                            <View key={field.key} style={{alignItems: 'center'}}>
-                                <Text style={styles.label}>{field.label}</Text>
-                                {form[field.key] ? (
-                                    <Image source={{uri: form[field.key]}} style={styles.imagePreview}/>
-                                ) : (
-                                    <View style={styles.imagePlaceholder}>
-                                        <Text style={{color: '#888'}}>Nenhuma imagem</Text>
-                                    </View>
-                                )}
-                                <TouchableOpacity
-                                    style={styles.buttonSmall}
-                                    onPress={() => handleSelectImage(field.key)}
-                                >
-                                    <Text style={styles.buttonText}>Selecionar Imagem</Text>
-                                </TouchableOpacity>
-                            </View>
-                        )
-                    }
-                    if (field.key === 'imageUrl') {
-                        return (
-                            <View key={field.key} style={{alignItems: 'center'}}>
-                                <Text style={styles.label}>{field.label}</Text>
-                                {form[field.key] ? (
-                                    <Image source={{uri: form[field.key]}} style={styles.imagePreview}/>
-                                ) : (
-                                    <View style={styles.imagePlaceholder}>
-                                        <Text style={{color: '#888'}}>Nenhuma imagem</Text>
-                                    </View>
-                                )}
-                                <TouchableOpacity
-                                    style={styles.buttonSmall}
-                                    onPress={() => handleSelectImage(field.key)}
-                                >
-                                    <Text style={styles.buttonText}>Selecionar Imagem</Text>
-                                </TouchableOpacity>
-                            </View>
-                        )
-                    }
+                    const imageKey = field.key === 'avatar' ? 'avatar' : field.key
+                    return (
+                        <View key={field.key} style={{alignItems: 'center'}}>
+                            {renderLabel()}
+                            {form[field.key] ? (
+                                <Image source={{uri: form[field.key]}} style={styles.imagePreview}/>
+                            ) : (
+                                <View style={styles.imagePlaceholder}>
+                                    <Text style={{color: '#888'}}>Nenhuma imagem</Text>
+                                </View>
+                            )}
+                            <TouchableOpacity
+                                style={styles.buttonSmall}
+                                onPress={() => handleSelectImage(field.key)}
+                            >
+                                <Text style={styles.buttonText}>Selecionar Imagem</Text>
+                            </TouchableOpacity>
+                            {field.error && <Text style={styles.errorText}>{field.error}</Text>}
+                        </View>
+                    )
                 }
-
-                if (field.dependsOn && !form[field.dependsOn]) return null
 
                 if (field.type === 'toggle') {
                     return (
                         <View key={field.key} style={styles.switchRow}>
-                            <Text style={styles.label}>{field.label}</Text>
+                            {renderLabel()}
                             <Switch
                                 value={!!form[field.key]}
                                 onValueChange={(value) =>
                                     setForm((prev) => ({ ...prev, [field.key]: value }))
                                 }
                             />
+                        </View>
+                    )
+                }
+
+                if (field.type === 'select') {
+                    const selectedOption = field.options?.find(opt => opt.value === form[field.key])
+                    return (
+                        <View key={field.key}>
+                            {renderLabel()}
+                            <ModalSelector
+                                data={field.options || []}
+                                initValue={selectedOption?.label || field.placeholder || 'Selecione uma opção'}
+                                onChange={(option) => {
+                                    setForm((prev) => ({ ...prev, [field.key]: option.value }))
+                                }}
+                                style={getInputStyle(styles.input)}
+                                initValueTextStyle={{ color: form[field.key] ? '#333' : '#999' }}
+                                selectTextStyle={{ padding: 12 }}
+                            >
+                                <TextInput
+                                    style={getInputStyle(styles.input)}
+                                    editable={false}
+                                    placeholder={field.placeholder || 'Selecione uma opção'}
+                                    value={selectedOption?.label || ''}
+                                    placeholderTextColor="#999"
+                                />
+                            </ModalSelector>
+                            {field.error && <Text style={styles.errorText}>{field.error}</Text>}
                         </View>
                     )
                 }
@@ -169,19 +236,38 @@ export default function FormsComponent({
 
                 const secure = field.type === 'password' || field.secure
 
+                // Placeholders padrão baseados no tipo
+                const getDefaultPlaceholder = () => {
+                    if (field.placeholder) return field.placeholder
+                    switch (field.type) {
+                        case 'email':
+                            return 'exemplo@email.com'
+                        case 'password':
+                            return '••••••••'
+                        case 'number':
+                            return '0'
+                        default:
+                            return ''
+                    }
+                }
+
                 return (
                     <View key={field.key}>
-                        <Text style={styles.label}>{field.label}</Text>
+                        {renderLabel()}
                         <TextInput
-                            style={field.key === 'description' ? styles.inputDescription : styles.input}
+                            style={getInputStyle(field.key === 'description' ? styles.inputDescription : styles.input)}
                             value={form[field.key] || ''}
-                            placeholder={field.placeholder}
+                            placeholder={getDefaultPlaceholder()}
+                            placeholderTextColor="#999"
                             secureTextEntry={secure}
                             keyboardType={keyboardType}
+                            autoCapitalize={field.type === 'email' ? 'none' : 'sentences'}
+                            autoCorrect={field.type === 'email' || field.type === 'password' ? false : true}
                             onChangeText={(text) =>
                                 setForm((prev) => ({ ...prev, [field.key]: text }))
                             }
                         />
+                        {field.error && <Text style={styles.errorText}>{field.error}</Text>}
                     </View>
                 )
 
@@ -198,9 +284,10 @@ export default function FormsComponent({
             <DateTimePickerModal
                 isVisible={isDatePickerVisible}
                 mode="date"
+                date={selectedDate}
                 onConfirm={handleConfirm}
                 onCancel={hideDatePicker}
-                // maximumDate={new Date()}
+                locale="pt_BR"
             />
         </View>
             </TouchableWithoutFeedback>
@@ -210,8 +297,21 @@ export default function FormsComponent({
 }
 
 const styles = StyleSheet.create({
-    container: { padding: 20 },
-    label: { fontSize: 14, marginBottom: 3, marginTop: 12, color: '#333' },
+    container: { 
+        padding: 20,
+        paddingTop: 130, // Altura do header fixo + padding
+    },
+    label: { 
+        fontSize: 14, 
+        marginBottom: 3, 
+        marginTop: 12, 
+        color: '#333',
+        fontWeight: '600',
+    },
+    required: {
+        color: '#e74c3c',
+        fontWeight: 'bold',
+    },
     buttonRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -246,6 +346,26 @@ const styles = StyleSheet.create({
         padding: 12,
         borderRadius: 8,
         marginBottom: 2,
+        backgroundColor: '#fff',
+        fontSize: 16,
+    },
+    inputError: {
+        borderColor: '#e74c3c',
+        borderWidth: 2,
+    },
+    inputText: {
+        color: '#333',
+        fontSize: 16,
+    },
+    placeholderText: {
+        color: '#999',
+        fontSize: 16,
+    },
+    errorText: {
+        color: '#e74c3c',
+        fontSize: 12,
+        marginTop: 4,
+        marginBottom: 8,
     },
     button: {
         backgroundColor: '#3366FF',
@@ -288,5 +408,7 @@ const styles = StyleSheet.create({
         padding: 12,
         borderRadius: 8,
         marginBottom: 2,
+        backgroundColor: '#fff',
+        textAlignVertical: 'top',
     }
 })

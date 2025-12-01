@@ -17,41 +17,47 @@ import {
 import ModalSelector from 'react-native-modal-selector'
 import api from '../api/api'
 import Toast from 'react-native-toast-message'
+import MemberSearch from '../components/MemberSearch'
 
-interface Member {
-    id: string
-    name: string
-    email?: string
+interface Contribution {
+  id: string
+  title: string
+  description?: string
 }
 
 export default function AddTransactionScreen({ navigation }: any) {
     const [title, setTitle] = useState('')
     const [amount, setAmount] = useState('')
     const [type, setType] = useState<'ENTRY' | 'EXIT'>('ENTRY')
-    const [entryType, setEntryType] = useState<'OFERTA' | 'DIZIMO' | ''>('')
+    const [entryType, setEntryType] = useState<'OFERTA' | 'DIZIMO' | 'CONTRIBUICAO' | ''>('')
+    const [exitType, setExitType] = useState<'ALUGUEL' | 'ENERGIA' | 'AGUA' | 'INTERNET' | 'OUTROS' | ''>('')
+    const [exitTypeOther, setExitTypeOther] = useState('')
     const [category, setCategory] = useState('')
     const [isTithePayerMember, setIsTithePayerMember] = useState(true)
     const [tithePayerMemberId, setTithePayerMemberId] = useState<string | null>(null)
     const [tithePayerName, setTithePayerName] = useState('')
-    const [selectedMember, setSelectedMember] = useState<Member | null>(null)
-    const [members, setMembers] = useState<Member[]>([])
+    const [contributions, setContributions] = useState<Contribution[]>([])
+    const [contributionId, setContributionId] = useState<string | null>(null)
+    const [isContributionMember, setIsContributionMember] = useState(true)
+    const [contributionMemberId, setContributionMemberId] = useState<string | null>(null)
+    const [contributionMemberName, setContributionMemberName] = useState('')
     const [loading, setLoading] = useState(false)
 
     useEffect(() => {
-        if (entryType === 'DIZIMO' && isTithePayerMember) {
-            fetchMembers()
+        if (entryType === 'CONTRIBUICAO') {
+            fetchContributions()
         }
-    }, [entryType, isTithePayerMember])
+    }, [entryType])
 
-    const fetchMembers = async () => {
+    const fetchContributions = async () => {
         try {
-            const res = await api.get('/members')
-            setMembers(res.data || [])
+            const response = await api.get('/contributions')
+            setContributions(response.data)
         } catch (error) {
-            console.error('Erro ao buscar membros:', error)
+            console.error('Erro ao buscar contribuições:', error)
             Toast.show({
                 type: 'error',
-                text1: 'Erro ao buscar membros',
+                text1: 'Erro ao carregar contribuições',
             })
         }
     }
@@ -63,7 +69,17 @@ export default function AddTransactionScreen({ navigation }: any) {
         }
 
         if (type === 'ENTRY' && !entryType) {
-            Alert.alert('Erro', 'Selecione o tipo de entrada (Ofertas ou Dízimo)')
+            Alert.alert('Erro', 'Selecione o tipo de entrada')
+            return
+        }
+
+        if (type === 'EXIT' && !exitType) {
+            Alert.alert('Erro', 'Selecione o tipo de saída')
+            return
+        }
+
+        if (exitType === 'OUTROS' && !exitTypeOther.trim()) {
+            Alert.alert('Erro', 'Descrição é obrigatória quando selecionar "Outros"')
             return
         }
 
@@ -78,6 +94,11 @@ export default function AddTransactionScreen({ navigation }: any) {
             }
         }
 
+        if (entryType === 'CONTRIBUICAO' && !contributionId) {
+            Alert.alert('Erro', 'Selecione uma contribuição')
+            return
+        }
+
         setLoading(true)
         try {
             const payload: any = {
@@ -89,15 +110,21 @@ export default function AddTransactionScreen({ navigation }: any) {
 
             if (type === 'ENTRY') {
                 payload.entryType = entryType
-            }
-
-            if (entryType === 'DIZIMO') {
-                if (isTithePayerMember) {
-                    payload.tithePayerMemberId = tithePayerMemberId
-                    payload.isTithePayerMember = true
-                } else {
-                    payload.tithePayerName = tithePayerName
-                    payload.isTithePayerMember = false
+                if (entryType === 'CONTRIBUICAO') {
+                    payload.contributionId = contributionId
+                } else if (entryType === 'DIZIMO') {
+                    if (isTithePayerMember) {
+                        payload.tithePayerMemberId = tithePayerMemberId
+                        payload.isTithePayerMember = true
+                    } else {
+                        payload.tithePayerName = tithePayerName
+                        payload.isTithePayerMember = false
+                    }
+                }
+            } else if (type === 'EXIT') {
+                payload.exitType = exitType
+                if (exitType === 'OUTROS') {
+                    payload.exitTypeOther = exitTypeOther
                 }
             }
 
@@ -119,12 +146,6 @@ export default function AddTransactionScreen({ navigation }: any) {
         }
     }
 
-    const memberOptions = members.map((member) => ({
-        key: member.id,
-        label: member.name,
-        value: member,
-    }))
-
     const handleTypeChange = (newType: 'ENTRY' | 'EXIT') => {
         setType(newType)
         if (newType === 'EXIT') {
@@ -132,17 +153,24 @@ export default function AddTransactionScreen({ navigation }: any) {
             setIsTithePayerMember(true)
             setTithePayerMemberId(null)
             setTithePayerName('')
-            setSelectedMember(null)
+            setContributionId(null)
+        } else {
+            setExitType('')
+            setExitTypeOther('')
         }
     }
 
-    const handleEntryTypeChange = (newEntryType: 'OFERTA' | 'DIZIMO') => {
+    const handleEntryTypeChange = (newEntryType: 'OFERTA' | 'DIZIMO' | 'CONTRIBUICAO') => {
         setEntryType(newEntryType)
-        if (newEntryType === 'OFERTA') {
+        if (newEntryType === 'OFERTA' || newEntryType === 'CONTRIBUICAO') {
             setIsTithePayerMember(true)
             setTithePayerMemberId(null)
             setTithePayerName('')
-            setSelectedMember(null)
+        }
+        if (newEntryType === 'CONTRIBUICAO') {
+            setContributionMemberId(null)
+            setContributionMemberName('')
+            setIsContributionMember(true)
         }
     }
 
@@ -153,24 +181,32 @@ export default function AddTransactionScreen({ navigation }: any) {
         >
             <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
                 <ScrollView contentContainerStyle={styles.scrollContent}>
-                    <Text style={styles.label}>Título *</Text>
+                    <Text style={styles.label}>
+                        Título <Text style={styles.required}>*</Text>
+                    </Text>
                     <TextInput
                         style={styles.input}
                         value={title}
                         onChangeText={setTitle}
                         placeholder="Ex: Pagamento de aluguel"
+                        placeholderTextColor="#999"
                     />
 
-                    <Text style={styles.label}>Valor *</Text>
+                    <Text style={styles.label}>
+                        Valor <Text style={styles.required}>*</Text>
+                    </Text>
                     <TextInput
                         style={styles.input}
                         keyboardType="numeric"
                         value={amount}
                         onChangeText={setAmount}
-                        placeholder="0.00"
+                        placeholder="R$ 0,00"
+                        placeholderTextColor="#999"
                     />
 
-                    <Text style={styles.label}>Tipo *</Text>
+                    <Text style={styles.label}>
+                        Tipo <Text style={styles.required}>*</Text>
+                    </Text>
                     <View style={styles.typeButtons}>
                         <TouchableOpacity
                             style={[styles.typeButton, type === 'ENTRY' && styles.typeButtonActive]}
@@ -192,22 +228,84 @@ export default function AddTransactionScreen({ navigation }: any) {
 
                     {type === 'ENTRY' && (
                         <>
-                            <Text style={styles.label}>Tipo de Entrada *</Text>
+                            <Text style={styles.label}>
+                                Tipo de Entrada <Text style={styles.required}>*</Text>
+                            </Text>
                             <ModalSelector
                                 data={[
                                     { key: 'OFERTA', label: 'Ofertas' },
                                     { key: 'DIZIMO', label: 'Dízimo' },
+                                    { key: 'CONTRIBUICAO', label: 'Contribuição' },
                                 ]}
-                                initValue={entryType === 'OFERTA' ? 'Ofertas' : entryType === 'DIZIMO' ? 'Dízimo' : 'Selecione...'}
-                                onChange={(option) => handleEntryTypeChange(option.key as 'OFERTA' | 'DIZIMO')}
+                                initValue={entryType === 'OFERTA' ? 'Ofertas' : entryType === 'DIZIMO' ? 'Dízimo' : entryType === 'CONTRIBUICAO' ? 'Contribuição' : 'Selecione...'}
+                                onChange={(option) => handleEntryTypeChange(option.key as 'OFERTA' | 'DIZIMO' | 'CONTRIBUICAO')}
                             >
                                 <TextInput
                                     style={styles.input}
                                     editable={false}
                                     placeholder="Selecione o tipo de entrada"
-                                    value={entryType === 'OFERTA' ? 'Ofertas' : entryType === 'DIZIMO' ? 'Dízimo' : ''}
+                                    value={entryType === 'OFERTA' ? 'Ofertas' : entryType === 'DIZIMO' ? 'Dízimo' : entryType === 'CONTRIBUICAO' ? 'Contribuição' : ''}
                                 />
                             </ModalSelector>
+
+                            {entryType === 'CONTRIBUICAO' && (
+                                <>
+                                    <Text style={styles.label}>
+                                        Contribuição <Text style={styles.required}>*</Text>
+                                    </Text>
+                                    <ModalSelector
+                                        data={contributions.map(c => ({ key: c.id, label: c.title }))}
+                                        initValue={contributions.find(c => c.id === contributionId)?.title || 'Selecione uma contribuição...'}
+                                        onChange={(option) => setContributionId(option.key)}
+                                    >
+                                        <TextInput
+                                            style={styles.input}
+                                            editable={false}
+                                            placeholder="Selecione uma contribuição..."
+                                            value={contributions.find(c => c.id === contributionId)?.title || ''}
+                                        />
+                                    </ModalSelector>
+
+                                    <View style={styles.switchContainer}>
+                                        <Text style={styles.label}>O contribuinte é membro</Text>
+                                        <Switch
+                                            value={isContributionMember}
+                                            onValueChange={(value) => {
+                                                setIsContributionMember(value)
+                                                if (!value) {
+                                                    setContributionMemberId(null)
+                                                    setContributionMemberName('')
+                                                } else {
+                                                    setContributionMemberName('')
+                                                }
+                                            }}
+                                        />
+                                    </View>
+
+                                    {isContributionMember ? (
+                                        <>
+                                            <Text style={styles.label}>Contribuinte (Membro)</Text>
+                                            <MemberSearch
+                                                value={contributionMemberId || undefined}
+                                                onChange={(memberId) => {
+                                                    setContributionMemberId(memberId)
+                                                }}
+                                                placeholder="Buscar membro contribuinte..."
+                                            />
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Text style={styles.label}>Nome do Contribuinte</Text>
+                                            <TextInput
+                                                style={styles.input}
+                                                value={contributionMemberName}
+                                                onChangeText={setContributionMemberName}
+                                                placeholder="Digite o nome do contribuinte"
+                                            />
+                                        </>
+                                    )}
+                                </>
+                            )}
 
                             {entryType === 'DIZIMO' && (
                                 <>
@@ -219,7 +317,6 @@ export default function AddTransactionScreen({ navigation }: any) {
                                                 setIsTithePayerMember(value)
                                                 if (!value) {
                                                     setTithePayerMemberId(null)
-                                                    setSelectedMember(null)
                                                 } else {
                                                     setTithePayerName('')
                                                 }
@@ -229,27 +326,22 @@ export default function AddTransactionScreen({ navigation }: any) {
 
                                     {isTithePayerMember ? (
                                         <>
-                                            <Text style={styles.label}>Dizimista (Membro) *</Text>
-                                            <ModalSelector
-                                                data={memberOptions}
-                                                initValue={selectedMember?.name || 'Selecione o membro...'}
-                                                onChange={(option) => {
-                                                    const member = option.value as Member
-                                                    setSelectedMember(member)
-                                                    setTithePayerMemberId(member.id)
+                                            <Text style={styles.label}>
+                                                Dizimista (Membro) <Text style={styles.required}>*</Text>
+                                            </Text>
+                                            <MemberSearch
+                                                value={tithePayerMemberId || undefined}
+                                                onChange={(memberId) => {
+                                                    setTithePayerMemberId(memberId)
                                                 }}
-                                            >
-                                                <TextInput
-                                                    style={styles.input}
-                                                    editable={false}
-                                                    placeholder="Buscar membro dizimista..."
-                                                    value={selectedMember?.name || ''}
-                                                />
-                                            </ModalSelector>
+                                                placeholder="Buscar membro dizimista..."
+                                            />
                                         </>
                                     ) : (
                                         <>
-                                            <Text style={styles.label}>Nome do Dizimista *</Text>
+                                            <Text style={styles.label}>
+                                                Nome do Dizimista <Text style={styles.required}>*</Text>
+                                            </Text>
                                             <TextInput
                                                 style={styles.input}
                                                 value={tithePayerName}
@@ -263,12 +355,59 @@ export default function AddTransactionScreen({ navigation }: any) {
                         </>
                     )}
 
+                    {type === 'EXIT' && (
+                        <>
+                            <Text style={styles.label}>
+                                Tipo de Saída <Text style={styles.required}>*</Text>
+                            </Text>
+                            <ModalSelector
+                                data={[
+                                    { key: 'ALUGUEL', label: 'Aluguel' },
+                                    { key: 'ENERGIA', label: 'Energia' },
+                                    { key: 'AGUA', label: 'Água' },
+                                    { key: 'INTERNET', label: 'Internet' },
+                                    { key: 'OUTROS', label: 'Outros' },
+                                ]}
+                                initValue={exitType === 'ALUGUEL' ? 'Aluguel' : exitType === 'ENERGIA' ? 'Energia' : exitType === 'AGUA' ? 'Água' : exitType === 'INTERNET' ? 'Internet' : exitType === 'OUTROS' ? 'Outros' : 'Selecione...'}
+                                onChange={(option) => {
+                                    const newExitType = option.key as 'ALUGUEL' | 'ENERGIA' | 'AGUA' | 'INTERNET' | 'OUTROS'
+                                    setExitType(newExitType)
+                                    if (newExitType !== 'OUTROS') {
+                                        setExitTypeOther('')
+                                    }
+                                }}
+                            >
+                                <TextInput
+                                    style={styles.input}
+                                    editable={false}
+                                    placeholder="Selecione o tipo de saída"
+                                    value={exitType === 'ALUGUEL' ? 'Aluguel' : exitType === 'ENERGIA' ? 'Energia' : exitType === 'AGUA' ? 'Água' : exitType === 'INTERNET' ? 'Internet' : exitType === 'OUTROS' ? 'Outros' : ''}
+                                />
+                            </ModalSelector>
+
+                            {exitType === 'OUTROS' && (
+                                <>
+                                    <Text style={styles.label}>
+                                        Descrição <Text style={styles.required}>*</Text>
+                                    </Text>
+                                    <TextInput
+                                        style={styles.input}
+                                        value={exitTypeOther}
+                                        onChangeText={setExitTypeOther}
+                                        placeholder="Digite a descrição do tipo de saída"
+                                    />
+                                </>
+                            )}
+                        </>
+                    )}
+
                     <Text style={styles.label}>Categoria</Text>
                     <TextInput
                         style={styles.input}
                         value={category}
                         onChangeText={setCategory}
                         placeholder="Ex: Aluguel, Salário, Material, etc."
+                        placeholderTextColor="#999"
                     />
                     <Text style={styles.hint}>Opcional - Categoria da transação</Text>
 
@@ -300,6 +439,10 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         marginBottom: 8,
         color: '#333',
+    },
+    required: {
+        color: '#e74c3c',
+        fontWeight: 'bold',
     },
     input: {
         borderWidth: 1,

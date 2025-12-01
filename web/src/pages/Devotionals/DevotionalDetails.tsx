@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, User, Heart, BookOpen } from 'lucide-react'
+import { ArrowLeft, User, Heart, BookOpen, Share2 } from 'lucide-react'
 import api from '../../api/api'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
 import ptBR from 'date-fns/locale/pt-BR'
 import { useAuthStore } from '../../stores/authStore'
+import { BibleText } from '../../components/BibleText'
 
 interface Devotional {
   id: string
@@ -61,6 +62,54 @@ export default function DevotionalDetails() {
     }
   }
 
+  const handleShare = async () => {
+    if (!devotional) return
+
+    const shareText = `📖 ${devotional.passage}\n\n${devotional.title}\n\n${devotional.content}\n\n- ${devotional.author.name}`
+
+    // Tenta usar Web Share API se disponível
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: devotional.title,
+          text: shareText,
+        })
+        toast.success('Devocional compartilhado!')
+      } catch (error: any) {
+        // Usuário cancelou ou erro
+        if (error.name !== 'AbortError') {
+          // Se não foi cancelamento, tenta copiar para clipboard
+          copyToClipboard(shareText)
+        }
+      }
+    } else {
+      // Fallback: copiar para clipboard
+      copyToClipboard(shareText)
+    }
+  }
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      toast.success('Devocional copiado para a área de transferência!')
+    } catch (error) {
+      // Fallback para navegadores mais antigos
+      const textArea = document.createElement('textarea')
+      textArea.value = text
+      textArea.style.position = 'fixed'
+      textArea.style.opacity = '0'
+      document.body.appendChild(textArea)
+      textArea.select()
+      try {
+        document.execCommand('copy')
+        toast.success('Devocional copiado para a área de transferência!')
+      } catch (err) {
+        toast.error('Não foi possível copiar o devocional')
+      }
+      document.body.removeChild(textArea)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -91,7 +140,8 @@ export default function DevotionalDetails() {
             <BookOpen className="w-5 h-5 text-primary" />
             <span className="font-semibold text-primary">Passagem Bíblica</span>
           </div>
-          <p className="text-gray-800 font-medium">{devotional.passage}</p>
+          <p className="text-gray-800 font-medium mb-2">{devotional.passage}</p>
+          <BibleText passage={devotional.passage} />
         </div>
 
         <div className="prose max-w-none mb-6">
@@ -111,19 +161,29 @@ export default function DevotionalDetails() {
             </span>
           </div>
 
-          {user && (
+          <div className="flex items-center gap-2">
+            {user && (
+              <button
+                onClick={handleLike}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                  devotional.liked
+                    ? 'bg-red-100 text-red-600'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                <Heart className={`w-5 h-5 ${devotional.liked ? 'fill-current' : ''}`} />
+                <span>{devotional.likes}</span>
+              </button>
+            )}
             <button
-              onClick={handleLike}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-                devotional.liked
-                  ? 'bg-red-100 text-red-600'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
+              onClick={handleShare}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
+              title="Compartilhar devocional"
             >
-              <Heart className={`w-5 h-5 ${devotional.liked ? 'fill-current' : ''}`} />
-              <span>{devotional.likes}</span>
+              <Share2 className="w-5 h-5" />
+              <span>Compartilhar</span>
             </button>
-          )}
+          </div>
         </div>
       </div>
     </div>

@@ -98,7 +98,7 @@ export default function ChurchScreen() {
         navigation.navigate('BranchesOnboarding')
       } else {
         // @ts-ignore
-        navigation.navigate('ConcluidoOnboarding')
+        navigation.navigate('SettingsOnboarding')
       }
     } catch (error: any) {
       Toast.show({

@@ -35,6 +35,13 @@ import BranchesOnboardingScreen from '../screens/onboarding/BranchesScreen'
 import ConcluidoOnboardingScreen from '../screens/onboarding/ConcluidoScreen'
 import ChurchSettingsScreen from '../screens/ChurchSettingsScreen'
 import ServiceScheduleFormScreen from '../screens/ServiceScheduleFormScreen'
+import EditTransactionScreen from '../screens/EditTransactionScreen'
+import TransactionDetailsScreen from '../screens/TransactionDetailsScreen'
+import MemberDetailsScreen from '../screens/MemberDetailsScreen'
+import BemVindoScreen from '../screens/onboarding/BemVindoScreen'
+import ConvitesScreen from '../screens/onboarding/ConvitesScreen'
+import SettingsScreen from '../screens/onboarding/SettingsScreen'
+import ForbiddenScreen from '../screens/ForbiddenScreen'
 
 
 
@@ -48,11 +55,17 @@ export default function AppNavigator() {
             <Stack.Navigator initialRouteName="Login" screenOptions={{animation: 'slide_from_right', headerShown: false }}>
                 <Stack.Screen name="Login" component={LoginScreen} />
                 <Stack.Screen name="Register" component={RegisterScreen} />
-                <Stack.Screen name="Dashboard" component={DashboardScreen} />
+                <Stack.Screen 
+                    name="Dashboard" 
+                    component={DashboardScreen}
+                    options={{ gestureEnabled: false }}
+                />
                 <Stack.Screen name="Events" component={EventsScreen} />
                 <Stack.Screen name="AddEvent" component={AddEventScreen} />
                 <Stack.Screen name="Finances" component={FinancesScreen} />
                 <Stack.Screen name="AddTransaction" component={AddTransactionScreen} />
+                <Stack.Screen name="EditTransaction" component={EditTransactionScreen} />
+                <Stack.Screen name="TransactionDetails" component={TransactionDetailsScreen} />
                 <Stack.Screen name="Contributions" component={ContributionsScreen} />
                 <Stack.Screen name="ContributionDetail" component={ContributionDetailScreen} />
                 <Stack.Screen name="Devotionals" component={DevotionalsScreen} />
@@ -76,15 +89,20 @@ export default function AppNavigator() {
                 <Stack.Screen name="AddContributions" component={AddContributions} />
                 <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
                 <Stack.Screen name="MembersListScreen" component={MembersListScreen} />
+                <Stack.Screen name="MemberDetails" component={MemberDetailsScreen} />
                 <Stack.Screen name="EditProfileScreen" component={EditProfileScreen} />
                 <Stack.Screen name="EventDetails" component={EventDetailsScreen} options={{ headerShown: false }} />
                 <Stack.Screen name="EditEventScreen" component={EditEventScreen}  />
+                <Stack.Screen name="BemVindoOnboarding" component={BemVindoScreen} />
                 <Stack.Screen name="StartOnboarding" component={StartOnboardingScreen} />
                 <Stack.Screen name="ChurchOnboarding" component={ChurchOnboardingScreen} />
                 <Stack.Screen name="BranchesOnboarding" component={BranchesOnboardingScreen} />
+                <Stack.Screen name="SettingsOnboarding" component={SettingsScreen} />
+                <Stack.Screen name="ConvitesOnboarding" component={ConvitesScreen} />
                 <Stack.Screen name="ConcluidoOnboarding" component={ConcluidoOnboardingScreen} />
                 <Stack.Screen name="ChurchSettings" component={ChurchSettingsScreen} />
                 <Stack.Screen name="ServiceScheduleForm" component={ServiceScheduleFormScreen} />
+                <Stack.Screen name="Forbidden" component={ForbiddenScreen} />
 
 
 

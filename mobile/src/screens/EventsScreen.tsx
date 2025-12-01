@@ -1,32 +1,40 @@
 import React, { useEffect, useState, useCallback } from 'react'
-import {View, Text, TouchableOpacity, FlatList, StyleSheet, ActivityIndicator} from 'react-native'
+import {View, Text, TouchableOpacity, FlatList, StyleSheet, ActivityIndicator, RefreshControl} from 'react-native'
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5'
 import { Ionicons } from '@expo/vector-icons'
 import api from '../api/api'
 import { useNavigation } from '@react-navigation/native'
 import { useAuthStore } from '../stores/authStore'
+import Tabs from '../components/Tabs'
+import PageHeader from '../components/PageHeader'
 
+
+interface Event {
+    id: string
+    title: string
+    startDate: string
+    time?: string
+    location?: string
+}
 
 export default function EventsScreen() {
     const [tab, setTab] = useState<'proximos' | 'passados'>('proximos')
-    const [events, setEvents] = useState([])
+    const [events, setEvents] = useState<Event[]>([])
     const [loading, setLoading] = useState(true)
     const [refreshing, setRefreshing] = useState(false)
 
     const navigation = useNavigation()
     const user = useAuthStore((s) => s.user)
-    const permissions = user?.permissions?.map((p) => p.type) || []
-
 
     const fetchEvents = useCallback(async () => {
         try {
             const res = await api.get('/events')
             const now = new Date()
 
-            const data = res.data || []
+            const data: Event[] = res.data || []
             const filtered = tab === 'proximos'
-                ? data.filter((e) => new Date(e.startDate) >= now)
-                : data.filter((e) => new Date(e.startDate) < now)
+                ? data.filter((e: Event) => new Date(e.startDate) >= now)
+                : data.filter((e: Event) => new Date(e.startDate) < now)
 
             // Só atualiza se os dados realmente mudarem
             setEvents((prev) => {
@@ -52,7 +60,7 @@ export default function EventsScreen() {
 
     if (loading) {
         return (
-            <View style={styles.centered}>
+            <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#3366FF" />
             </View>
         )
@@ -65,62 +73,85 @@ export default function EventsScreen() {
     }
 
     const canManageEvents =
-        user.role === 'ADMINGERAL' ||
-        user.role === 'ADMINFILIAL' ||
-        user.permissions?.some((p: any) => p.type === 'events_manage')
+        user?.role === 'ADMINGERAL' ||
+        user?.role === 'ADMINFILIAL' ||
+        user?.permissions?.some((p: any) => p.type === 'events_manage') || false
 
     return (
         <View style={styles.container}>
-            <View style={styles.header}>
-                <FontAwesome5 name="church" size={24} color="white" style={{ marginRight: 8 }} />
-                <Text style={styles.headerTitle}>Eventos e Cultos</Text>
-            </View>
+            <PageHeader
+                title="Eventos e Cultos"
+                Icon={FontAwesome5}
+                iconName="calendar"
+                rightButtonIcon={
+                    canManageEvents ? (
+                        <Ionicons name="add" size={24} color="white" />
+                    ) : undefined
+                }
+                onRightButtonPress={
+                    canManageEvents
+                        ? () => (navigation as any).navigate('AddEvent')
+                        : undefined
+                }
+            />
 
-            <View style={styles.tabs}>
-                <TouchableOpacity onPress={() => setTab('proximos')} style={[styles.tab, tab === 'proximos' && styles.activeTab]}>
-                    <Text style={[styles.tabText, tab === 'proximos' && styles.activeTabText]}>Próximos</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => setTab('passados')} style={[styles.tab, tab === 'passados' && styles.activeTab]}>
-                    <Text style={[styles.tabText, tab === 'passados' && styles.activeTabText]}>Passados</Text>
-                </TouchableOpacity>
-            </View>
+            <Tabs
+                tabs={[
+                    { key: 'proximos', label: 'Próximos' },
+                    { key: 'passados', label: 'Passados' },
+                ]}
+                activeTab={tab}
+                onTabChange={(key) => setTab(key as 'proximos' | 'passados')}
+                style={styles.tabsContainerWithHeader}
+            />
 
             <FlatList
                 data={events}
                 keyExtractor={(item) => item.id}
+                contentContainerStyle={styles.listContent}
+                style={styles.list}
+                refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+                }
                 renderItem={({ item }) => (
-                    <View style={styles.card}>
-                        <Text style={styles.dateLabel}>{new Date(item.startDate).toLocaleDateString()}</Text>
-                        <TouchableOpacity
-                            style={styles.eventBox}
-                            onPress={() => navigation.navigate('EventDetails', { id: item.id })}
-                            activeOpacity={0.8}
-                        >
-                            <View style={{ flex: 1 }}>
-                                <Text style={styles.title}>{item.title}</Text>
-                                <Text style={styles.subtitle}>
-                                    {new Date(item.startDate).toLocaleDateString()} • {item.time}
-                                </Text>
-                                <Text style={styles.subtitle}>{item.location}</Text>
+                    <TouchableOpacity
+                        style={styles.card}
+                        onPress={() => (navigation as any).navigate('EventDetails', { id: item.id })}
+                        activeOpacity={0.8}
+                    >
+                        <Text style={styles.eventTitle}>{item.title}</Text>
+                        <View style={styles.eventInfo}>
+                            <Ionicons name="calendar-outline" size={16} color="#666" />
+                            <Text style={styles.eventDetail}>
+                                {new Date(item.startDate).toLocaleDateString('pt-BR')} {item.time && `• ${item.time}`}
+                            </Text>
+                        </View>
+                        {item.location && (
+                            <View style={styles.eventInfo}>
+                                <Ionicons name="location-outline" size={16} color="#666" />
+                                <Text style={styles.eventDetail}>{item.location}</Text>
                             </View>
-                        </TouchableOpacity>
-                    </View>
-
+                        )}
+                    </TouchableOpacity>
                 )}
-                contentContainerStyle={{ paddingBottom: 80 }}
-                refreshing={refreshing}
-                onRefresh={handleRefresh}
                 ListEmptyComponent={
-                    <View style={styles.centered}>
-                        <Text style={styles.emptyText}>Nenhum evento encontrado 🙏</Text>
+                    <View style={styles.emptyContainer}>
+                        <Ionicons name="calendar-outline" size={64} color="#ccc" />
+                        <Text style={styles.emptyText}>
+                            {tab === 'proximos' 
+                                ? 'Nenhum evento próximo' 
+                                : 'Nenhum evento passado'}
+                        </Text>
                     </View>
                 }
             />
 
             {canManageEvents && (
-                <TouchableOpacity style={styles.fab} onPress={() => navigation.navigate('AddEvent')}>
+                <TouchableOpacity 
+                    style={styles.fab} 
+                    onPress={() => (navigation as any).navigate('AddEvent')}
+                >
                     <Ionicons name="add" size={24} color="white" />
-                    <Text style={styles.fabText}>Adicionar</Text>
                 </TouchableOpacity>
             )}
         </View>
@@ -129,98 +160,76 @@ export default function EventsScreen() {
 
 
 const styles = StyleSheet.create({
-    centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    emptyText: { fontSize: 16, color: '#666', marginBottom: 20, marginTop: 50},
-    container: { flex: 1, backgroundColor: '#fff' },
-    header: {
-        backgroundColor: '#3366FF',
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingTop: 50,
-        paddingHorizontal: 20,
-        paddingBottom: 20,
-        position: 'relative'
-    },
-    headerTitle: {
-        color: 'white',
-        fontSize: 18,
-        fontWeight: 'bold',
+    container: {
         flex: 1,
+        backgroundColor: '#f5f5f5',
     },
-    plusCircle: {
-        backgroundColor: 'rgba(255,255,255,0.2)',
-        borderRadius: 20,
-        padding: 6,
-    },
-    tabs: {
-        flexDirection: 'row',
-        borderBottomWidth: 1,
-        borderColor: '#eee',
-        backgroundColor: '#f7f7f7',
-    },
-    tab: {
+    loadingContainer: {
         flex: 1,
+        justifyContent: 'center',
         alignItems: 'center',
-        paddingVertical: 10,
     },
-    activeTab: {
-        borderBottomWidth: 3,
-        borderColor: '#3366FF',
+    list: {
+        marginTop: 0,
     },
-    tabText: {
-        color: '#888',
-        fontWeight: '500',
+    tabsContainerWithHeader: {
+        marginTop: 110, // Altura do header fixo
     },
-    activeTabText: {
-        color: '#3366FF',
-        fontWeight: 'bold',
+    listContent: {
+        padding: 16,
     },
     card: {
-        paddingHorizontal: 20,
-        paddingTop: 20,
-    },
-    dateLabel: {
-        color: '#666',
-        marginBottom: 6,
-        fontSize: 14,
-    },
-    eventBox: {
         backgroundColor: '#fff',
-        padding: 15,
         borderRadius: 12,
+        padding: 16,
+        marginBottom: 12,
         shadowColor: '#000',
-        shadowOpacity: 0.1,
         shadowOffset: { width: 0, height: 2 },
-        shadowRadius: 6,
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
         elevation: 3,
     },
-    title: {
-        fontSize: 16,
-        fontWeight: 'bold',
+    eventTitle: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#333',
+        marginBottom: 12,
     },
-    subtitle: {
+    eventInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    eventDetail: {
+        fontSize: 16,
         color: '#666',
-        marginTop: 4,
+        marginLeft: 8,
+    },
+    emptyContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingVertical: 64,
+    },
+    emptyText: {
+        fontSize: 16,
+        color: '#999',
+        marginTop: 16,
     },
     fab: {
         position: 'absolute',
         right: 20,
         bottom: 20,
         backgroundColor: '#3366FF',
-        paddingVertical: 12,
-        paddingHorizontal: 18,
-        borderRadius: 30,
-        flexDirection: 'row',
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        justifyContent: 'center',
         alignItems: 'center',
-        gap: 6,
         shadowColor: '#000',
-        shadowOpacity: 0.2,
-        shadowOffset: { width: 0, height: 2 },
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
         shadowRadius: 4,
-        elevation: 6,
-    },
-    fabText: {
-        color: '#fff',
-        fontWeight: 'bold',
+        elevation: 8,
     },
 })

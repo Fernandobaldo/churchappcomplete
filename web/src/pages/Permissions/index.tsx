@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Shield, Users, Check, X } from 'lucide-react'
+import { Shield, Users, X, Plus } from 'lucide-react'
 import api from '../../api/api'
 import toast from 'react-hot-toast'
 
@@ -17,30 +17,35 @@ interface Permission {
   description: string
 }
 
-const availablePermissions: Permission[] = [
-  { type: 'MANAGE_EVENTS', description: 'Gerenciar Eventos' },
-  { type: 'MANAGE_CONTRIBUTIONS', description: 'Gerenciar Contribuições' },
-  { type: 'MANAGE_DEVOTIONALS', description: 'Gerenciar Devocionais' },
-  { type: 'MANAGE_MEMBERS', description: 'Gerenciar Membros' },
-  { type: 'MANAGE_PERMISSIONS', description: 'Gerenciar Permissões' },
-]
+// Mapeamento de permissões para descrições em português
+const permissionDescriptions: Record<string, string> = {
+  'devotional_manage': 'Gerenciar Devocionais',
+  'members_view': 'Visualizar Membros',
+  'members_manage': 'Gerenciar Membros',
+  'events_manage': 'Gerenciar Eventos',
+  'contributions_manage': 'Gerenciar Contribuições',
+  'finances_manage': 'Gerenciar Finanças',
+  'church_manage': 'Gerenciar Igreja',
+}
 
 export default function Permissions() {
   const [searchParams] = useSearchParams()
   const memberId = searchParams.get('memberId')
   const [members, setMembers] = useState<Member[]>([])
   const [selectedMember, setSelectedMember] = useState<Member | null>(null)
+  const [availablePermissions, setAvailablePermissions] = useState<Permission[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     fetchMembers()
+    fetchAvailablePermissions()
   }, [])
 
   useEffect(() => {
     if (memberId && members.length > 0) {
       const member = members.find(m => m.id === memberId)
       if (member) {
-        setSelectedMember(member)
+        fetchMemberDetails(member.id)
       }
     }
   }, [memberId, members])
@@ -48,7 +53,12 @@ export default function Permissions() {
   const fetchMembers = async () => {
     try {
       const response = await api.get('/members')
-      setMembers(response.data)
+      // Garante que todos os membros tenham permissions como array
+      const membersWithPermissions = response.data.map((member: Member) => ({
+        ...member,
+        permissions: member.permissions || []
+      }))
+      setMembers(membersWithPermissions)
     } catch (error) {
       toast.error('Erro ao carregar membros')
     } finally {
@@ -56,27 +66,78 @@ export default function Permissions() {
     }
   }
 
+  const fetchAvailablePermissions = async () => {
+    try {
+      const response = await api.get('/permissions/all')
+      const permissions = response.data.map((p: { type: string }) => ({
+        type: p.type,
+        description: permissionDescriptions[p.type] || p.type,
+      }))
+      setAvailablePermissions(permissions)
+    } catch (error) {
+      console.error('Erro ao carregar permissões disponíveis:', error)
+      // Fallback para permissões padrão se a API falhar
+      setAvailablePermissions([
+        { type: 'devotional_manage', description: 'Gerenciar Devocionais' },
+        { type: 'members_view', description: 'Visualizar Membros' },
+        { type: 'members_manage', description: 'Gerenciar Membros' },
+        { type: 'events_manage', description: 'Gerenciar Eventos' },
+        { type: 'contributions_manage', description: 'Gerenciar Contribuições' },
+        { type: 'finances_manage', description: 'Gerenciar Finanças' },
+        { type: 'church_manage', description: 'Gerenciar Igreja' },
+      ])
+    }
+  }
+
+  const fetchMemberDetails = async (id: string) => {
+    try {
+      const response = await api.get(`/members/${id}`)
+      const member = response.data
+      // Garante que permissions seja sempre um array
+      if (!member.permissions) {
+        member.permissions = []
+      }
+      setSelectedMember(member)
+    } catch (error) {
+      toast.error('Erro ao carregar detalhes do membro')
+    }
+  }
+
+  const handleMemberSelect = (member: Member) => {
+    // Garante que permissions seja sempre um array
+    const memberWithPermissions = {
+      ...member,
+      permissions: member.permissions || []
+    }
+    setSelectedMember(memberWithPermissions)
+    fetchMemberDetails(member.id)
+  }
+
   const togglePermission = async (permissionType: string) => {
     if (!selectedMember) return
 
-    const hasPermission = selectedMember.permissions.some(p => p.type === permissionType)
+    const currentPermissions = (selectedMember.permissions || []).map(p => p.type)
+    const hasPermission = currentPermissions.includes(permissionType)
+
+    // Cria o novo array de permissões
+    const newPermissions = hasPermission
+      ? currentPermissions.filter(p => p !== permissionType)
+      : [...currentPermissions, permissionType]
 
     try {
-      if (hasPermission) {
-        await api.delete(`/permissions/${selectedMember.id}/${permissionType}`)
-        toast.success('Permissão removida com sucesso!')
-      } else {
-        await api.post(`/permissions/${selectedMember.id}`, { type: permissionType })
-        toast.success('Permissão adicionada com sucesso!')
-      }
-      // Atualiza a lista de membros e o membro selecionado
+      await api.post(`/permissions/${selectedMember.id}`, { permissions: newPermissions })
+      toast.success(hasPermission ? 'Permissão removida com sucesso!' : 'Permissão adicionada com sucesso!')
+      
+      // Recarrega os detalhes do membro para obter as permissões atualizadas com IDs corretos
+      await fetchMemberDetails(selectedMember.id)
+      
+      // Atualiza também na lista de membros
       const response = await api.get('/members')
-      const updatedMembers = response.data
-      setMembers(updatedMembers)
-      const updatedMember = updatedMembers.find((m: Member) => m.id === selectedMember.id)
-      if (updatedMember) {
-        setSelectedMember(updatedMember)
-      }
+      const membersWithPermissions = response.data.map((member: Member) => ({
+        ...member,
+        permissions: member.permissions || []
+      }))
+      setMembers(membersWithPermissions)
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Erro ao atualizar permissão')
     }
@@ -108,7 +169,7 @@ export default function Permissions() {
               {members.map((member) => (
                 <button
                   key={member.id}
-                  onClick={() => setSelectedMember(member)}
+                  onClick={() => handleMemberSelect(member)}
                   className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${
                     selectedMember?.id === member.id
                       ? 'bg-primary text-white'
@@ -128,41 +189,83 @@ export default function Permissions() {
         <div className="lg:col-span-2">
           {selectedMember ? (
             <div className="card">
-              <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                <Shield className="w-5 h-5" />
-                Permissões de {selectedMember.name}
-              </h2>
-              <div className="space-y-3">
-                {availablePermissions.map((permission) => {
-                  const hasPermission = selectedMember.permissions.some(
-                    p => p.type === permission.type
-                  )
-                  return (
-                    <div
-                      key={permission.type}
-                      className="flex items-center justify-between p-4 border border-gray-200 rounded-lg"
-                    >
-                      <div>
-                        <p className="font-medium">{permission.description}</p>
-                        <p className="text-sm text-gray-600">{permission.type}</p>
-                      </div>
-                      <button
-                        onClick={() => togglePermission(permission.type)}
-                        className={`p-2 rounded-lg transition-colors ${
-                          hasPermission
-                            ? 'bg-green-100 text-green-600 hover:bg-green-200'
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                        }`}
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold flex items-center gap-2">
+                  <Shield className="w-5 h-5" />
+                  Permissões de {selectedMember.name}
+                </h2>
+                <span className="text-sm text-gray-500">
+                  {(selectedMember.permissions || []).length} {(selectedMember.permissions || []).length === 1 ? 'permissão' : 'permissões'}
+                </span>
+              </div>
+              
+              {(selectedMember.permissions || []).length > 0 && (
+                <div className="mb-6">
+                  <h3 className="text-sm font-medium text-gray-700 mb-3">Permissões Atuais</h3>
+                  <div className="space-y-2">
+                    {(selectedMember.permissions || []).map((permission) => {
+                      const permissionInfo = availablePermissions.find(p => p.type === permission.type)
+                      return (
+                        <div
+                          key={permission.id || permission.type}
+                          className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg"
+                        >
+                          <div>
+                            <p className="font-medium text-green-900">
+                              {permissionInfo?.description || permission.type}
+                            </p>
+                            <p className="text-xs text-green-700">{permission.type}</p>
+                          </div>
+                          <button
+                            onClick={() => togglePermission(permission.type)}
+                            className="p-2 bg-green-100 text-green-600 rounded-lg hover:bg-green-200 transition-colors"
+                            title="Remover permissão"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <h3 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+                  <Plus className="w-4 h-4" />
+                  Adicionar Permissão
+                </h3>
+                <div className="space-y-2">
+                  {availablePermissions
+                    .filter(permission => 
+                      !(selectedMember.permissions || []).some(p => p.type === permission.type)
+                    )
+                    .map((permission) => (
+                      <div
+                        key={permission.type}
+                        className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
                       >
-                        {hasPermission ? (
-                          <Check className="w-5 h-5" />
-                        ) : (
-                          <X className="w-5 h-5" />
-                        )}
-                      </button>
-                    </div>
-                  )
-                })}
+                        <div>
+                          <p className="font-medium text-gray-900">{permission.description}</p>
+                          <p className="text-xs text-gray-600">{permission.type}</p>
+                        </div>
+                        <button
+                          onClick={() => togglePermission(permission.type)}
+                          className="p-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors"
+                          title="Adicionar permissão"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  {availablePermissions.every(permission => 
+                    (selectedMember.permissions || []).some(p => p.type === permission.type)
+                  ) && (
+                    <p className="text-sm text-gray-500 text-center py-4">
+                      Todas as permissões disponíveis já foram atribuídas
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
           ) : (

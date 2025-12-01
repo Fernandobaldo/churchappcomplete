@@ -3,12 +3,14 @@ import React, { useEffect, useState } from 'react'
 import { View, Text, StyleSheet, Image, TouchableOpacity, ActivityIndicator } from 'react-native'
 
 import {useNavigation, useRoute} from '@react-navigation/native'
-import PageHeader from '../components/PageHeader'
+import DetailScreenLayout from '../components/layouts/DetailScreenLayout'
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5'
 import { Ionicons } from '@expo/vector-icons'
 import api from '../api/api'
 
 import { useAuthStore } from '../stores/authStore'
+import { format } from 'date-fns'
+import ptBR from 'date-fns/locale/pt-BR'
 
 export default function ProfileScreen() {
     const route = useRoute()
@@ -88,18 +90,22 @@ export default function ProfileScreen() {
     }
 
     return (
-        <View style={styles.container}>
-            <PageHeader
-                title={memberId ? 'Perfil do Membro' : 'Meu Perfil'}
-                Icon={FontAwesome5}
-                iconName="user"
-                rightButtonIcon={
-                    !memberId ? <Ionicons name="settings-outline" size={24} color="white" /> : undefined
-            }
-                onRightButtonPress={() => {
-                    navigation.navigate('EditProfileScreen')
-                }}
-            />
+        <DetailScreenLayout
+            headerProps={{
+                title: memberId ? 'Perfil do Membro' : 'Meu Perfil',
+                Icon: FontAwesome5,
+                iconName: "user",
+                rightButtonIcon: !memberId ? (
+                    <Ionicons name="settings-outline" size={24} color="white" />
+                ) : undefined,
+                onRightButtonPress: !memberId
+                    ? () => {
+                        navigation.navigate('EditProfileScreen' as never)
+                    }
+                    : undefined,
+            }}
+            backgroundColor="#f2f2f2"
+        >
             <View style={styles.card}>
                 <Image
                     source={{ uri: profile.avatarUrl || 'https://via.placeholder.com/150' }}
@@ -107,14 +113,42 @@ export default function ProfileScreen() {
                     defaultSource={require('../../assets/worshipImage.png')} //
                 />
                 <Text style={styles.name}>{profile.name}</Text>
-                <Text style={styles.email}>{profile.birthDate}</Text>
+                {profile.email && <Text style={styles.email}>{profile.email}</Text>}
 
                 <View style={styles.divider} />
 
-                <View style={styles.infoRow}>
-                    <Text style={styles.label}>Congregação</Text>
-                    <Text style={styles.value}>{profile.branch.church?.name}</Text>
-                </View>
+                {profile.email && (
+                    <View style={styles.infoRow}>
+                        <Text style={styles.label}>Email</Text>
+                        <Text style={styles.value}>{profile.email}</Text>
+                    </View>
+                )}
+                {profile.phone && (
+                    <View style={styles.infoRow}>
+                        <Text style={styles.label}>Telefone</Text>
+                        <Text style={styles.value}>{profile.phone}</Text>
+                    </View>
+                )}
+                {profile.address && (
+                    <View style={styles.infoRow}>
+                        <Text style={styles.label}>Endereço</Text>
+                        <Text style={styles.value}>{profile.address}</Text>
+                    </View>
+                )}
+                {profile.birthDate && (
+                    <View style={styles.infoRow}>
+                        <Text style={styles.label}>Data de Nascimento</Text>
+                        <Text style={styles.value}>
+                            {format(new Date(profile.birthDate), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                        </Text>
+                    </View>
+                )}
+                {profile.branch && (
+                    <View style={styles.infoRow}>
+                        <Text style={styles.label}>Congregação</Text>
+                        <Text style={styles.value}>{profile.branch?.church?.name || 'Não informado'}</Text>
+                    </View>
+                )}
                 <View style={styles.infoRow}>
                     <Text style={styles.label}>Cargo</Text>
                     <Text style={styles.value}> {formatRole(profile.role) || 'Nenhum'}</Text>
@@ -137,7 +171,7 @@ export default function ProfileScreen() {
                     </TouchableOpacity>
                 )}
             </View>
-        </View>
+        </DetailScreenLayout>
     )
 }
 
@@ -145,18 +179,11 @@ export default function ProfileScreen() {
 
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#f2f2f2',
-        alignItems: 'center',
-
-    },
     card: {
-        marginTop: 50,
         backgroundColor: '#fff',
         borderRadius: 16,
         padding: 24,
-        width: '90%',
+        width: '100%',
         alignItems: 'center',
         shadowColor: '#000',
         shadowOpacity: 0.1,

@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react'
-import { View, StyleSheet } from 'react-native'
 import { useNavigation, useRoute } from '@react-navigation/native'
 import Toast from 'react-native-toast-message'
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5'
-import PageHeader from '../components/PageHeader'
+import FormScreenLayout from '../components/layouts/FormScreenLayout'
 import MemberForm from '../components/FormsComponent'
 import api from '../api/api'
 import { parse, format, isValid } from 'date-fns'
@@ -16,22 +15,21 @@ export default function EditEventScreen() {
     const [form, setForm] = useState({
         title: '',
         startDate: '',
-        endDate: '',
         time: '',
         description: '',
         location: '',
         hasDonation: false,
         donationReason: '',
         donationLink: '',
+        imageUrl: '',
     })
 
     const fields = [
-        { key: 'title', label: 'Titulo do evento', type: 'string' },
-        { key: 'startDate', label: 'Data de início', type: 'date' },
-        { key: 'endDate', label: 'Data do término', type: 'date' },
-        { key: 'time', label: 'Horario', type: 'string' },
-        { key: 'description', label: 'Descrição', type: 'string' },
-        { key: 'location', label: 'Localização', type: 'string' },
+        { key: 'title', label: 'Título do evento', type: 'string', required: true, placeholder: 'Ex: Culto Dominical' },
+        { key: 'startDate', label: 'Data do evento', type: 'date', required: true, placeholder: 'DD/MM/AAAA' },
+        { key: 'time', label: 'Horário', type: 'time', placeholder: 'HH:mm' },
+        { key: 'description', label: 'Descrição', type: 'string', placeholder: 'Descrição do evento' },
+        { key: 'location', label: 'Localização', type: 'string', placeholder: 'Ex: Templo Principal' },
         { key: 'hasDonation', label: 'Contribuição habilitada', type: 'toggle' },
         {
             key: 'donationReason',
@@ -46,6 +44,11 @@ export default function EditEventScreen() {
             placeholder: 'https://exemplo.com/pagamento',
             type: 'string',
             dependsOn: 'hasDonation',
+        },
+        {
+            key: 'imageUrl',
+            label: 'Banner do evento',
+            type: 'image',
         },
     ]
 
@@ -74,13 +77,13 @@ export default function EditEventScreen() {
             setForm({
                 title: e.title || '',
                 startDate: e.startDate ? format(new Date(e.startDate), 'dd/MM/yyyy') : '',
-                endDate: e.endDate ? format(new Date(e.endDate), 'dd/MM/yyyy') : '',
                 time: timeValue,
                 description: e.description || '',
                 location: e.location || '',
                 hasDonation: e.hasDonation || false,
                 donationReason: e.donationReason || '',
-                donationLink: e.donationLink || '', // adaptando o nome do campo
+                donationLink: e.donationLink || '',
+                imageUrl: e.imageUrl || '',
             })
         } catch (error) {
             Toast.show({
@@ -97,11 +100,31 @@ export default function EditEventScreen() {
     }, [id])
 
     const handleUpdate = async () => {
+        // Validação de campos obrigatórios
+        if (!form.title || !form.startDate) {
+            Toast.show({
+                type: 'error',
+                text1: 'Campos obrigatórios',
+                text2: 'Preencha todos os campos obrigatórios (*)',
+            })
+            return
+        }
+
+        // Combina startDate com time se ambos estiverem presentes
+        let finalStartDate = convertToFormattedDate(form.startDate)
+        if (form.startDate && form.time) {
+            const [hours, minutes] = form.time.split(':').map(Number)
+            const startDate = parse(form.startDate, 'dd/MM/yyyy', new Date())
+            if (isValid(startDate)) {
+                startDate.setHours(hours || 0, minutes || 0, 0, 0)
+                finalStartDate = format(startDate, 'dd-MM-yyyy')
+            }
+        }
+
         const payload = {
             ...form,
-            startDate: convertToFormattedDate(form.startDate),
-            endDate: convertToFormattedDate(form.endDate),
-            donationLink: form.donationLink, // adaptando de volta para o nome esperado pela API
+            startDate: finalStartDate,
+            endDate: finalStartDate, // Usa a mesma data de início como término
         }
 
         try {
@@ -123,8 +146,13 @@ export default function EditEventScreen() {
     }
 
     return (
-        <View style={styles.container}>
-            <PageHeader title="Editar Evento" Icon={FontAwesome5} iconName="edit" />
+        <FormScreenLayout
+            headerProps={{
+                title: "Editar Evento",
+                Icon: FontAwesome5,
+                iconName: "calendar"
+            }}
+        >
             <MemberForm
                 form={form}
                 setForm={setForm}
@@ -132,13 +160,8 @@ export default function EditEventScreen() {
                 onSubmit={handleUpdate}
                 submitLabel="Salvar alterações"
             />
-        </View>
+        </FormScreenLayout>
     )
 }
 
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#fff',
-    },
-})
+// Estilos removidos - agora gerenciados pelo FormScreenLayout

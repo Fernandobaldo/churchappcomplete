@@ -55,7 +55,7 @@ export default function LoginScreen() {
           navigation.navigate('StartOnboarding' as never)
         } else {
           Toast.show({ type: 'success', text1: 'Login realizado!' })
-          navigation.navigate('Dashboard' as never)
+          navigation.navigate('Main' as never)
         }
       }, 100)
     } catch (error: any) {
@@ -93,18 +93,20 @@ export default function LoginScreen() {
           <Text style={styles.title}>Login</Text>
           <TextInput
             style={styles.input}
-            placeholder="Email"
+            placeholder="exemplo@email.com"
             autoCapitalize="none"
             keyboardType="email-address"
             value={email}
             onChangeText={setEmail}
+            placeholderTextColor="#999"
           />
           <TextInput
             style={styles.input}
-            placeholder="Senha"
+            placeholder="••••••••"
             secureTextEntry
             value={password}
             onChangeText={setPassword}
+            placeholderTextColor="#999"
           />
           <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={loading}>
             <Text style={styles.buttonText}>{loading ? 'Entrando...' : 'Entrar'}</Text>

@@ -82,7 +82,10 @@ export default function EditMemberPermissionsScreen({ route, navigation }: any) 
                 Icon={FontAwesome5}
                 iconName="lock"
             />
-            <ScrollView contentContainerStyle={{ padding: 20 }}>
+            <ScrollView 
+                contentContainerStyle={{ padding: 20 }}
+                style={styles.scrollView}
+            >
                 {PERMISSIONS.map((perm) => (
                     <View key={perm.key} style={styles.row}>
                         <Text style={styles.label}>{perm.label}</Text>
@@ -102,6 +105,9 @@ export default function EditMemberPermissionsScreen({ route, navigation }: any) 
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#fff' },
+    scrollView: {
+        marginTop: 110, // Altura do header fixo
+    },
     centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     row: {
         flexDirection: 'row',

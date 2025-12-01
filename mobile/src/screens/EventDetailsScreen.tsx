@@ -1,15 +1,14 @@
 import React, { useEffect, useState } from 'react'
-import {View, Text, TouchableOpacity, ScrollView, Linking, Alert, ActivityIndicator, StyleSheet} from 'react-native'
+import {View, Text, TouchableOpacity, Linking, Alert, ActivityIndicator, StyleSheet} from 'react-native'
 import { useNavigation, useRoute } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import api from '../api/api'
 import { useAuthStore } from '../stores/authStore'
-import PageHeader from "../components/PageHeader";
+import DetailScreenLayout from '../components/layouts/DetailScreenLayout'
 import FontAwesome5 from "@expo/vector-icons/FontAwesome5";
 import Toast from "react-native-toast-message";
-import { Image } from 'react-native'
 export default function EventDetailsScreen() {
     const navigation = useNavigation()
     const route = useRoute()
@@ -69,108 +68,192 @@ export default function EventDetailsScreen() {
     const formatDate = (dateStr: string) => {
         const date = new Date(dateStr)
         if (isNaN(date.getTime())) return 'Data inválida'
-        return format(date, "EEEE, dd 'de' MMMM 'de' yyyy", { locale: ptBR })
+        return format(date, "EEEE, dd 'de' MMMM 'de' yyyy 'às' HH:mm", { locale: ptBR })
+    }
+
+    const formatTime = () => {
+        if (event.time) {
+            return event.time
+        }
+        if (event.startDate) {
+            const date = new Date(event.startDate)
+            if (!isNaN(date.getTime())) {
+                return format(date, 'HH:mm')
+            }
+        }
+        return 'Horário não informado'
     }
 
     return (
-        <View style={{  backgroundColor: 'white' }}>
-            <PageHeader
-                title={'Detalhes do Evento'}
-                Icon={FontAwesome5}
-                iconName="user"
-            />
-            {event.imageUrl && (
-                <Image
-                    source={{ uri: event.imageUrl }}
-                    style={{ width: '100%', height: 200, marginBottom: 16 }}
-                    resizeMode="cover"
-                />
-            )}
-            <ScrollView contentContainerStyle={{ padding: 16 }}>
+        <DetailScreenLayout
+            headerProps={{
+                title: "Detalhes do Evento",
+                Icon: FontAwesome5,
+                iconName: "calendar",
+                rightButtonIcon: hasPermissionToEdit ? (
+                    <Ionicons name="create-outline" size={24} color="white" />
+                ) : undefined,
+                onRightButtonPress: hasPermissionToEdit
+                    ? () => (navigation as any).navigate('EditEventScreen', { id: event.id })
+                    : undefined,
+            }}
+            imageUrl={event.imageUrl}
+        >
+            <View style={styles.card}>
                 <Text style={styles.eventName}>{event.title}</Text>
-                <Text style={styles.bodyText}>{formatDate(event.startDate)} às {event.time || 'Horário não informado'}</Text>
-                <Text style={styles.bodyText}>Local: {event.location || 'Não informado'}</Text>
+                
+                <View style={styles.infoRow}>
+                    <Ionicons name="calendar-outline" size={20} color="#666" />
+                    <View style={styles.infoContent}>
+                        <Text style={styles.infoLabel}>Data e Hora</Text>
+                        <Text style={styles.infoValue}>
+                            {formatDate(event.startDate)} {event.time && `(${event.time})`}
+                        </Text>
+                    </View>
+                </View>
 
-                <Text style={styles.descriptionHeader}>Descrição:</Text>
-                <Text style={styles.bodyText}>{event.description || 'Sem descrição'}</Text>
-
-                {event.hasDonation && (
-                    <View style={styles.hasDonationCard}>
-                        <Text style={{ fontWeight: 'bold', marginBottom: 4 }}>Contribuição</Text>
-                        <Text style={{ marginBottom: 8 }}>Motivo: {event.donationReason || 'Não informado'}</Text>
-                        <Text style={{ marginBottom: 8 }}>Link de pagamento: {event.donationLink || 'Não informado'}</Text>
-
-
-                        {event.donationLink && (
-                            <TouchableOpacity onPress={openDonationLink} style={styles.donationLinkBtn}>
-                                <Text style={styles.donationBtnText}>
-                                    Abrir link de contribuição
-                                </Text>
-                            </TouchableOpacity>
-                        )}
+                {event.location && (
+                    <View style={styles.infoRow}>
+                        <Ionicons name="location-outline" size={20} color="#666" />
+                        <View style={styles.infoContent}>
+                            <Text style={styles.infoLabel}>Local</Text>
+                            <Text style={styles.infoValue}>{event.location}</Text>
+                        </View>
                     </View>
                 )}
 
-                {hasPermissionToEdit && (
-                    <TouchableOpacity
-                        onPress={() => navigation.navigate('EditEventScreen', { id: event.id })}
-                        style={styles.editBtn}
-                    >
-                        <Text style={styles.buttonText}>Editar Evento</Text>
-                    </TouchableOpacity>
+                {event.description && (
+                    <View style={styles.descriptionSection}>
+                        <Text style={styles.descriptionHeader}>Descrição</Text>
+                        <Text style={styles.descriptionText}>{event.description}</Text>
+                    </View>
                 )}
-            </ScrollView>
-        </View>
+            </View>
+
+            {event.hasDonation && (
+                <View style={styles.donationCard}>
+                    <View style={styles.donationHeader}>
+                        <Ionicons name="heart" size={24} color="#EF4444" />
+                        <Text style={styles.donationTitle}>Contribuição</Text>
+                    </View>
+                    {event.donationReason && (
+                        <View style={styles.donationInfo}>
+                            <Text style={styles.donationLabel}>Motivo:</Text>
+                            <Text style={styles.donationValue}>{event.donationReason}</Text>
+                        </View>
+                    )}
+                    {event.donationLink && (
+                        <TouchableOpacity onPress={openDonationLink} style={styles.donationLinkBtn}>
+                            <Ionicons name="link-outline" size={20} color="#fff" />
+                            <Text style={styles.donationBtnText}>Abrir link de contribuição</Text>
+                        </TouchableOpacity>
+                    )}
+                </View>
+            )}
+        </DetailScreenLayout>
     )
 }
 
 
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#f2f2f2',
-        alignItems: 'center',
-
+    card: {
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
     },
-    subHeader:{
+    eventName: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        color: '#333',
+        marginBottom: 20,
+    },
+    infoRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        marginBottom: 16,
+    },
+    infoContent: {
+        flex: 1,
+        marginLeft: 12,
+    },
+    infoLabel: {
+        fontSize: 14,
+        color: '#666',
+        marginBottom: 4,
+    },
+    infoValue: {
+        fontSize: 16,
+        color: '#333',
+        fontWeight: '500',
+    },
+    descriptionSection: {
+        marginTop: 8,
+        paddingTop: 16,
+        borderTopWidth: 1,
+        borderTopColor: '#eee',
+    },
+    descriptionHeader: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#333',
+        marginBottom: 8,
+    },
+    descriptionText: {
+        fontSize: 16,
+        color: '#666',
+        lineHeight: 24,
+    },
+    donationCard: {
+        backgroundColor: '#FEE2E2',
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 16,
+        borderLeftWidth: 4,
+        borderLeftColor: '#EF4444',
+    },
+    donationHeader: {
         flexDirection: 'row',
         alignItems: 'center',
-        padding: 16,
-        borderBottomWidth: 1,
-        borderColor: '#eee' },
-    subHeaderText:{ fontSize: 18,
+        marginBottom: 12,
+    },
+    donationTitle: {
+        fontSize: 18,
         fontWeight: 'bold',
-        marginLeft: 16 },
-    eventName:{ fontSize: 24,
-        fontWeight: 'bold',
-        marginBottom: 8,
-        borderBottomWidth: 1,
-        borderColor: '#eee'},
-    bodyText:{
-        color: '#555',
-        marginBottom: 4 },
-
-    descriptionHeader:{
-        fontWeight: 'bold',
+        color: '#333',
+        marginLeft: 8,
+    },
+    donationInfo: {
+        marginBottom: 12,
+    },
+    donationLabel: {
+        fontSize: 14,
+        color: '#666',
         marginBottom: 4,
-        marginTop: 10 },
-    hasDonationCard:{
-        backgroundColor: '#f5f5f5',
-        padding: 16,
+    },
+    donationValue: {
+        fontSize: 16,
+        color: '#333',
+        fontWeight: '500',
+    },
+    donationLinkBtn: {
+        backgroundColor: '#EF4444',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 12,
         borderRadius: 8,
-        marginBottom: 20,
-        marginTop: 16 },
-    editBtn:{
-        backgroundColor: '#FFB200',
-        padding: 14,
-        borderRadius: 6,
-        marginTop: 16 },
-    buttonText: {
-        color: 'white',
-        fontWeight: 'bold',
-        textAlign: 'center' },
-    donationLinkBtn:{ backgroundColor: '#3366FF', padding: 12, borderRadius: 6 },
-    donationBtnText:{ color: 'white', textAlign: 'center', fontWeight: 'bold' },
-
+        gap: 8,
+    },
+    donationBtnText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '600',
+    },
 })

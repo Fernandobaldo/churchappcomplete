@@ -3,11 +3,12 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
+  FlatList,
   TouchableOpacity,
   Alert,
   ActivityIndicator,
   Share,
+  RefreshControl,
 } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
@@ -17,6 +18,7 @@ import Toast from 'react-native-toast-message'
 import PageHeader from '../components/PageHeader'
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5'
 import PlanUpgradeModal from '../components/PlanUpgradeModal'
+import Tabs from '../components/Tabs'
 
 interface InviteLink {
   id: string
@@ -42,6 +44,7 @@ export default function InviteLinksScreen() {
   const { user } = useAuthStore()
   const [links, setLinks] = useState<InviteLink[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [creating, setCreating] = useState(false)
@@ -54,6 +57,7 @@ export default function InviteLinksScreen() {
 
   useEffect(() => {
     if (user?.branchId) {
+      setLoading(true)
       fetchLinks()
     }
   }, [user?.branchId])
@@ -62,7 +66,6 @@ export default function InviteLinksScreen() {
     if (!user?.branchId) return
 
     try {
-      setLoading(true)
       const response = await api.get(`/invite-links/branch/${user.branchId}`)
       setLinks(response.data)
     } catch (error: any) {
@@ -73,7 +76,13 @@ export default function InviteLinksScreen() {
       })
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
+  }
+
+  const onRefresh = () => {
+    setRefreshing(true)
+    fetchLinks()
   }
 
   const handleCreateLink = async () => {
@@ -212,11 +221,14 @@ export default function InviteLinksScreen() {
     return link.currentUses >= link.maxUses
   }
 
+  const filteredLinks = links.filter((link) => 
+    activeTab === 'active' ? link.isActive : !link.isActive
+  )
+
   if (loading) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#4F46E5" />
-        <Text style={styles.loadingText}>Carregando links de convite...</Text>
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#3366FF" />
       </View>
     )
   }
@@ -228,120 +240,126 @@ export default function InviteLinksScreen() {
         Icon={FontAwesome5}
         iconName="link"
       />
-      <ScrollView style={styles.scrollView}>
-        <TouchableOpacity
-          style={styles.createButton}
-          onPress={() => setShowCreateModal(true)}
-        >
-          <Ionicons name="add-circle" size={24} color="#fff" />
-          <Text style={styles.createButtonText}>Novo Link de Convite</Text>
-        </TouchableOpacity>
+      
+      {/* Tabs */}
+      <Tabs
+        tabs={[
+          {
+            key: 'active',
+            label: 'Ativos',
+            badge: links.filter((l) => l.isActive).length > 0 
+              ? links.filter((l) => l.isActive).length 
+              : undefined,
+          },
+          {
+            key: 'inactive',
+            label: 'Desativados',
+            badge: links.filter((l) => !l.isActive).length > 0 
+              ? links.filter((l) => !l.isActive).length 
+              : undefined,
+          },
+        ]}
+        activeTab={activeTab}
+        onTabChange={(key) => setActiveTab(key as 'active' | 'inactive')}
+        style={styles.tabsContainerWithHeader}
+      />
 
-        {/* Tabs */}
-        <View style={styles.tabsContainer}>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'active' && styles.tabActive]}
-            onPress={() => setActiveTab('active')}
+      <FlatList
+        data={filteredLinks}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.listContent}
+        style={styles.list}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+        renderItem={({ item: link }) => (
+          <View
+            style={[
+              styles.linkCard,
+              (!link.isActive || isExpired(link.expiresAt) || isLimitReached(link)) &&
+                styles.linkCardInactive,
+            ]}
           >
-            <Text style={[styles.tabText, activeTab === 'active' && styles.tabTextActive]}>
-              Ativos ({links.filter((l) => l.isActive).length})
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'inactive' && styles.tabActive]}
-            onPress={() => setActiveTab('inactive')}
-          >
-            <Text style={[styles.tabText, activeTab === 'inactive' && styles.tabTextActive]}>
-              Desativados ({links.filter((l) => !l.isActive).length})
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {links.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>Nenhum link de convite criado ainda.</Text>
-            <Text style={styles.emptySubtext}>
-              Clique em "Novo Link de Convite" para criar o primeiro.
-            </Text>
-          </View>
-        ) : (
-          <View style={styles.linksContainer}>
-            {links
-              .filter((link) => (activeTab === 'active' ? link.isActive : !link.isActive))
-              .map((link) => (
-              <View
-                key={link.id}
-                style={[
-                  styles.linkCard,
-                  (!link.isActive || isExpired(link.expiresAt) || isLimitReached(link)) &&
-                    styles.linkCardInactive,
-                ]}
-              >
-                <View style={styles.linkHeader}>
-                  <Text style={styles.linkTitle}>Link de Convite</Text>
-                  <View style={styles.badgesContainer}>
-                    {!link.isActive && (
-                      <View style={styles.badge}>
-                        <Text style={styles.badgeText}>Desativado</Text>
-                      </View>
-                    )}
-                    {link.isActive && isExpired(link.expiresAt) && (
-                      <View style={[styles.badge, styles.badgeError]}>
-                        <Text style={styles.badgeText}>Expirado</Text>
-                      </View>
-                    )}
-                    {link.isActive && isLimitReached(link) && (
-                      <View style={[styles.badge, styles.badgeWarning]}>
-                        <Text style={styles.badgeText}>Limite Atingido</Text>
-                      </View>
-                    )}
+            <View style={styles.linkHeader}>
+              <Text style={styles.linkTitle}>Link de Convite</Text>
+              <View style={styles.badgesContainer}>
+                {!link.isActive && (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>Desativado</Text>
                   </View>
-                </View>
-
-                <Text style={styles.linkInfo}>
-                  Igreja: <Text style={styles.linkInfoBold}>{link.Branch.Church.name}</Text>
-                </Text>
-                {link.creatorName && (
-                  <Text style={styles.linkInfo}>
-                    Criado por: <Text style={styles.linkInfoBold}>{link.creatorName}</Text>
-                  </Text>
                 )}
-                <Text style={styles.linkInfo}>
-                  Criado em: {new Date(link.createdAt).toLocaleDateString('pt-BR')}
-                </Text>
-                <Text style={styles.linkInfo}>
-                  Expira em: {formatDate(link.expiresAt)}
-                </Text>
-                <Text style={styles.linkInfo}>
-                  Usos: {link.currentUses} /{' '}
-                  {link.maxUses === null ? 'Ilimitado' : link.maxUses}
-                </Text>
-
-                <View style={styles.actionsContainer}>
-                  <TouchableOpacity
-                    style={styles.actionButton}
-                    onPress={() => handleShareLink(link.token)}
-                  >
-                    <Ionicons name="share-outline" size={20} color="#4F46E5" />
-                    <Text style={styles.actionButtonText}>Compartilhar</Text>
-                  </TouchableOpacity>
-                  {link.isActive && (
-                    <TouchableOpacity
-                      style={[styles.actionButton, styles.actionButtonDanger]}
-                      onPress={() => handleDeactivate(link.id)}
-                    >
-                      <Ionicons name="close-circle-outline" size={20} color="#EF4444" />
-                      <Text style={[styles.actionButtonText, styles.actionButtonTextDanger]}>
-                        Desativar
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
+                {link.isActive && isExpired(link.expiresAt) && (
+                  <View style={[styles.badge, styles.badgeError]}>
+                    <Text style={styles.badgeText}>Expirado</Text>
+                  </View>
+                )}
+                {link.isActive && isLimitReached(link) && (
+                  <View style={[styles.badge, styles.badgeWarning]}>
+                    <Text style={styles.badgeText}>Limite Atingido</Text>
+                  </View>
+                )}
               </View>
-            ))}
+            </View>
+
+            <Text style={styles.linkInfo}>
+              Igreja: <Text style={styles.linkInfoBold}>{link.Branch.Church.name}</Text>
+            </Text>
+            {link.creatorName && (
+              <Text style={styles.linkInfo}>
+                Criado por: <Text style={styles.linkInfoBold}>{link.creatorName}</Text>
+              </Text>
+            )}
+            <Text style={styles.linkInfo}>
+              Criado em: {new Date(link.createdAt).toLocaleDateString('pt-BR')}
+            </Text>
+            <Text style={styles.linkInfo}>
+              Expira em: {formatDate(link.expiresAt)}
+            </Text>
+            <Text style={styles.linkInfo}>
+              Usos: {link.currentUses} /{' '}
+              {link.maxUses === null ? 'Ilimitado' : link.maxUses}
+            </Text>
+
+            <View style={styles.actionsContainer}>
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() => handleShareLink(link.token)}
+              >
+                <Ionicons name="share-outline" size={20} color="#3366FF" />
+                <Text style={styles.actionButtonText}>Compartilhar</Text>
+              </TouchableOpacity>
+              {link.isActive && (
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.actionButtonDanger]}
+                  onPress={() => handleDeactivate(link.id)}
+                >
+                  <Ionicons name="close-circle-outline" size={20} color="#EF4444" />
+                  <Text style={[styles.actionButtonText, styles.actionButtonTextDanger]}>
+                    Desativar
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
         )}
-      </ScrollView>
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Ionicons name="link-outline" size={64} color="#ccc" />
+            <Text style={styles.emptyText}>
+              {activeTab === 'active' 
+                ? 'Nenhum link ativo' 
+                : 'Nenhum link desativado'}
+            </Text>
+          </View>
+        }
+      />
+
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => setShowCreateModal(true)}
+      >
+        <Ionicons name="add" size={24} color="white" />
+      </TouchableOpacity>
 
       {/* Modal de Criação */}
       {showCreateModal && (
@@ -423,60 +441,32 @@ export default function InviteLinksScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: '#f5f5f5',
   },
-  centered: {
+  loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  loadingText: {
-    marginTop: 10,
-    color: '#6b7280',
+  list: {
+    marginTop: 0,
   },
-  scrollView: {
-    flex: 1,
+  tabsContainerWithHeader: {
+    marginTop: 110, // Altura do header fixo
+  },
+  listContent: {
     padding: 16,
-  },
-  createButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#4F46E5',
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 16,
-  },
-  createButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  emptyContainer: {
-    padding: 32,
-    alignItems: 'center',
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#6b7280',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#9ca3af',
-    textAlign: 'center',
-  },
-  linksContainer: {
-    gap: 16,
   },
   linkCard: {
     backgroundColor: '#fff',
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 16,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   linkCardInactive: {
     opacity: 0.6,
@@ -491,7 +481,7 @@ const styles = StyleSheet.create({
   linkTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#111827',
+    color: '#333',
   },
   badgesContainer: {
     flexDirection: 'row',
@@ -539,18 +529,45 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#4F46E5',
+    borderColor: '#3366FF',
   },
   actionButtonDanger: {
     borderColor: '#EF4444',
   },
   actionButtonText: {
     marginLeft: 8,
-    color: '#4F46E5',
+    color: '#3366FF',
     fontWeight: '500',
   },
   actionButtonTextDanger: {
     color: '#EF4444',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 64,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#999',
+    marginTop: 16,
+  },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 20,
+    backgroundColor: '#3366FF',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 8,
   },
   modalOverlay: {
     position: 'absolute',
@@ -604,7 +621,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   radioOptionSelected: {
-    borderColor: '#4F46E5',
+    borderColor: '#3366FF',
     backgroundColor: '#eef2ff',
   },
   radioText: {
@@ -612,7 +629,7 @@ const styles = StyleSheet.create({
     color: '#6b7280',
   },
   radioTextSelected: {
-    color: '#4F46E5',
+    color: '#3366FF',
     fontWeight: '500',
   },
   modalActions: {
@@ -630,7 +647,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f3f4f6',
   },
   modalButtonPrimary: {
-    backgroundColor: '#4F46E5',
+    backgroundColor: '#3366FF',
   },
   modalButtonText: {
     fontSize: 16,
@@ -640,30 +657,8 @@ const styles = StyleSheet.create({
   modalButtonTextPrimary: {
     color: '#fff',
   },
-  tabsContainer: {
-    flexDirection: 'row',
-    marginBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
-  },
-  tabActive: {
-    borderBottomColor: '#4F46E5',
-  },
-  tabText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#6b7280',
-  },
-  tabTextActive: {
-    color: '#4F46E5',
+  tabsContainerWithHeader: {
+    marginTop: 110, // Altura do header fixo
   },
 })
 

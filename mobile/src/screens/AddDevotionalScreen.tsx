@@ -41,11 +41,12 @@ export default function AddDevotionalScreen() {
     }))
 
     const handleSave = async () => {
-        if (!title || !selectedBook || !chapter || !verse || !content) {
+        // Validação de campos obrigatórios (title e passage são obrigatórios no backend)
+        if (!title || !selectedBook || !chapter || !verse) {
             Toast.show({
                 type: 'error',
-                text1: 'Erro',
-                text2: 'Preencha todos os campos obrigatórios.',
+                text1: 'Campos obrigatórios',
+                text2: 'Preencha todos os campos obrigatórios (*)',
             })
             return
         }
@@ -88,15 +89,20 @@ export default function AddDevotionalScreen() {
                 <ScrollView contentContainerStyle={styles.form}>
                     <Text style={styles.title}>Adicionar Devocional</Text>
 
-                    <Text style={styles.label}>Título</Text>
+                    <Text style={styles.label}>
+                        Título <Text style={styles.required}>*</Text>
+                    </Text>
                     <TextInput
                         style={styles.input}
                         value={title}
                         onChangeText={setTitle}
                         placeholder="Ex: Tema do dia"
+                        placeholderTextColor="#999"
                     />
 
-                    <Text style={styles.label}>Livro</Text>
+                    <Text style={styles.label}>
+                        Livro <Text style={styles.required}>*</Text>
+                    </Text>
                     <RNPickerSelect
                         onValueChange={(value) => setSelectedBook(value)}
                         value={selectedBook}
@@ -122,22 +128,28 @@ export default function AddDevotionalScreen() {
                         )}
                     />
 
-                    <Text style={styles.label}>Capítulo</Text>
+                    <Text style={styles.label}>
+                        Capítulo <Text style={styles.required}>*</Text>
+                    </Text>
                     <TextInput
                         style={styles.input}
                         value={chapter}
                         onChangeText={setChapter}
-                        placeholder="Capítulo"
+                        placeholder="Número do capítulo"
                         keyboardType="numeric"
+                        placeholderTextColor="#999"
                     />
 
-                    <Text style={styles.label}>Versículo</Text>
+                    <Text style={styles.label}>
+                        Versículo <Text style={styles.required}>*</Text>
+                    </Text>
                     <TextInput
                         style={styles.input}
                         value={verse}
                         onChangeText={setVerse}
-                        placeholder="Versículo"
+                        placeholder="Número do versículo"
                         keyboardType="numeric"
+                        placeholderTextColor="#999"
                     />
 
                     <Text style={styles.label}>Conteúdo</Text>
@@ -147,6 +159,8 @@ export default function AddDevotionalScreen() {
                         onChangeText={setContent}
                         multiline
                         placeholder="Escreva o devocional aqui..."
+                        placeholderTextColor="#999"
+                        textAlignVertical="top"
                     />
 
                     <Text style={styles.label}>Data</Text>
@@ -157,7 +171,9 @@ export default function AddDevotionalScreen() {
                             setShowDatePicker(true)
                         }}
                     >
-                        <Text>{date ? date.toLocaleDateString('pt-BR') : 'Selecione a data'}</Text>
+                        <Text style={date ? { color: '#333' } : { color: '#999' }}>
+                            {date ? date.toLocaleDateString('pt-BR') : 'DD/MM/AAAA'}
+                        </Text>
                     </TouchableOpacity>
 
                     <Modal
@@ -230,7 +246,11 @@ const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#fff' },
     form: { padding: 20, flexGrow: 1 },
     title: { fontSize: 22, fontWeight: 'bold', marginBottom: 25 , marginTop: 45},
-    label: { marginTop: 16, marginBottom: 1, fontWeight: '600' },
+    label: { marginTop: 16, marginBottom: 1, fontWeight: '600', color: '#333' },
+    required: {
+        color: '#e74c3c',
+        fontWeight: 'bold',
+    },
     input: {
         borderWidth: 1,
         borderColor: '#ccc',
@@ -238,7 +258,8 @@ const styles = StyleSheet.create({
         padding: 12,
         justifyContent: 'center',
         marginBottom: 10,
-        backgroundColor: '#f9f9f9',
+        backgroundColor: '#fff',
+        fontSize: 16,
     },
     modalOverlay: {
         flex: 1,

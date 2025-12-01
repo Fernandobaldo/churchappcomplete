@@ -24,7 +24,7 @@ export default function ConcluidoScreen() {
 
         <TouchableOpacity
           style={styles.button}
-          onPress={() => navigation.navigate('Dashboard' as never)}
+          onPress={() => navigation.navigate('Main' as never)}
         >
           <Text style={styles.buttonText}>Ir para o painel</Text>
         </TouchableOpacity>

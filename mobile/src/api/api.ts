@@ -48,11 +48,11 @@ const getBaseURL = (): string => {
 // Obter URL base e logar para debug (apenas em desenvolvimento)
 const baseURL = getBaseURL()
 if (__DEV__) {
-  console.log('🔗 API Base URL:', baseURL)
+  console.log('🔗 API Base URL configurada:', baseURL)
 }
 
 const api = axios.create({
-  baseURL: getBaseURL(),
+  baseURL: baseURL,
   timeout: 30000, // 30 segundos de timeout (aumentado para debug)
   headers: {
     'Content-Type': 'application/json',

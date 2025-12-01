@@ -97,9 +97,11 @@ export default function ServiceScheduleFormScreen() {
   return (
     <View style={styles.container}>
       <PageHeader title={schedule ? 'Editar Horário' : 'Novo Horário'} />
-      <ScrollView style={styles.scrollView}>
+      <ScrollView style={[styles.scrollView, styles.scrollViewWithHeader]}>
         <View style={styles.section}>
-          <Text style={styles.label}>Dia da Semana *</Text>
+          <Text style={styles.label}>
+            Dia da Semana <Text style={styles.required}>*</Text>
+          </Text>
           <View style={styles.pickerContainer}>
             <Picker selectedValue={dayOfWeek} onValueChange={setDayOfWeek} style={styles.picker}>
               {DAYS_OF_WEEK.map((day) => (
@@ -108,21 +110,27 @@ export default function ServiceScheduleFormScreen() {
             </Picker>
           </View>
 
-          <Text style={styles.label}>Horário *</Text>
+          <Text style={styles.label}>
+            Horário <Text style={styles.required}>*</Text>
+          </Text>
           <TextInput
             style={styles.input}
             placeholder="HH:mm"
             value={time}
             onChangeText={setTime}
             keyboardType="numeric"
+            placeholderTextColor="#999"
           />
 
-          <Text style={styles.label}>Título *</Text>
+          <Text style={styles.label}>
+            Título <Text style={styles.required}>*</Text>
+          </Text>
           <TextInput
             style={styles.input}
             placeholder="Ex: Culto Dominical"
             value={title}
             onChangeText={setTitle}
+            placeholderTextColor="#999"
           />
 
           <Text style={styles.label}>Descrição</Text>
@@ -133,6 +141,8 @@ export default function ServiceScheduleFormScreen() {
             onChangeText={setDescription}
             multiline
             numberOfLines={3}
+            placeholderTextColor="#999"
+            textAlignVertical="top"
           />
 
           <Text style={styles.label}>Localização</Text>
@@ -141,6 +151,7 @@ export default function ServiceScheduleFormScreen() {
             placeholder="Ex: Templo Principal"
             value={location}
             onChangeText={setLocation}
+            placeholderTextColor="#999"
           />
 
           <View style={styles.switchRow}>
@@ -162,6 +173,7 @@ export default function ServiceScheduleFormScreen() {
                 value={autoCreateDaysAhead}
                 onChangeText={setAutoCreateDaysAhead}
                 keyboardType="numeric"
+                placeholderTextColor="#999"
               />
             </>
           )}
@@ -187,6 +199,9 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
+  scrollViewWithHeader: {
+    marginTop: 110, // Altura do header fixo
+  },
   section: {
     backgroundColor: '#fff',
     margin: 16,
@@ -200,12 +215,17 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     marginTop: 12,
   },
+  required: {
+    color: '#e74c3c',
+    fontWeight: 'bold',
+  },
   input: {
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 8,
     padding: 12,
     backgroundColor: '#fff',
+    fontSize: 16,
   },
   textArea: {
     height: 80,

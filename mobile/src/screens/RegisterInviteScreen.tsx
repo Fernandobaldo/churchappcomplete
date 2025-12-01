@@ -143,7 +143,7 @@ export default function RegisterInviteScreen() {
         text2: 'Registro realizado com sucesso! Bem-vindo(a)!',
       })
 
-      navigation.navigate('Dashboard' as never)
+      navigation.navigate('Main' as never)
     } catch (error: any) {
       console.error('Erro ao registrar:', error)
 

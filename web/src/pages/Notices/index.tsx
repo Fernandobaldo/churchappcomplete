@@ -6,6 +6,7 @@ import toast from 'react-hot-toast'
 import { format } from 'date-fns'
 import ptBR from 'date-fns/locale/pt-BR'
 import PermissionGuard from '../../components/PermissionGuard'
+import { useAuthStore } from '../../stores/authStore'
 
 interface Notice {
   id: string

@@ -110,7 +110,7 @@ export default function BranchesScreen() {
 
       Toast.show({ type: 'success', text1: 'Filiais salvas!' })
       // @ts-ignore
-      navigation.navigate('ConcluidoOnboarding')
+      navigation.navigate('SettingsOnboarding')
     } catch (error: any) {
       Toast.show({
         type: 'error',

@@ -1,9 +1,9 @@
 import React, {useEffect, useState} from 'react'
-import {View, Text, TextInput, Button, StyleSheet, Alert, TouchableOpacity} from 'react-native'
+import {StyleSheet, Alert} from 'react-native'
 import { useAuthStore } from '../stores/authStore'
 import {useNavigation, useRoute} from '@react-navigation/native'
 import api from '../api/api'
-import PageHeader from "../components/PageHeader";
+import FormScreenLayout from '../components/layouts/FormScreenLayout'
 import FontAwesome5 from "@expo/vector-icons/FontAwesome5";
 import FormsComponent from '../components/FormsComponent'
 import Toast from 'react-native-toast-message'
@@ -35,15 +35,13 @@ export default function MemberRegistrationScreen() {
 
 
     const fields = [
-        { key: 'name', label: 'Nome completo', type: 'string' },
-        { key: 'email', label: 'E-mail', type: 'email', placeholder: 'exemplo@email.com' },
-        { key: 'phone', label: 'Telefone', type: 'string' },
-        { key: 'birthDate', label: 'Data de nascimento', type: 'date' },
-        { key: 'role', label: 'Typo de membro', type: 'select', options: typeOptions },
-        { key: 'password', label: 'Senha', type: 'password' },
+        { key: 'name', label: 'Nome completo', type: 'string', required: true, placeholder: 'Seu nome completo' },
+        { key: 'email', label: 'E-mail', type: 'email', required: true, placeholder: 'exemplo@email.com' },
+        { key: 'phone', label: 'Telefone', type: 'string', placeholder: '(00) 00000-0000' },
+        { key: 'birthDate', label: 'Data de nascimento', type: 'date', placeholder: 'DD/MM/AAAA' },
+        { key: 'role', label: 'Tipo de membro', type: 'select', options: typeOptions, placeholder: 'Selecione o tipo' },
+        { key: 'password', label: 'Senha', type: 'password', required: true, placeholder: 'Mínimo 6 caracteres' },
         { key: 'avatarUrl', label: 'Foto de Perfil', type: 'image' },
-
-
     ]
     useEffect(() => {
     async function fetchTypes() {
@@ -74,6 +72,26 @@ export default function MemberRegistrationScreen() {
             return
         }
 
+        // Validação de campos obrigatórios
+        if (!form.name || !form.email || !form.password) {
+            Toast.show({
+                type: 'error',
+                text1: 'Campos obrigatórios',
+                text2: 'Preencha todos os campos obrigatórios (*)',
+            })
+            return
+        }
+
+        // Validação de senha
+        if (form.password.length < 6) {
+            Toast.show({
+                type: 'error',
+                text1: 'Senha inválida',
+                text2: 'A senha deve ter pelo menos 6 caracteres',
+            })
+            return
+        }
+
         try {
             await api.post('/register', {
                 ...form,
@@ -85,35 +103,36 @@ export default function MemberRegistrationScreen() {
                 text1: 'Perfil cadastrado!',
                 text2: 'Seu perfil foi cadastrado com sucesso. 🎉',
             })
-        } catch (err) {
+        } catch (err: any) {
             console.error(err)
-            Alert.alert('Erro', 'Não foi possível cadastrar o membro.')
+            const errorMessage = err.response?.data?.message || 'Não foi possível cadastrar o membro.'
+            Toast.show({
+                type: 'error',
+                text1: 'Erro ao cadastrar',
+                text2: errorMessage,
+            })
         }
     }
 
 
 
     return (
-        <View >
-            <PageHeader
-                title="Cadastrar membro"
-                Icon={FontAwesome5}
-                iconName="user"
+        <FormScreenLayout
+            headerProps={{
+                title: "Cadastrar membro",
+                Icon: FontAwesome5,
+                iconName: "user"
+            }}
+        >
+            <FormsComponent
+                form={form}
+                setForm={setForm}
+                fields={fields}
+                onSubmit={handleRegister}
+                submitLabel="Cadastrar membro"
             />
-
-                <FormsComponent
-                    form={form}
-                    setForm={setForm}
-                    fields={fields}
-                    onSubmit={handleRegister}
-                    submitLabel="Cadastrar membro"
-                />
-
-        </View>
-
+        </FormScreenLayout>
     )
 }
 
-const styles = StyleSheet.create({
-    centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-})
+// Estilos removidos - agora gerenciados pelo FormScreenLayout

@@ -55,11 +55,21 @@ export default function AddContributionScreen() {
     }, [])
 
     const handleSave = async () => {
-        if (!value || isNaN(parseFloat(value))) {
+        // Validação de campos obrigatórios
+        if (!title || !value || !type) {
             Toast.show({
                 type: 'error',
-                text1: 'Erro',
-                text2: 'Por favor, preencha um valor válido.',
+                text1: 'Campos obrigatórios',
+                text2: 'Preencha todos os campos obrigatórios (*)',
+            })
+            return
+        }
+
+        if (isNaN(parseFloat(value)) || parseFloat(value) <= 0) {
+            Toast.show({
+                type: 'error',
+                text1: 'Valor inválido',
+                text2: 'Por favor, preencha um valor válido maior que zero.',
             })
             return
         }
@@ -101,12 +111,15 @@ export default function AddContributionScreen() {
                 <ScrollView contentContainerStyle={styles.form}>
                     <Text style={styles.title}>Adicionar Contribuição</Text>
 
-                    <Text style={styles.label}>Título</Text>
+                    <Text style={styles.label}>
+                        Título <Text style={styles.required}>*</Text>
+                    </Text>
                     <TextInput
                         style={styles.input}
                         value={title}
                         onChangeText={setTitle}
                         placeholder="Ex: Dízimo de abril"
+                        placeholderTextColor="#999"
                     />
 
                     <Text style={styles.label}>Descrição</Text>
@@ -116,18 +129,25 @@ export default function AddContributionScreen() {
                         onChangeText={setDescription}
                         multiline
                         placeholder="Descrição opcional"
+                        placeholderTextColor="#999"
+                        textAlignVertical="top"
                     />
 
-                    <Text style={styles.label}>Valor</Text>
+                    <Text style={styles.label}>
+                        Valor <Text style={styles.required}>*</Text>
+                    </Text>
                     <TextInput
                         style={styles.input}
                         value={value}
                         onChangeText={setValue}
                         keyboardType="numeric"
                         placeholder="R$ 0,00"
+                        placeholderTextColor="#999"
                     />
 
-                    <Text style={styles.label}>Data</Text>
+                    <Text style={styles.label}>
+                        Data <Text style={styles.required}>*</Text>
+                    </Text>
                     <TouchableOpacity
                         style={styles.input}
                         onPress={() => {
@@ -135,7 +155,9 @@ export default function AddContributionScreen() {
                             setShowDatePicker(true)
                         }}
                     >
-                        <Text>{date ? date.toLocaleDateString('pt-BR') : 'Selecione a data'}</Text>
+                        <Text style={date ? styles.inputText : styles.placeholderText}>
+                            {date ? date.toLocaleDateString('pt-BR') : 'DD/MM/AAAA'}
+                        </Text>
                     </TouchableOpacity>
 
                     <Modal
@@ -177,7 +199,9 @@ export default function AddContributionScreen() {
                         </View>
                     </Modal>
 
-                    <Text style={styles.label}>Tipo de Contribuição</Text>
+                    <Text style={styles.label}>
+                        Tipo de Contribuição <Text style={styles.required}>*</Text>
+                    </Text>
                     <ModalSelector
                         data={typeOptions}
                         initValue="Selecione o tipo"
@@ -186,11 +210,15 @@ export default function AddContributionScreen() {
                         }}
                         style={styles.input}
                         initValueTextStyle={{ color: '#999' }}
-                        selectTextStyle={{ padding: 10 }}
+                        selectTextStyle={{ padding: 12 }}
                     >
-                        <Text style={{ padding: 10 }}>
-                            {typeOptions.find(opt => opt.value === type)?.label || 'Selecione o tipo'}
-                        </Text>
+                        <TextInput
+                            style={styles.input}
+                            editable={false}
+                            placeholder="Selecione o tipo"
+                            value={typeOptions.find(opt => opt.value === type)?.label || ''}
+                            placeholderTextColor="#999"
+                        />
                     </ModalSelector>
 
                     <View style={styles.buttonRow}>
@@ -224,7 +252,11 @@ const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#fff' },
     form: { padding: 20, flexGrow: 1 },
     title: { fontSize: 22, fontWeight: 'bold', marginBottom: 20, marginTop: 50 },
-    label: { marginTop: 16, marginBottom: 6, fontWeight: '600' },
+    label: { marginTop: 16, marginBottom: 6, fontWeight: '600', color: '#333' },
+    required: {
+        color: '#e74c3c',
+        fontWeight: 'bold',
+    },
     input: {
         borderWidth: 1,
         borderColor: '#ccc',
@@ -232,7 +264,16 @@ const styles = StyleSheet.create({
         padding: 12,
         justifyContent: 'center',
         marginBottom: 10,
-        backgroundColor: '#f9f9f9',
+        backgroundColor: '#fff',
+        fontSize: 16,
+    },
+    inputText: {
+        color: '#333',
+        fontSize: 16,
+    },
+    placeholderText: {
+        color: '#999',
+        fontSize: 16,
     },
     modalOverlay: {
         flex: 1,

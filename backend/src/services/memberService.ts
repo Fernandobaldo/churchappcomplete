@@ -44,7 +44,7 @@ export async function findAllMembers(
         email: true,
         role: true,
         Permission: {
-          select: { type: true },
+          select: { id: true, type: true },
         },
         Branch: {
           select: {
@@ -59,7 +59,7 @@ export async function findAllMembers(
       const { Permission, Branch, email, phone, address, ...rest } = member
       const result: any = {
         ...rest,
-        permissions: Permission.map(p => ({ type: p.type })),
+        permissions: Permission.map(p => ({ id: p.id, type: p.type })),
         branch: Branch,
       }
       
@@ -93,7 +93,7 @@ export async function findAllMembers(
       email: true,
       role: true,
       Permission: {
-        select: { type: true },
+        select: { id: true, type: true },
       },
     },
   })
@@ -102,7 +102,7 @@ export async function findAllMembers(
     const { Permission, email, phone, address, ...rest } = member
     const result: any = {
       ...rest,
-      permissions: Permission.map(p => ({ type: p.type })),
+      permissions: Permission.map(p => ({ id: p.id, type: p.type })),
     }
     
     // Inclui dados sensíveis apenas se tiver permissão members_manage
@@ -130,7 +130,7 @@ export async function findMemberById(id: string, hasManagePermission: boolean = 
       email: true,
       role: true,
       Permission: {
-        select: { type: true },
+        select: { id: true, type: true },
       },
       Branch: {
         include: { Church: true },
@@ -143,7 +143,7 @@ export async function findMemberById(id: string, hasManagePermission: boolean = 
   const { Permission, Branch, email, phone, address, ...rest } = member
   const result: any = {
     ...rest,
-    permissions: Permission.map(p => ({ type: p.type })),
+    permissions: Permission.map(p => ({ id: p.id, type: p.type })),
     branch: Branch,
   }
   
