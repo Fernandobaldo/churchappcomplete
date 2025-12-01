@@ -17,6 +17,7 @@ import { resetTestDatabase } from '../utils/resetTestDatabase'
 import { seedTestDatabase } from '../utils/seedTestDatabase'
 import { debugSeed } from '../utils/debugSeed'
 import { authenticate } from '../../src/middlewares/authenticate'
+import { logTestResponse } from '../utils/testResponseHelper'
 
 
 
@@ -93,6 +94,7 @@ describe('Auth Routes - /auth/login', () => {
       .post('/auth/login')
       .send({ email: 'member@example.com', password: 'password123' })
 
+    logTestResponse(response, 200)
     // Debug apenas se necessário
     if (process.env.DEBUG_TEST) {
       console.log('[TEST] Response body:', JSON.stringify(response.body, null, 2))
@@ -118,6 +120,7 @@ describe('Auth Routes - /auth/login', () => {
       .post('/auth/login')
       .send({ email: 'user@example.com', password: 'password123' })
 
+    logTestResponse(response, 200)
     expect(response.status).toBe(200)
     expect(response.body.token).toBeDefined()
     expect(response.body.user.email).toBe('user@example.com')
@@ -135,6 +138,7 @@ describe('Auth Routes - /auth/login', () => {
       .post('/auth/login')
       .send({ email: 'notfound@example.com', password: 'password123' })
 
+    logTestResponse(response, 401)
     expect(response.status).toBe(401)
     expect(response.body.message).toContain('Credenciais inválidas')
   })
@@ -144,6 +148,7 @@ describe('Auth Routes - /auth/login', () => {
       .post('/auth/login')
       .send({ email: 'juliet@example.com', password: 'wrongpassword' })
 
+    logTestResponse(response, 401)
     expect(response.status).toBe(401)
     expect(response.body.message).toContain('Credenciais inválidas')
   })
@@ -153,6 +158,7 @@ describe('Auth Routes - /auth/login', () => {
       .post('/auth/login')
       .send({}) // sem email e senha
 
+    logTestResponse(response, 400)
     expect(response.status).toBe(400)
     expect(response.body.message).toBeDefined()
   })
@@ -192,6 +198,7 @@ describe('Auth Routes - /auth/me', () => {
       .get('/auth/me')
       .set('Authorization', `Bearer ${token}`)
 
+    logTestResponse(response, 200)
     expect(response.status).toBe(200)
     expect(response.body).toHaveProperty('id')
     expect(response.body).toHaveProperty('name')
@@ -204,6 +211,7 @@ describe('Auth Routes - /auth/me', () => {
     const response = await request(app.server)
       .get('/auth/me')
 
+    logTestResponse(response, 401)
     expect(response.status).toBe(401)
   })
 
@@ -212,6 +220,7 @@ describe('Auth Routes - /auth/me', () => {
       .get('/auth/me')
       .set('Authorization', 'Bearer invalid-token')
 
+    logTestResponse(response, 401)
     expect(response.status).toBe(401)
   })
 
@@ -236,6 +245,7 @@ describe('Auth Routes - /auth/me', () => {
       .get('/auth/me')
       .set('Authorization', `Bearer ${token}`)
 
+    logTestResponse(response, 404)
     expect(response.status).toBe(404)
     expect(response.body.message).toContain('Membro não encontrado')
   })

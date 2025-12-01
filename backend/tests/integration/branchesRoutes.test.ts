@@ -14,6 +14,7 @@ import bcrypt from 'bcryptjs'
 import { resetTestDatabase } from '../utils/resetTestDatabase'
 import { registerRoutes } from '../../src/routes/registerRoutes'
 import { authenticate } from '../../src/middlewares/authenticate'
+import { logTestResponse } from '../utils/testResponseHelper'
 
 describe('Branches Routes - CRUD Completo', () => {
   const app = Fastify()
@@ -151,6 +152,7 @@ describe('Branches Routes - CRUD Completo', () => {
         .get('/branches')
         .set('Authorization', `Bearer ${adminToken}`)
 
+      logTestResponse(response, 200)
       expect(response.status).toBe(200)
       expect(Array.isArray(response.body)).toBe(true)
       expect(response.body.length).toBeGreaterThan(0)
@@ -163,6 +165,7 @@ describe('Branches Routes - CRUD Completo', () => {
       const response = await request(app.server)
         .get('/branches')
 
+      logTestResponse(response, 401)
       expect(response.status).toBe(401)
     })
   })
@@ -179,6 +182,7 @@ describe('Branches Routes - CRUD Completo', () => {
         .set('Authorization', `Bearer ${adminToken}`)
         .send(branchData)
 
+      logTestResponse(response, 201)
       expect(response.status).toBe(201)
       expect(response.body).toHaveProperty('id')
       expect(response.body).toHaveProperty('name', 'Nova Filial')
@@ -197,6 +201,7 @@ describe('Branches Routes - CRUD Completo', () => {
         .set('Authorization', `Bearer ${coordinatorToken}`)
         .send(branchData)
 
+      logTestResponse(response, 403)
       expect(response.status).toBe(403)
     })
 
@@ -211,6 +216,7 @@ describe('Branches Routes - CRUD Completo', () => {
         .set('Authorization', `Bearer ${adminToken}`)
         .send(branchData)
 
+      logTestResponse(response, 400)
       expect(response.status).toBe(400)
     })
 
@@ -283,6 +289,7 @@ describe('Branches Routes - CRUD Completo', () => {
         .set('Authorization', `Bearer ${limitedToken}`)
         .send(branchData)
 
+      logTestResponse(response, 403)
       expect(response.status).toBe(403)
       expect(response.body).toHaveProperty('error')
     })
@@ -303,6 +310,7 @@ describe('Branches Routes - CRUD Completo', () => {
         .delete(`/branches/${branchToDelete.id}`)
         .set('Authorization', `Bearer ${adminToken}`)
 
+      logTestResponse(response, 200)
       expect(response.status).toBe(200)
       expect(response.body).toHaveProperty('message')
 
@@ -318,6 +326,7 @@ describe('Branches Routes - CRUD Completo', () => {
         .delete(`/branches/${adminBranchId}`)
         .set('Authorization', `Bearer ${adminToken}`)
 
+      logTestResponse(response, 400)
       expect(response.status).toBe(400)
       expect(response.body).toHaveProperty('error')
     })
@@ -329,6 +338,7 @@ describe('Branches Routes - CRUD Completo', () => {
         .delete(`/branches/${fakeId}`)
         .set('Authorization', `Bearer ${adminToken}`)
 
+      logTestResponse(response, 404)
       expect(response.status).toBe(404)
     })
 
@@ -345,6 +355,7 @@ describe('Branches Routes - CRUD Completo', () => {
         .delete(`/branches/${branchToDelete.id}`)
         .set('Authorization', `Bearer ${coordinatorToken}`)
 
+      logTestResponse(response, 403)
       expect(response.status).toBe(403)
     })
   })

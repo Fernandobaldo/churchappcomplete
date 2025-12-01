@@ -24,6 +24,7 @@ import {
   createChurch,
   createEvent,
   createContribution,
+  createTransaction,
   setupCompleteUser,
 } from './helpers/testHelpers'
 import { format } from 'date-fns'
@@ -439,6 +440,261 @@ describe('E2E: Fluxo Completo - Registro até Contribuição', () => {
       })
 
       expect(response.statusCode).toBeGreaterThanOrEqual(400)
+    })
+
+    it('deve validar campos obrigatórios ao criar transação financeira', async () => {
+      const timestamp = Date.now()
+      const auth = await setupCompleteUser(
+        app,
+        {
+          name: `Usuário Validação Finance ${timestamp}`,
+          email: `e2e-validation-finance-${timestamp}@test.com`,
+          password: 'senha123456',
+        },
+        {
+          name: `Igreja Validação Finance ${timestamp}`,
+        }
+      )
+
+      // Tentar criar transação ENTRY sem entryType (deve falhar)
+      const response = await app.inject({
+        method: 'POST',
+        url: '/finances',
+        headers: {
+          authorization: `Bearer ${auth.token}`,
+        },
+        payload: {
+          title: 'Transação sem entryType',
+          amount: 100.0,
+          type: 'ENTRY',
+          // entryType ausente
+        },
+      })
+
+      expect(response.statusCode).toBeGreaterThanOrEqual(400)
+    })
+  })
+
+  describe('Cenário 5: Fluxo completo com transações financeiras', () => {
+    it('deve completar fluxo: registro → igreja → transações financeiras', async () => {
+      const timestamp = Date.now()
+      const userEmail = `e2e-finance-${timestamp}@test.com`
+      const userName = `Usuário Finance E2E ${timestamp}`
+
+      // PASSO 1: Registrar novo usuário
+      console.log('[E2E] 📝 Passo 1: Registrando novo usuário...')
+      const registerResult = await registerUser(app, {
+        name: userName,
+        email: userEmail,
+        password: 'senha123456',
+      })
+
+      expect(registerResult.user).toBeDefined()
+      expect(registerResult.user.email).toBe(userEmail)
+      expect(registerResult.token).toBeDefined()
+      console.log('[E2E] ✅ Usuário registrado:', registerResult.user.id)
+
+      // PASSO 2: Criar igreja (isso também cria member e branch)
+      console.log('[E2E] 🏛️ Passo 2: Criando igreja...')
+      const churchResult = await createChurch(app, registerResult.token, {
+        name: `Igreja Finance E2E ${timestamp}`,
+        branchName: 'Sede Principal',
+        pastorName: 'Pastor Teste',
+      })
+
+      expect(churchResult.church || churchResult).toBeDefined()
+      const churchId = churchResult.church?.id || churchResult.id
+      const branchId = churchResult.branch?.id
+      const memberId = churchResult.member?.id
+      const memberToken = churchResult.newToken
+
+      expect(churchId).toBeDefined()
+      expect(branchId).toBeDefined()
+      expect(memberId).toBeDefined()
+      expect(memberToken).toBeDefined()
+      console.log('[E2E] ✅ Igreja criada:', churchId)
+      console.log('[E2E] ✅ Filial criada:', branchId)
+      console.log('[E2E] ✅ Member criado:', memberId)
+
+      // PASSO 3: Criar transação de entrada (Oferta)
+      console.log('[E2E] 💰 Passo 3: Criando transação de oferta...')
+      const offerTransaction = await createTransaction(app, memberToken, {
+        title: `Oferta E2E ${timestamp}`,
+        amount: 500.0,
+        type: 'ENTRY',
+        entryType: 'OFERTA',
+        category: 'Oferta',
+      })
+
+      expect(offerTransaction.id).toBeDefined()
+      expect(offerTransaction.title).toBe(`Oferta E2E ${timestamp}`)
+      expect(offerTransaction.amount).toBe(500.0)
+      expect(offerTransaction.type).toBe('ENTRY')
+      expect(offerTransaction.entryType).toBe('OFERTA')
+      expect(offerTransaction.branchId).toBe(branchId)
+      console.log('[E2E] ✅ Oferta criada:', offerTransaction.id)
+
+      // PASSO 4: Criar transação de entrada (Dízimo com dizimista não membro)
+      console.log('[E2E] 💰 Passo 4: Criando transação de dízimo...')
+      const titheTransaction = await createTransaction(app, memberToken, {
+        title: `Dízimo E2E ${timestamp}`,
+        amount: 1000.0,
+        type: 'ENTRY',
+        entryType: 'DIZIMO',
+        category: 'Dízimo',
+        tithePayerName: 'Visitante Teste',
+        isTithePayerMember: false,
+      })
+
+      expect(titheTransaction.id).toBeDefined()
+      expect(titheTransaction.title).toBe(`Dízimo E2E ${timestamp}`)
+      expect(titheTransaction.amount).toBe(1000.0)
+      expect(titheTransaction.type).toBe('ENTRY')
+      expect(titheTransaction.entryType).toBe('DIZIMO')
+      expect(titheTransaction.tithePayerName).toBe('Visitante Teste')
+      expect(titheTransaction.isTithePayerMember).toBe(false)
+      console.log('[E2E] ✅ Dízimo criado:', titheTransaction.id)
+
+      // PASSO 5: Criar transação de saída
+      console.log('[E2E] 💰 Passo 5: Criando transação de saída...')
+      const exitTransaction = await createTransaction(app, memberToken, {
+        title: `Pagamento E2E ${timestamp}`,
+        amount: 300.0,
+        type: 'EXIT',
+        category: 'Despesas',
+      })
+
+      expect(exitTransaction.id).toBeDefined()
+      expect(exitTransaction.title).toBe(`Pagamento E2E ${timestamp}`)
+      expect(exitTransaction.amount).toBe(300.0)
+      expect(exitTransaction.type).toBe('EXIT')
+      expect(exitTransaction.branchId).toBe(branchId)
+      console.log('[E2E] ✅ Pagamento criado:', exitTransaction.id)
+
+      // PASSO 6: Verificar resumo financeiro
+      console.log('[E2E] 📊 Passo 6: Verificando resumo financeiro...')
+      const summaryResponse = await app.inject({
+        method: 'GET',
+        url: '/finances',
+        headers: {
+          authorization: `Bearer ${memberToken}`,
+        },
+      })
+
+      expect(summaryResponse.statusCode).toBe(200)
+      const summaryData = JSON.parse(summaryResponse.body)
+      expect(summaryData).toHaveProperty('transactions')
+      expect(summaryData).toHaveProperty('summary')
+      expect(summaryData.transactions.length).toBeGreaterThanOrEqual(3)
+      expect(summaryData.summary.entries).toBe(1500.0) // 500 (oferta) + 1000 (dízimo)
+      expect(summaryData.summary.exits).toBe(300.0)
+      expect(summaryData.summary.total).toBe(1200.0) // 1500 - 300
+      console.log('[E2E] ✅ Resumo financeiro verificado!')
+
+      // Verificação final: todos os dados foram criados corretamente
+      console.log('[E2E] 🔍 Verificando dados no banco...')
+
+      const transactionsInDb = await prisma.transaction.findMany({
+        where: { branchId: branchId },
+      })
+      expect(transactionsInDb.length).toBeGreaterThanOrEqual(3)
+
+      const offerInDb = transactionsInDb.find((t) => t.id === offerTransaction.id)
+      expect(offerInDb).toBeDefined()
+      expect(offerInDb?.type).toBe('ENTRY')
+      expect(offerInDb?.entryType).toBe('OFERTA')
+
+      const titheInDb = transactionsInDb.find((t) => t.id === titheTransaction.id)
+      expect(titheInDb).toBeDefined()
+      expect(titheInDb?.type).toBe('ENTRY')
+      expect(titheInDb?.entryType).toBe('DIZIMO')
+      expect(titheInDb?.tithePayerName).toBe('Visitante Teste')
+
+      const exitInDb = transactionsInDb.find((t) => t.id === exitTransaction.id)
+      expect(exitInDb).toBeDefined()
+      expect(exitInDb?.type).toBe('EXIT')
+
+      console.log('[E2E] ✅ Todos os dados verificados no banco!')
+    })
+
+    it('deve criar múltiplas transações e calcular resumo correto', async () => {
+      const timestamp = Date.now()
+      const auth = await setupCompleteUser(
+        app,
+        {
+          name: `Usuário Múltiplas Transações ${timestamp}`,
+          email: `e2e-multiple-transactions-${timestamp}@test.com`,
+          password: 'senha123456',
+        },
+        {
+          name: `Igreja Múltiplas Transações ${timestamp}`,
+        }
+      )
+
+      expect(auth.branchId).toBeDefined()
+
+      // Criar 5 transações de entrada
+      console.log('[E2E] 💰 Criando múltiplas transações de entrada...')
+      const entries = []
+      for (let i = 1; i <= 5; i++) {
+        const isDizimo = i % 2 !== 0 // Ímpares são dízimo
+        const transactionData: any = {
+          title: `Entrada ${i} - E2E ${timestamp}`,
+          amount: i * 100,
+          type: 'ENTRY',
+          entryType: isDizimo ? 'DIZIMO' : 'OFERTA',
+          category: `Categoria ${i}`,
+        }
+        
+        // Se for dízimo, adicionar dados do dizimista
+        if (isDizimo) {
+          transactionData.tithePayerName = `Dizimista ${i}`
+          transactionData.isTithePayerMember = false
+        }
+        
+        const transaction = await createTransaction(app, auth.token, transactionData)
+        entries.push(transaction)
+        expect(transaction.id).toBeDefined()
+      }
+
+      // Criar 3 transações de saída
+      console.log('[E2E] 💰 Criando múltiplas transações de saída...')
+      const exits = []
+      for (let i = 1; i <= 3; i++) {
+        const transaction = await createTransaction(app, auth.token, {
+          title: `Saída ${i} - E2E ${timestamp}`,
+          amount: i * 50,
+          type: 'EXIT',
+          category: `Despesa ${i}`,
+        })
+        exits.push(transaction)
+        expect(transaction.id).toBeDefined()
+      }
+
+      // Verificar resumo
+      const summaryResponse = await app.inject({
+        method: 'GET',
+        url: '/finances',
+        headers: {
+          authorization: `Bearer ${auth.token}`,
+        },
+      })
+
+      expect(summaryResponse.statusCode).toBe(200)
+      const summaryData = JSON.parse(summaryResponse.body)
+      
+      // Entradas: 100 + 200 + 300 + 400 + 500 = 1500
+      const expectedEntries = 100 + 200 + 300 + 400 + 500
+      // Saídas: 50 + 100 + 150 = 300
+      const expectedExits = 50 + 100 + 150
+      const expectedTotal = expectedEntries - expectedExits
+
+      expect(summaryData.summary.entries).toBe(expectedEntries)
+      expect(summaryData.summary.exits).toBe(expectedExits)
+      expect(summaryData.summary.total).toBe(expectedTotal)
+      expect(summaryData.transactions.length).toBeGreaterThanOrEqual(8)
+
+      console.log('[E2E] ✅ Múltiplas transações criadas e resumo verificado!')
     })
   })
 })

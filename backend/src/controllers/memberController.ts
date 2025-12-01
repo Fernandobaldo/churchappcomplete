@@ -115,7 +115,8 @@ export async function getMyProfile(request: FastifyRequest, reply: FastifyReply)
     return reply.status(404).send({ message: 'Membro não encontrado' })
   }
   
-  const member = await findMemberById(user.memberId)
+  // Para o próprio perfil, sempre incluir dados sensíveis (email, phone, address)
+  const member = await findMemberById(user.memberId, true)
 
   if (!member) {
     return reply.code(404).send({ message: 'Membro não encontrado' })

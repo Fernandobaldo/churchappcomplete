@@ -14,6 +14,7 @@ import bcrypt from 'bcryptjs'
 import { resetTestDatabase } from '../utils/resetTestDatabase'
 import { registerRoutes } from '../../src/routes/registerRoutes'
 import { authenticate } from '../../src/middlewares/authenticate'
+import { logTestResponse } from '../utils/testResponseHelper'
 
 describe('Events Routes', () => {
   const app = Fastify()
@@ -119,6 +120,7 @@ describe('Events Routes', () => {
         .get('/events')
         .set('Authorization', `Bearer ${userToken}`)
 
+      logTestResponse(response, 200)
       expect(response.status).toBe(200)
       expect(response.body).toEqual([])
     })
@@ -141,6 +143,7 @@ describe('Events Routes', () => {
         .get('/events')
         .set('Authorization', `Bearer ${userToken}`)
 
+      logTestResponse(response, 200)
       expect(response.status).toBe(200)
       expect(Array.isArray(response.body)).toBe(true)
       expect(response.body.length).toBeGreaterThan(0)
@@ -169,6 +172,7 @@ describe('Events Routes', () => {
         .get('/events')
         .set('Authorization', `Bearer ${tokenWithoutMember}`)
 
+      logTestResponse(response, 200)
       expect(response.status).toBe(200)
       expect(response.body).toEqual([])
     })
@@ -180,6 +184,7 @@ describe('Events Routes', () => {
         .get('/events/next')
         .set('Authorization', `Bearer ${userToken}`)
 
+      logTestResponse(response, 200)
       expect(response.status).toBe(200)
       expect(response.body).toBeNull()
     })
@@ -204,6 +209,7 @@ describe('Events Routes', () => {
         .get('/events/next')
         .set('Authorization', `Bearer ${userToken}`)
 
+      logTestResponse(response, 200)
       expect(response.status).toBe(200)
       expect(response.body).not.toBeNull()
       expect(response.body).toHaveProperty('id', event.id)
@@ -230,6 +236,7 @@ describe('Events Routes', () => {
         .get('/events/next')
         .set('Authorization', `Bearer ${tokenWithoutMember}`)
 
+      logTestResponse(response, 200)
       expect(response.status).toBe(200)
       expect(response.body).toBeNull()
     })
@@ -253,6 +260,7 @@ describe('Events Routes', () => {
         .get(`/events/${event.id}`)
         .set('Authorization', `Bearer ${userToken}`)
 
+      logTestResponse(response, 200)
       expect(response.status).toBe(200)
       expect(response.body).toHaveProperty('id', event.id)
       expect(response.body).toHaveProperty('title', 'Evento Detalhes')
@@ -266,6 +274,7 @@ describe('Events Routes', () => {
         .get(`/events/${fakeId}`)
         .set('Authorization', `Bearer ${userToken}`)
 
+      logTestResponse(response, 404)
       expect(response.status).toBe(404)
       expect(response.body).toHaveProperty('message', 'Evento não encontrado')
     })
@@ -288,6 +297,7 @@ describe('Events Routes', () => {
         .set('Authorization', `Bearer ${userToken}`)
         .send(eventData)
 
+      logTestResponse(response, 201)
       expect(response.status).toBe(201)
       expect(response.body).toHaveProperty('id')
       expect(response.body).toHaveProperty('title', 'Novo Evento')
@@ -312,6 +322,7 @@ describe('Events Routes', () => {
         .set('Authorization', `Bearer ${userToken}`)
         .send(eventData)
 
+      logTestResponse(response, 201)
       expect(response.status).toBe(201)
       expect(response.body).toHaveProperty('hasDonation', true)
       expect(response.body).toHaveProperty('donationReason', 'Construção do templo')
@@ -440,6 +451,7 @@ describe('Events Routes', () => {
         .set('Authorization', `Bearer ${userToken}`)
         .send(updateData)
 
+      logTestResponse(response, 200)
       expect(response.status).toBe(200)
       expect(response.body).toHaveProperty('title', 'Evento Atualizado')
       expect(response.body).toHaveProperty('description', 'Nova descrição')
@@ -458,6 +470,7 @@ describe('Events Routes', () => {
         .set('Authorization', `Bearer ${userToken}`)
         .send(updateData)
 
+      logTestResponse(response, 404)
       expect(response.status).toBe(404)
     })
   })

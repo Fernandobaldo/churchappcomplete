@@ -28,18 +28,18 @@ model AuditLog {
 }
 
 model Branch {
-  id              String           @id @default(cuid())
-  name            String
-  churchId        String
-  isMainBranch    Boolean          @default(false)
-  Church          Church           @relation(fields: [churchId], references: [id], onDelete: Cascade)
-  Contribution    Contribution[]
-  Devotional      Devotional[]
-  Event           Event[]
-  Member          Member[]
-  Notice          Notice[]
-  Transaction     Transaction[]
-  ServiceSchedule ServiceSchedule[]
+  id               String             @id @default(cuid())
+  name             String
+  churchId         String
+  isMainBranch     Boolean            @default(false)
+  Church           Church             @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  Contribution     Contribution[]
+  Devotional       Devotional[]
+  Event            Event[]
+  Member           Member[]
+  Notice           Notice[]
+  Transaction      Transaction[]
+  ServiceSchedule  ServiceSchedule[]
   MemberInviteLink MemberInviteLink[]
 }
 
@@ -69,6 +69,7 @@ model Contribution {
   updatedAt   DateTime         @updatedAt
   branchId    String
   Branch      Branch           @relation(fields: [branchId], references: [id])
+  Transaction Transaction[]
 }
 
 model Devotional {
@@ -116,21 +117,21 @@ model Event {
 }
 
 model Member {
-  id             String           @id @default(cuid())
+  id             String            @id @default(cuid())
   name           String
-  email          String           @unique
-  role           Role             @default(MEMBER)
+  email          String            @unique
+  role           Role              @default(MEMBER)
   branchId       String
   address        String?
   avatarUrl      String?
   birthDate      DateTime?
   phone          String?
-  userId         String?          @unique
+  userId         String?           @unique
   inviteLinkId   String?
   Devotional     Devotional[]
   DevotionalLike DevotionalLike[]
-  Branch         Branch           @relation(fields: [branchId], references: [id])
-  User           User?            @relation(fields: [userId], references: [id])
+  Branch         Branch            @relation(fields: [branchId], references: [id])
+  User           User?             @relation(fields: [userId], references: [id])
   Permission     Permission[]
   InviteLink     MemberInviteLink? @relation(fields: [inviteLinkId], references: [id])
 }
@@ -180,31 +181,41 @@ model Subscription {
 }
 
 model Transaction {
-  id        String          @id @default(cuid())
-  title     String
-  amount    Float
-  type      TransactionType
-  category  String?
-  branchId  String
-  createdAt DateTime        @default(now())
-  updatedAt DateTime        @updatedAt
-  Branch    Branch          @relation(fields: [branchId], references: [id])
+  id                 String          @id @default(cuid())
+  title              String
+  amount             Float
+  type               TransactionType
+  category           String?
+  entryType          EntryType?
+  exitType           ExitType?
+  exitTypeOther      String?
+  tithePayerMemberId String?
+  tithePayerName     String?
+  isTithePayerMember Boolean?
+  contributionId    String?
+  createdBy          String?
+  branchId           String
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  Branch             Branch          @relation(fields: [branchId], references: [id])
+  Contribution       Contribution?   @relation(fields: [contributionId], references: [id])
+  CreatedByUser      User?           @relation(fields: [createdBy], references: [id])
 }
 
 model ServiceSchedule {
-  id                 String    @id @default(cuid())
-  branchId           String
-  dayOfWeek          Int       // 0-6, onde 0 = Domingo
-  time               String    // formato HH:mm
-  title              String
-  description        String?
-  location           String?
-  isDefault          Boolean   @default(false)
-  autoCreateEvents   Boolean   @default(false)
-  autoCreateDaysAhead Int?     // quantos dias à frente criar eventos, padrão: 90
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
-  Branch             Branch    @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  id                  String   @id @default(cuid())
+  branchId            String
+  dayOfWeek           Int // 0-6, onde 0 = Domingo
+  time                String // formato HH:mm
+  title               String
+  description         String?
+  location            String?
+  isDefault           Boolean  @default(false)
+  autoCreateEvents    Boolean  @default(false)
+  autoCreateDaysAhead Int? // quantos dias à frente criar eventos, padrão: 90
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  Branch              Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
 
   @@index([branchId])
   @@index([dayOfWeek])
@@ -219,22 +230,23 @@ model User {
   updatedAt    DateTime       @updatedAt
   Member       Member?
   Subscription Subscription[]
+  Transactions Transaction[]
 }
 
 model MemberInviteLink {
-  id          String   @id @default(cuid())
-  token       String   @unique
+  id          String    @id @default(cuid())
+  token       String    @unique
   branchId    String
   createdBy   String
   maxUses     Int?
-  currentUses Int      @default(0)
+  currentUses Int       @default(0)
   expiresAt   DateTime?
-  isActive    Boolean  @default(true)
+  isActive    Boolean   @default(true)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   Branch      Branch    @relation(fields: [branchId], references: [id], onDelete: Cascade)
   Member      Member[]
-  
+
   @@index([token])
   @@index([branchId])
   @@index([isActive])
@@ -283,4 +295,18 @@ enum Role {
 enum TransactionType {
   ENTRY
   EXIT
+}
+
+enum EntryType {
+  OFERTA
+  DIZIMO
+  CONTRIBUICAO
+}
+
+enum ExitType {
+  ALUGUEL
+  ENERGIA
+  AGUA
+  INTERNET
+  OUTROS
 }

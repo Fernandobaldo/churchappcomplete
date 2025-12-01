@@ -13,6 +13,7 @@ import { authenticate } from '../../src/middlewares/authenticate'
 import { prisma } from '../../src/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { resetTestDatabase } from '../utils/resetTestDatabase'
+import { logTestResponse } from '../utils/testResponseHelper'
 
 describe('Registro via Link de Convite - E2E', () => {
   const app = Fastify()
@@ -158,6 +159,7 @@ describe('Registro via Link de Convite - E2E', () => {
       },
     })
 
+    logTestResponse(response, 201)
     expect(response.statusCode).toBe(201)
     const data = JSON.parse(response.body)
     expect(data.member).toBeDefined()
@@ -214,6 +216,7 @@ describe('Registro via Link de Convite - E2E', () => {
       },
     })
 
+    logTestResponse(response, 403)
     expect(response.statusCode).toBe(403)
     const data = JSON.parse(response.body)
     expect(data.error).toBe('LIMIT_REACHED')
@@ -253,6 +256,7 @@ describe('Registro via Link de Convite - E2E', () => {
       },
     })
 
+    logTestResponse(response, 400)
     expect(response.statusCode).toBe(400)
     const data = JSON.parse(response.body)
     expect(data.error).toContain('já cadastrado')
@@ -269,6 +273,7 @@ describe('Registro via Link de Convite - E2E', () => {
       },
     })
 
+    logTestResponse(response, 400)
     expect(response.statusCode).toBe(400)
   })
 
@@ -284,6 +289,7 @@ describe('Registro via Link de Convite - E2E', () => {
       },
     })
 
+    logTestResponse(response, 404)
     expect(response.statusCode).toBe(404)
   })
 
@@ -304,6 +310,7 @@ describe('Registro via Link de Convite - E2E', () => {
       },
     })
 
+    logTestResponse(response, 403)
     expect(response.statusCode).toBe(403)
     const data = JSON.parse(response.body)
     expect(data.error).toContain('desativado')
@@ -329,6 +336,7 @@ describe('Registro via Link de Convite - E2E', () => {
       },
     })
 
+    logTestResponse(response, 403)
     expect(response.statusCode).toBe(403)
     const data = JSON.parse(response.body)
     expect(data.error).toContain('expirou')
@@ -351,6 +359,7 @@ describe('Registro via Link de Convite - E2E', () => {
       },
     })
 
+    logTestResponse(response, 403)
     expect(response.statusCode).toBe(403)
     const data = JSON.parse(response.body)
     expect(data.error).toContain('limite de usos')
@@ -392,6 +401,7 @@ describe('Registro via Link de Convite - E2E', () => {
       },
     })
 
+    logTestResponse(response, 403)
     expect(response.statusCode).toBe(403)
     const data = JSON.parse(response.body)
     expect(data.error).toBe('LIMIT_REACHED')

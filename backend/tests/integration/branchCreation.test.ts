@@ -11,6 +11,7 @@ import bcrypt from 'bcryptjs'
 import { resetTestDatabase } from '../utils/resetTestDatabase'
 import { seedTestDatabase } from '../utils/seedTestDatabase'
 import { authenticate } from '../../src/middlewares/authenticate'
+import { logTestResponse } from '../utils/testResponseHelper'
 
 describe('Branch Creation - Validações de Segurança', () => {
   const app = Fastify()
@@ -148,6 +149,7 @@ describe('Branch Creation - Validações de Segurança', () => {
           churchId: adminChurchId,
         })
 
+      logTestResponse(response, 401)
       expect(response.status).toBe(401)
     })
 
@@ -175,6 +177,7 @@ describe('Branch Creation - Validações de Segurança', () => {
           churchId: adminChurchId,
         })
 
+      logTestResponse(response, 201)
       expect(response.status).toBe(201)
       expect(response.body.name).toBe('Nova Filial')
     })
@@ -188,6 +191,7 @@ describe('Branch Creation - Validações de Segurança', () => {
           churchId: adminChurchId,
         })
 
+      logTestResponse(response, 403)
       expect(response.status).toBe(403)
       expect(response.body.error).toContain('Administradores Gerais')
     })
@@ -208,6 +212,7 @@ describe('Branch Creation - Validações de Segurança', () => {
           churchId: otherChurch.id,
         })
 
+      logTestResponse(response, 403)
       expect(response.status).toBe(403)
       expect(response.body.error).toContain('outras igrejas')
     })
@@ -233,6 +238,7 @@ describe('Branch Creation - Validações de Segurança', () => {
           churchId: adminChurchId,
         })
 
+      logTestResponse(response, 403)
       expect(response.status).toBe(403)
       expect(response.body.error).toContain('Limite do plano atingido')
 
@@ -264,6 +270,7 @@ describe('Branch Creation - Validações de Segurança', () => {
           churchId: adminChurchId,
         })
 
+      logTestResponse(response, 201)
       expect(response.status).toBe(201)
 
       // Restaurar limite original

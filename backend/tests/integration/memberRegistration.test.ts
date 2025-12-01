@@ -11,6 +11,7 @@ import bcrypt from 'bcryptjs'
 import { resetTestDatabase } from '../utils/resetTestDatabase'
 import { seedTestDatabase } from '../utils/seedTestDatabase'
 import { authenticate } from '../../src/middlewares/authenticate'
+import { logTestResponse } from '../utils/testResponseHelper'
 
 describe('Member Registration - Validações de Segurança', () => {
   const app = Fastify()
@@ -136,6 +137,7 @@ describe('Member Registration - Validações de Segurança', () => {
           branchId: adminBranchId,
         })
 
+      logTestResponse(response, 401)
       expect(response.status).toBe(401)
     })
 
@@ -151,6 +153,7 @@ describe('Member Registration - Validações de Segurança', () => {
           role: 'MEMBER',
         })
 
+      logTestResponse(response, 201)
       expect(response.status).toBe(201)
       expect(response.body.email).toBe('novo@example.com')
       expect(response.body.role).toBe('MEMBER')
@@ -196,6 +199,7 @@ describe('Member Registration - Validações de Segurança', () => {
           branchId: otherBranch.id,
         })
 
+      logTestResponse(response, 403)
       expect(response.status).toBe(403)
       expect(response.body.error).toContain('sua própria filial')
     })
@@ -231,6 +235,7 @@ describe('Member Registration - Validações de Segurança', () => {
           role: 'ADMINGERAL',
         })
 
+      logTestResponse(response, 403)
       expect(response.status).toBe(403)
       expect(response.body.error).toContain('Administrador Geral')
     })
@@ -247,6 +252,7 @@ describe('Member Registration - Validações de Segurança', () => {
           role: 'ADMINGERAL',
         })
 
+      logTestResponse(response, 403)
       expect(response.status).toBe(403)
       expect(response.body.error).toContain('Apenas o sistema pode criar')
     })
@@ -317,6 +323,7 @@ describe('Member Registration - Validações de Segurança', () => {
           branchId: adminBranchId,
         })
 
+      logTestResponse(response, 403)
       expect(response.status).toBe(403)
       expect(response.body.error).toContain('Limite do plano atingido')
 
@@ -339,6 +346,7 @@ describe('Member Registration - Validações de Segurança', () => {
           password: 'password123',
         })
 
+      logTestResponse(response, 400)
       expect(response.status).toBe(400)
     })
 
@@ -353,6 +361,7 @@ describe('Member Registration - Validações de Segurança', () => {
           branchId: 'branch-inexistente',
         })
 
+      logTestResponse(response, 400)
       expect(response.status).toBe(400)
       expect(response.body.error).toContain('não encontrada')
     })

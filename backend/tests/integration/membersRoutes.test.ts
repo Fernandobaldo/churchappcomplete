@@ -14,6 +14,7 @@ import bcrypt from 'bcryptjs'
 import { resetTestDatabase } from '../utils/resetTestDatabase'
 import { registerRoutes } from '../../src/routes/registerRoutes'
 import { authenticate } from '../../src/middlewares/authenticate'
+import { logTestResponse } from '../utils/testResponseHelper'
 
 describe('Members Routes', () => {
   const app = Fastify()
@@ -181,6 +182,8 @@ describe('Members Routes', () => {
         .get('/members')
         .set('Authorization', `Bearer ${adminToken}`)
 
+      logTestResponse(response, 200)
+      logTestResponse(response, 200)
       expect(response.status).toBe(200)
       expect(Array.isArray(response.body)).toBe(true)
       expect(response.body.length).toBeGreaterThanOrEqual(3) // Admin, Coordinator, Member
@@ -191,21 +194,32 @@ describe('Members Routes', () => {
         .get('/members')
         .set('Authorization', `Bearer ${coordinatorToken}`)
 
+      logTestResponse(response, 200)
+      logTestResponse(response, 200)
       expect(response.status).toBe(200)
       expect(Array.isArray(response.body)).toBe(true)
       // Coordinator vê membros da mesma filial
       expect(response.body.length).toBeGreaterThanOrEqual(3)
     })
 
-    it('MEMBER deve ver apenas a si mesmo', async () => {
+    it('MEMBER deve ver todos os membros da sua filial', async () => {
       const response = await request(app.server)
         .get('/members')
         .set('Authorization', `Bearer ${memberToken}`)
 
+      logTestResponse(response, 200)
+      logTestResponse(response, 200)
       expect(response.status).toBe(200)
       expect(Array.isArray(response.body)).toBe(true)
-      expect(response.body.length).toBe(1)
-      expect(response.body[0]).toHaveProperty('id', memberId)
+      // MEMBER pode ver todos os membros da mesma filial (Admin, Coordinator e Member)
+      expect(response.body.length).toBeGreaterThanOrEqual(3)
+      // Verifica que o próprio membro está na lista
+      const selfMember = response.body.find((m: any) => m.id === memberId)
+      expect(selfMember).toBeDefined()
+      expect(selfMember).toHaveProperty('id', memberId)
+      // Verifica que não inclui dados sensíveis (email, phone, address) para outros membros
+      // O próprio membro pode ter seus dados, mas vamos verificar que pelo menos a estrutura está correta
+      expect(selfMember).toHaveProperty('name', 'Regular Member')
     })
   })
 
@@ -215,6 +229,8 @@ describe('Members Routes', () => {
         .get('/members/me')
         .set('Authorization', `Bearer ${memberToken}`)
 
+      logTestResponse(response, 200)
+      logTestResponse(response, 200)
       expect(response.status).toBe(200)
       expect(response.body).toHaveProperty('id', memberId)
       expect(response.body).toHaveProperty('name', 'Regular Member')
@@ -241,6 +257,8 @@ describe('Members Routes', () => {
         .get('/members/me')
         .set('Authorization', `Bearer ${tokenWithoutMember}`)
 
+      logTestResponse(response, 404)
+      logTestResponse(response, 404)
       expect(response.status).toBe(404)
     })
   })
@@ -251,6 +269,7 @@ describe('Members Routes', () => {
         .get(`/members/${memberId}`)
         .set('Authorization', `Bearer ${adminToken}`)
 
+      logTestResponse(response, 200)
       expect(response.status).toBe(200)
       expect(response.body).toHaveProperty('id', memberId)
     })
@@ -260,6 +279,7 @@ describe('Members Routes', () => {
         .get(`/members/${memberId}`)
         .set('Authorization', `Bearer ${coordinatorToken}`)
 
+      logTestResponse(response, 200)
       expect(response.status).toBe(200)
       expect(response.body).toHaveProperty('id', memberId)
     })
@@ -269,16 +289,104 @@ describe('Members Routes', () => {
         .get(`/members/${memberId}`)
         .set('Authorization', `Bearer ${memberToken}`)
 
+      logTestResponse(response, 200)
       expect(response.status).toBe(200)
       expect(response.body).toHaveProperty('id', memberId)
     })
 
-    it('MEMBER não deve ver outros membros', async () => {
+    it('MEMBER pode ver outros membros da mesma filial', async () => {
+      // MEMBER pode ver outros membros da mesma filial (todos estão na mesma branch)
       const response = await request(app.server)
         .get(`/members/${adminMemberId}`)
         .set('Authorization', `Bearer ${memberToken}`)
 
+      logTestResponse(response, 200)
+      expect(response.status).toBe(200)
+      expect(response.body).toHaveProperty('id', adminMemberId)
+    })
+
+    it('MEMBER não deve ver membros de outras filiais', async () => {
+      // Criar outra filial
+      const otherBranch = await prisma.branch.create({
+        data: {
+          name: 'Outra Filial',
+          churchId: adminChurchId,
+        },
+      })
+
+      // Criar membro em outra filial
+      const otherBranchUser = await prisma.user.create({
+        data: {
+          name: 'Other Branch User',
+          email: 'otherbranch@example.com',
+          password: await bcrypt.hash('password123', 10),
+        },
+      })
+
+      const otherBranchMember = await prisma.member.create({
+        data: {
+          name: 'Other Branch Member',
+          email: 'otherbranchmember@example.com',
+          branchId: otherBranch.id,
+          role: 'MEMBER',
+          userId: otherBranchUser.id,
+        },
+      })
+
+      // MEMBER não deve ver membro de outra filial
+      const response = await request(app.server)
+        .get(`/members/${otherBranchMember.id}`)
+        .set('Authorization', `Bearer ${memberToken}`)
+
+      logTestResponse(response, 403)
       expect(response.status).toBe(403)
+      expect(response.body).toHaveProperty('error', 'Você só pode visualizar membros da sua filial')
+    })
+
+    it('ADMINGERAL não deve ver membros de outras igrejas', async () => {
+      // Criar outra igreja
+      const otherChurch = await prisma.church.create({
+        data: {
+          name: 'Outra Igreja',
+        },
+      })
+
+      // Criar filial na outra igreja
+      const otherBranch = await prisma.branch.create({
+        data: {
+          name: 'Filial Outra Igreja',
+          churchId: otherChurch.id,
+        },
+      })
+
+      // Criar usuário na outra igreja
+      const otherChurchUser = await prisma.user.create({
+        data: {
+          name: 'Other Church User',
+          email: 'otherchurch@example.com',
+          password: await bcrypt.hash('password123', 10),
+        },
+      })
+
+      // Criar membro na outra igreja
+      const otherChurchMember = await prisma.member.create({
+        data: {
+          name: 'Other Church Member',
+          email: 'otherchurchmember@example.com',
+          branchId: otherBranch.id,
+          role: 'MEMBER',
+          userId: otherChurchUser.id,
+        },
+      })
+
+      // ADMINGERAL não deve ver membro de outra igreja
+      const response = await request(app.server)
+        .get(`/members/${otherChurchMember.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+
+      logTestResponse(response, 403)
+      expect(response.status).toBe(403)
+      expect(response.body).toHaveProperty('error', 'Você só pode visualizar membros da sua igreja')
     })
 
     it('deve retornar 404 quando membro não existe', async () => {
@@ -288,6 +396,7 @@ describe('Members Routes', () => {
         .get(`/members/${fakeId}`)
         .set('Authorization', `Bearer ${adminToken}`)
 
+      logTestResponse(response, 404)
       expect(response.status).toBe(404)
     })
   })
@@ -304,6 +413,7 @@ describe('Members Routes', () => {
         .set('Authorization', `Bearer ${adminToken}`)
         .send(updateData)
 
+      logTestResponse(response, 200)
       expect(response.status).toBe(200)
       expect(response.body).toHaveProperty('name', 'Member Atualizado')
       expect(response.body).toHaveProperty('phone', '11999999999')
@@ -319,6 +429,7 @@ describe('Members Routes', () => {
         .set('Authorization', `Bearer ${memberToken}`)
         .send(updateData)
 
+      logTestResponse(response, 403)
       expect(response.status).toBe(403)
     })
 
@@ -334,6 +445,7 @@ describe('Members Routes', () => {
         .set('Authorization', `Bearer ${adminToken}`)
         .send(updateData)
 
+      logTestResponse(response, 404)
       expect(response.status).toBe(404)
     })
   })

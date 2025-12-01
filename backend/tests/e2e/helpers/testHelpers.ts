@@ -151,6 +151,37 @@ export async function createContribution(
 }
 
 /**
+ * Cria uma transação financeira (requer autenticação, role e permissão)
+ */
+export async function createTransaction(
+  app: FastifyInstance,
+  token: string,
+  transactionData: {
+    title: string
+    amount: number
+    type: 'ENTRY' | 'EXIT'
+    category?: string
+    entryType?: 'OFERTA' | 'DIZIMO'
+    tithePayerMemberId?: string
+    tithePayerName?: string
+    isTithePayerMember?: boolean
+  }
+) {
+  const response = await request(app.server)
+    .post('/finances')
+    .set('Authorization', `Bearer ${token}`)
+    .send(transactionData)
+
+  if (response.status !== 201) {
+    throw new Error(
+      `Falha ao criar transação: ${response.status} - ${JSON.stringify(response.body)}`
+    )
+  }
+
+  return response.body
+}
+
+/**
  * Fluxo completo: registra usuário e cria igreja
  */
 export async function setupCompleteUser(

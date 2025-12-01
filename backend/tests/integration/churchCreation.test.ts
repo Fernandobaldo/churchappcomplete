@@ -14,6 +14,7 @@ import bcrypt from 'bcryptjs'
 import { resetTestDatabase } from '../utils/resetTestDatabase'
 import { registerRoutes } from '../../src/routes/registerRoutes'
 import { authenticate } from '../../src/middlewares/authenticate'
+import { logTestResponse } from '../utils/testResponseHelper'
 
 describe('Church Creation - Novo Modelo User + Member', () => {
   const app = Fastify()
@@ -91,6 +92,7 @@ describe('Church Creation - Novo Modelo User + Member', () => {
         withBranch: true,
       })
 
+    logTestResponse(response, 201)
     expect(response.status).toBe(201)
     expect(response.body.church).toBeDefined()
     expect(response.body.branch).toBeDefined()

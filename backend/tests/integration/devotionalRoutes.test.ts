@@ -14,6 +14,7 @@ import bcrypt from 'bcryptjs'
 import { resetTestDatabase } from '../utils/resetTestDatabase'
 import { registerRoutes } from '../../src/routes/registerRoutes'
 import { authenticate } from '../../src/middlewares/authenticate'
+import { logTestResponse } from '../utils/testResponseHelper'
 
 describe('Devotional Routes', () => {
   const app = Fastify()
@@ -144,6 +145,7 @@ describe('Devotional Routes', () => {
           content: 'Porque Deus amou o mundo de tal maneira...',
         })
 
+      logTestResponse(response, 201)
       expect(response.status).toBe(201)
       expect(response.body).toHaveProperty('id')
       expect(response.body.title).toBe('Devocional de Teste')
@@ -162,6 +164,7 @@ describe('Devotional Routes', () => {
           passage: 'Romanos 8:28',
         })
 
+      logTestResponse(response, 201)
       expect(response.status).toBe(201)
       expect(response.body).toHaveProperty('id')
       expect(response.body.title).toBe('Devocional Sem Conteúdo')
@@ -178,6 +181,7 @@ describe('Devotional Routes', () => {
           passage: 'João 3:16',
         })
 
+      logTestResponse(response, 400)
       expect(response.status).toBe(400)
       expect(response.body).toHaveProperty('error')
       expect(response.body.error).toBe('Dados inválidos')
@@ -192,6 +196,7 @@ describe('Devotional Routes', () => {
           passage: '',
         })
 
+      logTestResponse(response, 400)
       expect(response.status).toBe(400)
       expect(response.body).toHaveProperty('error')
       expect(response.body.error).toBe('Dados inválidos')
@@ -205,6 +210,7 @@ describe('Devotional Routes', () => {
           passage: 'João 3:16',
         })
 
+      logTestResponse(response, 400)
       expect(response.status).toBe(400)
       expect(response.body).toHaveProperty('error')
     })
@@ -217,6 +223,7 @@ describe('Devotional Routes', () => {
           title: 'Devocional Teste',
         })
 
+      logTestResponse(response, 400)
       expect(response.status).toBe(400)
       expect(response.body).toHaveProperty('error')
     })
@@ -246,6 +253,7 @@ describe('Devotional Routes', () => {
           passage: 'João 3:16',
         })
 
+      logTestResponse(response, 400)
       expect(response.status).toBe(400)
       expect(response.body.message).toBe('Usuário não vinculado a uma filial.')
     })
@@ -277,6 +285,7 @@ describe('Devotional Routes', () => {
         .get('/devotionals')
         .set('Authorization', `Bearer ${userToken}`)
 
+      logTestResponse(response, 200)
       expect(response.status).toBe(200)
       expect(Array.isArray(response.body)).toBe(true)
       expect(response.body.length).toBeGreaterThanOrEqual(2)
@@ -310,6 +319,7 @@ describe('Devotional Routes', () => {
         .get('/devotionals')
         .set('Authorization', `Bearer ${tokenWithoutBranch}`)
 
+      logTestResponse(response, 400)
       expect(response.status).toBe(400)
       expect(response.body.message).toBe('Usuário não vinculado a uma filial.')
     })
@@ -338,6 +348,7 @@ describe('Devotional Routes', () => {
           content: 'Conteúdo atualizado',
         })
 
+      logTestResponse(response, 200)
       expect(response.status).toBe(200)
       expect(response.body).toHaveProperty('id', devotionalId)
       expect(response.body).toHaveProperty('title', 'Devocional Atualizado')
@@ -365,6 +376,7 @@ describe('Devotional Routes', () => {
           title: 'Apenas Título Atualizado',
         })
 
+      logTestResponse(response, 200)
       expect(response.status).toBe(200)
       expect(response.body).toHaveProperty('title', 'Apenas Título Atualizado')
       expect(response.body).toHaveProperty('passage', 'João 3:16') // Mantém original
@@ -497,6 +509,7 @@ describe('Devotional Routes', () => {
           title: 'Editado por Admin',
         })
 
+      logTestResponse(response, 200)
       expect(response.status).toBe(200)
       expect(response.body).toHaveProperty('title', 'Editado por Admin')
     })
@@ -519,6 +532,7 @@ describe('Devotional Routes', () => {
         .delete(`/devotionals/${devotionalId}`)
         .set('Authorization', `Bearer ${userToken}`)
 
+      logTestResponse(response, 200)
       expect(response.status).toBe(200)
       expect(response.body).toHaveProperty('message', 'Devocional deletado com sucesso')
 
@@ -554,6 +568,7 @@ describe('Devotional Routes', () => {
         .delete(`/devotionals/${devotionalId}`)
         .set('Authorization', `Bearer ${userToken}`)
 
+      logTestResponse(response, 200)
       expect(response.status).toBe(200)
 
       // Verificar se likes foram deletados

@@ -1,10 +1,24 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
 import App from '@/App'
 import { useAuthStore } from '@/stores/authStore'
 import api from '@/api/api'
+
+// Variável global para controlar a rota inicial nos testes
+let testInitialEntries = ['/']
+
+// Mock do BrowserRouter para usar MemoryRouter nos testes
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual('react-router-dom')
+  return {
+    ...actual,
+    BrowserRouter: ({ children }: any) => {
+      const { MemoryRouter } = actual as any
+      return <MemoryRouter initialEntries={testInitialEntries}>{children}</MemoryRouter>
+    },
+  }
+})
 
 vi.mock('@/api/api')
 vi.mock('@/stores/authStore', () => ({
@@ -16,22 +30,24 @@ vi.mock('react-hot-toast', () => ({
     success: vi.fn(),
     error: vi.fn(),
   },
+  Toaster: () => null,
 }))
 
 describe('Fluxo de Permissões E2E', () => {
-  // Simula um membro criado via link de convite (sem permissões)
+  // Simula um membro criado via link de convite (com members_view automaticamente)
   const memberCreatedViaInvite = {
     id: 'member-invite-1',
     name: 'Membro Via Convite',
     email: 'invite@test.com',
     role: 'MEMBER',
     branchId: 'branch-1',
-    permissions: [], // Membros criados via link não têm permissões
+    permissions: [{ type: 'members_view' }], // Membros criados via link recebem members_view automaticamente
     token: 'mock-token',
   }
 
   beforeEach(() => {
     vi.clearAllMocks()
+    testInitialEntries = ['/']
     ;(api.get as any).mockResolvedValue({ data: [] })
   })
 
@@ -43,13 +59,10 @@ describe('Fluxo de Permissões E2E', () => {
       setToken: vi.fn(),
     })
 
-    render(
-      <MemoryRouter initialEntries={['/app']}>
-        <App />
-      </MemoryRouter>
-    )
+    testInitialEntries = ['/app/events/new']
+    render(<App />)
 
-    // Tenta acessar página de eventos (protegida)
+    // Tenta acessar página de criar evento (protegida por permissão)
     await waitFor(() => {
       expect(screen.getByText('403')).toBeInTheDocument()
       expect(screen.getByText('Acesso Negado')).toBeInTheDocument()
@@ -65,11 +78,8 @@ describe('Fluxo de Permissões E2E', () => {
     })
 
     // Acessa dashboard (página pública)
-    render(
-      <MemoryRouter initialEntries={['/app/dashboard']}>
-        <App />
-      </MemoryRouter>
-    )
+    testInitialEntries = ['/app/dashboard']
+    render(<App />)
 
     await waitFor(() => {
       // Verifica que não há botões de criar eventos, membros, etc no dashboard
@@ -102,11 +112,8 @@ describe('Fluxo de Permissões E2E', () => {
       ],
     })
 
-    render(
-      <MemoryRouter initialEntries={['/app/members']}>
-        <App />
-      </MemoryRouter>
-    )
+    testInitialEntries = ['/app/members']
+    render(<App />)
 
     await waitFor(() => {
       // Deve ver nome e cargo
@@ -134,11 +141,8 @@ describe('Fluxo de Permissões E2E', () => {
       data: [],
     })
 
-    render(
-      <MemoryRouter initialEntries={['/app/members']}>
-        <App />
-      </MemoryRouter>
-    )
+    testInitialEntries = ['/app/members']
+    render(<App />)
 
     await waitFor(() => {
       // Não deve ver botão de criar membro
@@ -155,11 +159,8 @@ describe('Fluxo de Permissões E2E', () => {
       setToken: vi.fn(),
     })
 
-    render(
-      <MemoryRouter initialEntries={['/app/members/new']}>
-        <App />
-      </MemoryRouter>
-    )
+    testInitialEntries = ['/app/members/new']
+    render(<App />)
 
     await waitFor(() => {
       expect(screen.getByText('403')).toBeInTheDocument()
@@ -175,45 +176,33 @@ describe('Fluxo de Permissões E2E', () => {
       setToken: vi.fn(),
     })
 
-    const { rerender } = render(
-      <MemoryRouter initialEntries={['/app/events']}>
-        <App />
-      </MemoryRouter>
-    )
-
-    // Tenta acessar eventos
-    await waitFor(() => {
-      expect(screen.getByText('403')).toBeInTheDocument()
-    })
-
-    // Tenta acessar contribuições
-    rerender(
-      <MemoryRouter initialEntries={['/app/contributions']}>
-        <App />
-      </MemoryRouter>
-    )
+    // Tenta acessar criar evento (protegido por permissão)
+    testInitialEntries = ['/app/events/new']
+    const { rerender } = render(<App />)
 
     await waitFor(() => {
       expect(screen.getByText('403')).toBeInTheDocument()
     })
 
-    // Tenta acessar devocionais
-    rerender(
-      <MemoryRouter initialEntries={['/app/devotionals']}>
-        <App />
-      </MemoryRouter>
-    )
+    // Tenta acessar criar contribuição (protegido por permissão)
+    testInitialEntries = ['/app/contributions/new']
+    rerender(<App />)
 
     await waitFor(() => {
       expect(screen.getByText('403')).toBeInTheDocument()
     })
 
-    // Tenta acessar finanças
-    rerender(
-      <MemoryRouter initialEntries={['/app/finances']}>
-        <App />
-      </MemoryRouter>
-    )
+    // Tenta acessar criar devocional (protegido por permissão)
+    testInitialEntries = ['/app/devotionals/new']
+    rerender(<App />)
+
+    await waitFor(() => {
+      expect(screen.getByText('403')).toBeInTheDocument()
+    })
+
+    // Tenta acessar criar transação financeira (protegido por permissão)
+    testInitialEntries = ['/app/finances/new']
+    rerender(<App />)
 
     await waitFor(() => {
       expect(screen.getByText('403')).toBeInTheDocument()

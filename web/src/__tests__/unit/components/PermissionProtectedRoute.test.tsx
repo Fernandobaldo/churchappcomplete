@@ -4,6 +4,8 @@ import { MemoryRouter } from 'react-router-dom'
 import PermissionProtectedRoute from '@/components/PermissionProtectedRoute'
 import { useAuthStore } from '@/stores/authStore'
 
+const mockNavigate = vi.fn()
+
 vi.mock('@/stores/authStore')
 vi.mock('@/utils/authUtils', () => ({
   hasAccess: vi.fn((user, permission) => {
@@ -20,21 +22,20 @@ vi.mock('@/utils/authUtils', () => ({
   }),
 }))
 
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual('react-router-dom')
+  return {
+    ...actual,
+    Navigate: ({ to }: any) => {
+      mockNavigate(to)
+      return null
+    },
+  }
+})
+
 describe('PermissionProtectedRoute', () => {
-  const mockNavigate = vi.fn()
-  
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mock('react-router-dom', async () => {
-      const actual = await vi.importActual('react-router-dom')
-      return {
-        ...actual,
-        Navigate: ({ to }: any) => {
-          mockNavigate(to)
-          return null
-        },
-      }
-    })
   })
 
   it('deve renderizar children quando tem permissão', () => {

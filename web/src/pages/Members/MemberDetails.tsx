@@ -16,7 +16,7 @@ interface Member {
   birthDate?: string
   role: string
   avatarUrl?: string
-  permissions: Array<{ id: string; type: string }>
+  permissions?: Array<{ id: string; type: string }>
 }
 
 export default function MemberDetails() {
@@ -158,7 +158,7 @@ export default function MemberDetails() {
             )}
           </div>
 
-          {member.permissions.length > 0 && (
+          {member.permissions && member.permissions.length > 0 && (
             <div>
               <h3 className="font-semibold mb-3 flex items-center gap-2">
                 <Shield className="w-5 h-5" />

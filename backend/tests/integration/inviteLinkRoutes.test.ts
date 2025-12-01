@@ -11,6 +11,7 @@ import { authenticate } from '../../src/middlewares/authenticate'
 import { prisma } from '../../src/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { resetTestDatabase } from '../utils/resetTestDatabase'
+import { logTestResponse } from '../utils/testResponseHelper'
 import { seedTestDatabase } from '../utils/seedTestDatabase'
 
 describe('Invite Link Routes', () => {
@@ -153,6 +154,7 @@ describe('Invite Link Routes', () => {
         },
       })
 
+      logTestResponse(response, 201)
       expect(response.statusCode).toBe(201)
       const data = JSON.parse(response.body)
       expect(data.token).toBeDefined()
@@ -174,6 +176,7 @@ describe('Invite Link Routes', () => {
         },
       })
 
+      logTestResponse(response, 201)
       expect(response.statusCode).toBe(201)
       const data = JSON.parse(response.body)
       expect(data.maxUses).toBeNull()
@@ -188,6 +191,7 @@ describe('Invite Link Routes', () => {
         },
       })
 
+      logTestResponse(response, 401)
       expect(response.statusCode).toBe(401)
     })
 
@@ -234,6 +238,7 @@ describe('Invite Link Routes', () => {
         },
       })
 
+      logTestResponse(response, 403)
       expect(response.statusCode).toBe(403)
     })
 
@@ -288,6 +293,7 @@ describe('Invite Link Routes', () => {
         },
       })
 
+      logTestResponse(response, 403)
       expect(response.statusCode).toBe(403)
       const data = JSON.parse(response.body)
       expect(data.code).toBe('PLAN_LIMIT_REACHED')
@@ -319,6 +325,7 @@ describe('Invite Link Routes', () => {
         },
       })
 
+      logTestResponse(response, 200)
       expect(response.statusCode).toBe(200)
       const data = JSON.parse(response.body)
       expect(Array.isArray(data)).toBe(true)
@@ -353,6 +360,7 @@ describe('Invite Link Routes', () => {
         },
       })
 
+      logTestResponse(response, 200)
       expect(response.statusCode).toBe(200)
       const data = JSON.parse(response.body)
       expect(data.isActive).toBe(false)
@@ -403,6 +411,7 @@ describe('Invite Link Routes', () => {
         console.error('❌ Erro ao buscar informações do link:', response.statusCode, response.body)
       }
 
+      logTestResponse(response, 200)
       expect(response.statusCode).toBe(200)
       const data = JSON.parse(response.body)
       expect(data.id).toBe(linkData.id)
@@ -452,6 +461,7 @@ describe('Invite Link Routes', () => {
         console.error('❌ Erro ao buscar QR code:', response.statusCode, response.body)
       }
 
+      logTestResponse(response, 200)
       expect(response.statusCode).toBe(200)
       expect(response.headers['content-type']).toContain('image/png')
     })

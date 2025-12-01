@@ -14,6 +14,7 @@ import bcrypt from 'bcryptjs'
 import { resetTestDatabase } from '../utils/resetTestDatabase'
 import { registerRoutes } from '../../src/routes/registerRoutes'
 import { authenticate } from '../../src/middlewares/authenticate'
+import { logTestResponse } from '../utils/testResponseHelper'
 
 describe('Churches Routes - CRUD Completo', () => {
   const app = Fastify()
@@ -138,6 +139,7 @@ describe('Churches Routes - CRUD Completo', () => {
         .set('Authorization', `Bearer ${userToken}`)
         .send(churchData)
 
+      logTestResponse(response, 400)
       expect(response.status).toBe(400)
     })
 
@@ -153,6 +155,7 @@ describe('Churches Routes - CRUD Completo', () => {
         .post('/churches')
         .send(churchData)
 
+      logTestResponse(response, 401)
       expect(response.status).toBe(401)
     })
   })
@@ -163,6 +166,7 @@ describe('Churches Routes - CRUD Completo', () => {
         .get('/churches')
         .set('Authorization', `Bearer ${userToken}`)
 
+      logTestResponse(response, 200)
       expect(response.status).toBe(200)
       expect(Array.isArray(response.body)).toBe(true)
       expect(response.body.length).toBeGreaterThan(0)
@@ -174,6 +178,7 @@ describe('Churches Routes - CRUD Completo', () => {
       const response = await request(app.server)
         .get('/churches')
 
+      logTestResponse(response, 401)
       expect(response.status).toBe(401)
     })
   })
@@ -184,6 +189,7 @@ describe('Churches Routes - CRUD Completo', () => {
         .get(`/churches/${churchId}`)
         .set('Authorization', `Bearer ${userToken}`)
 
+      logTestResponse(response, 200)
       expect(response.status).toBe(200)
       expect(response.body).toHaveProperty('id', churchId)
       expect(response.body).toHaveProperty('name', 'Igreja Teste')
@@ -211,6 +217,7 @@ describe('Churches Routes - CRUD Completo', () => {
         .set('Authorization', `Bearer ${userToken}`)
         .send(updateData)
 
+      logTestResponse(response, 200)
       expect(response.status).toBe(200)
       expect(response.body).toHaveProperty('name', 'Igreja Atualizada')
     })
@@ -290,6 +297,7 @@ describe('Churches Routes - CRUD Completo', () => {
         .delete(`/churches/${churchToDelete.id}`)
         .set('Authorization', `Bearer ${deleteToken}`)
 
+      logTestResponse(response, 200)
       expect(response.status).toBe(200)
 
       // Verificar que foi deletado
@@ -397,6 +405,7 @@ describe('Churches Routes - CRUD Completo', () => {
         .patch(`/churches/${churchToDeactivate.id}/deactivate`)
         .set('Authorization', `Bearer ${deactivateToken}`)
 
+      logTestResponse(response, 200)
       expect(response.status).toBe(200)
       expect(response.body).toHaveProperty('isActive', false)
     })

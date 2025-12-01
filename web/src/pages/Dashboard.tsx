@@ -5,6 +5,7 @@ import api from '../api/api'
 import { useAuthStore } from '../stores/authStore'
 import toast from 'react-hot-toast'
 import PermissionGuard from '../components/PermissionGuard'
+import { hasAccess } from '../utils/authUtils'
 
 interface NextEvent {
   id: string
@@ -163,13 +164,16 @@ export default function Dashboard() {
                 <span>Criar Novo Evento</span>
               </button>
             </PermissionGuard>
-            <button
-              onClick={() => navigate('/app/events')}
-              className="w-full flex items-center gap-2 px-4 py-2 text-left hover:bg-gray-50 rounded-lg transition-colors"
-            >
-              <Eye className="w-5 h-5 text-gray-600" />
-              <span>Ver Eventos</span>
-            </button>
+            {/* Só mostra "Ver Eventos" se o usuário NÃO tiver permissão de edição */}
+            {!hasAccess(user, 'events_manage') && (
+              <button
+                onClick={() => navigate('/app/events')}
+                className="w-full flex items-center gap-2 px-4 py-2 text-left hover:bg-gray-50 rounded-lg transition-colors"
+              >
+                <Eye className="w-5 h-5 text-gray-600" />
+                <span>Ver Eventos</span>
+              </button>
+            )}
             <PermissionGuard permission="contributions_manage">
               <button
                 onClick={() => navigate('/app/contributions/new')}
@@ -179,13 +183,16 @@ export default function Dashboard() {
                 <span>Adicionar Contribuição</span>
               </button>
             </PermissionGuard>
-            <button
-              onClick={() => navigate('/app/contributions')}
-              className="w-full flex items-center gap-2 px-4 py-2 text-left hover:bg-gray-50 rounded-lg transition-colors"
-            >
-              <Eye className="w-5 h-5 text-gray-600" />
-              <span>Ver Contribuições</span>
-            </button>
+            {/* Só mostra "Ver Contribuições" se o usuário NÃO tiver permissão de edição */}
+            {!hasAccess(user, 'contributions_manage') && (
+              <button
+                onClick={() => navigate('/app/contributions')}
+                className="w-full flex items-center gap-2 px-4 py-2 text-left hover:bg-gray-50 rounded-lg transition-colors"
+              >
+                <Eye className="w-5 h-5 text-gray-600" />
+                <span>Ver Contribuições</span>
+              </button>
+            )}
             <PermissionGuard permission="devotional_manage">
               <button
                 onClick={() => navigate('/app/devotionals/new')}
@@ -195,13 +202,16 @@ export default function Dashboard() {
                 <span>Criar Devocional</span>
               </button>
             </PermissionGuard>
-            <button
-              onClick={() => navigate('/app/devotionals')}
-              className="w-full flex items-center gap-2 px-4 py-2 text-left hover:bg-gray-50 rounded-lg transition-colors"
-            >
-              <Eye className="w-5 h-5 text-gray-600" />
-              <span>Ver Devocionais</span>
-            </button>
+            {/* Só mostra "Ver Devocionais" se o usuário NÃO tiver permissão de edição */}
+            {!hasAccess(user, 'devotional_manage') && (
+              <button
+                onClick={() => navigate('/app/devotionals')}
+                className="w-full flex items-center gap-2 px-4 py-2 text-left hover:bg-gray-50 rounded-lg transition-colors"
+              >
+                <Eye className="w-5 h-5 text-gray-600" />
+                <span>Ver Devocionais</span>
+              </button>
+            )}
           </div>
         </div>
 

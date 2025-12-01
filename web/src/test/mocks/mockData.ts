@@ -9,8 +9,50 @@ export const mockUser = {
     { type: 'members_manage' },
     { type: 'devotional_manage' },
     { type: 'contributions_manage' },
+    { type: 'finances_manage' },
   ],
   token: 'mock-jwt-token',
+}
+
+export const mockTransactions = [
+  {
+    id: 'trans-1',
+    title: 'Dízimo',
+    amount: 1000.0,
+    type: 'ENTRY',
+    category: 'Dízimo',
+    entryType: 'DIZIMO',
+    branchId: 'branch-123',
+    createdAt: '2024-01-15T10:00:00Z',
+    updatedAt: '2024-01-15T10:00:00Z',
+  },
+  {
+    id: 'trans-2',
+    title: 'Oferta',
+    amount: 500.0,
+    type: 'ENTRY',
+    category: 'Oferta',
+    entryType: 'OFERTA',
+    branchId: 'branch-123',
+    createdAt: '2024-01-16T10:00:00Z',
+    updatedAt: '2024-01-16T10:00:00Z',
+  },
+  {
+    id: 'trans-3',
+    title: 'Pagamento',
+    amount: 300.0,
+    type: 'EXIT',
+    category: 'Despesas',
+    branchId: 'branch-123',
+    createdAt: '2024-01-17T10:00:00Z',
+    updatedAt: '2024-01-17T10:00:00Z',
+  },
+]
+
+export const mockFinanceSummary = {
+  total: 1200.0,
+  entries: 1500.0,
+  exits: 300.0,
 }
 
 export const mockMember = {

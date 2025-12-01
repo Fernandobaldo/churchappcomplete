@@ -30,6 +30,8 @@ import Permissions from './pages/Permissions'
 import Profile from './pages/Profile'
 import Finances from './pages/Finances'
 import AddTransaction from './pages/Finances/AddTransaction'
+import EditTransaction from './pages/Finances/EditTransaction'
+import TransactionDetails from './pages/Finances/TransactionDetails'
 import Notices from './pages/Notices'
 import AddNotice from './pages/Notices/AddNotice'
 import ChurchSettings from './pages/ChurchSettings'
@@ -130,6 +132,8 @@ function App() {
           <Route path="members/:id" element={<MemberDetails />} />
           <Route path="finances" element={<Finances />} />
           <Route path="finances/new" element={<PermissionProtectedRoute permission="finances_manage"><AddTransaction /></PermissionProtectedRoute>} />
+          <Route path="finances/:id" element={<TransactionDetails />} />
+          <Route path="finances/:id/edit" element={<PermissionProtectedRoute permission="finances_manage"><EditTransaction /></PermissionProtectedRoute>} />
           <Route path="notices" element={<Notices />} />
           <Route path="notices/new" element={<AddNotice />} />
           <Route path="church-settings" element={<PermissionProtectedRoute permission="church_manage"><ChurchSettings /></PermissionProtectedRoute>} />

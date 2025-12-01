@@ -14,6 +14,7 @@ import bcrypt from 'bcryptjs'
 import { resetTestDatabase } from '../utils/resetTestDatabase'
 import { registerRoutes } from '../../src/routes/registerRoutes'
 import { authenticate } from '../../src/middlewares/authenticate'
+import { logTestResponse } from '../utils/testResponseHelper'
 
 describe('Contributions Routes', () => {
   const app = Fastify()
@@ -119,6 +120,7 @@ describe('Contributions Routes', () => {
         .get('/contributions')
         .set('Authorization', `Bearer ${userToken}`)
 
+      logTestResponse(response, 200)
       expect(response.status).toBe(200)
       expect(response.body).toEqual([])
     })
@@ -140,6 +142,7 @@ describe('Contributions Routes', () => {
         .get('/contributions')
         .set('Authorization', `Bearer ${userToken}`)
 
+      logTestResponse(response, 200)
       expect(response.status).toBe(200)
       expect(Array.isArray(response.body)).toBe(true)
       expect(response.body.length).toBeGreaterThan(0)
@@ -168,6 +171,7 @@ describe('Contributions Routes', () => {
         .get('/contributions')
         .set('Authorization', `Bearer ${tokenWithoutMember}`)
 
+      logTestResponse(response, 400)
       expect(response.status).toBe(400)
       expect(response.body).toHaveProperty('message', 'Usuário não vinculado a uma filial.')
     })
@@ -178,6 +182,7 @@ describe('Contributions Routes', () => {
       const response = await request(app.server)
         .get('/contributions/types')
 
+      logTestResponse(response, 200)
       expect(response.status).toBe(200)
       expect(Array.isArray(response.body)).toBe(true)
       expect(response.body.length).toBe(3)
@@ -201,6 +206,7 @@ describe('Contributions Routes', () => {
         .set('Authorization', `Bearer ${userToken}`)
         .send(contributionData)
 
+      logTestResponse(response, 201)
       expect(response.status).toBe(201)
       expect(response.body).toHaveProperty('id')
       expect(response.body).toHaveProperty('title', 'Oferta')
@@ -223,6 +229,7 @@ describe('Contributions Routes', () => {
         .set('Authorization', `Bearer ${userToken}`)
         .send(contributionData)
 
+      logTestResponse(response, 201)
       expect(response.status).toBe(201)
       expect(response.body).toHaveProperty('id')
       expect(response.body).toHaveProperty('title', 'Dízimo')
@@ -241,6 +248,7 @@ describe('Contributions Routes', () => {
         .set('Authorization', `Bearer ${userToken}`)
         .send(contributionData)
 
+      logTestResponse(response, 400)
       expect(response.status).toBe(400)
       expect(response.body).toHaveProperty('error', 'Dados inválidos')
     })
@@ -273,6 +281,7 @@ describe('Contributions Routes', () => {
         .set('Authorization', `Bearer ${tokenWithoutMember}`)
         .send(contributionData)
 
+      logTestResponse(response, 400)
       expect(response.status).toBe(400)
       expect(response.body).toHaveProperty('message', 'Usuário não vinculado a uma filial.')
     })
@@ -321,6 +330,7 @@ describe('Contributions Routes', () => {
         .set('Authorization', `Bearer ${tokenWithoutPermission}`)
         .send(contributionData)
 
+      logTestResponse(response, 403)
       expect(response.status).toBe(403)
     })
   })
@@ -348,6 +358,7 @@ describe('Contributions Routes', () => {
         .get(`/contributions/${contribution.id}`)
         .set('Authorization', `Bearer ${userToken}`)
 
+      logTestResponse(response, 200)
       expect(response.status).toBe(200)
       expect(response.body).toHaveProperty('id', contribution.id)
       expect(response.body).toHaveProperty('title', 'Dízimo Especial')
@@ -393,6 +404,7 @@ describe('Contributions Routes', () => {
         .get(`/contributions/${contribution.id}`)
         .set('Authorization', `Bearer ${userToken}`)
 
+      logTestResponse(response, 403)
       expect(response.status).toBe(403)
       expect(response.body).toHaveProperty('message', 'Você não tem permissão para visualizar esta contribuição')
     })
@@ -427,6 +439,7 @@ describe('Contributions Routes', () => {
         .get(`/contributions/${contribution.id}`)
         .set('Authorization', `Bearer ${tokenWithoutMember}`)
 
+      logTestResponse(response, 400)
       expect(response.status).toBe(400)
       expect(response.body).toHaveProperty('message', 'Usuário não vinculado a uma filial.')
     })

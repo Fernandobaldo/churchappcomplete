@@ -15,6 +15,7 @@ import bcrypt from 'bcryptjs'
 import { resetTestDatabase } from '../utils/resetTestDatabase'
 import { seedTestDatabase } from '../utils/seedTestDatabase'
 import { authenticate } from '../../src/middlewares/authenticate'
+import { logTestResponse } from '../utils/testResponseHelper'
 
 describe('Onboarding Routes - Fluxo Completo', () => {
   const app = Fastify()
@@ -90,6 +91,7 @@ describe('Onboarding Routes - Fluxo Completo', () => {
           password: 'password123',
         })
 
+      logTestResponse(response, 201)
       expect(response.status).toBe(201)
       expect(response.body).toHaveProperty('token')
       expect(response.body).toHaveProperty('user')
@@ -114,6 +116,7 @@ describe('Onboarding Routes - Fluxo Completo', () => {
         password: 'password123',
       })
 
+      logTestResponse(response, 400)
       expect(response.status).toBe(400)
       expect(response.body.error).toContain('já cadastrado')
     })
@@ -130,6 +133,7 @@ describe('Onboarding Routes - Fluxo Completo', () => {
           branchName: 'Sede',
         })
 
+      logTestResponse(response, 201)
       expect(response.status).toBe(201)
       expect(response.body).toHaveProperty('church')
       expect(response.body.church).toHaveProperty('id')
@@ -148,6 +152,7 @@ describe('Onboarding Routes - Fluxo Completo', () => {
           branchName: 'Sede',
         })
 
+      logTestResponse(response, 201)
       expect(response.status).toBe(201)
       expect(response.body).toHaveProperty('member')
       expect(response.body.member.role).toBe('ADMINGERAL')
@@ -158,6 +163,7 @@ describe('Onboarding Routes - Fluxo Completo', () => {
         name: 'Igreja Sem Auth',
       })
 
+      logTestResponse(response, 401)
       expect(response.status).toBe(401)
     })
   })
@@ -168,6 +174,7 @@ describe('Onboarding Routes - Fluxo Completo', () => {
         .get('/churches')
         .set('Authorization', `Bearer ${userToken}`)
 
+      logTestResponse(response, 200)
       expect(response.status).toBe(200)
       expect(response.body).toEqual([])
     })
@@ -191,6 +198,7 @@ describe('Onboarding Routes - Fluxo Completo', () => {
         .get('/churches')
         .set('Authorization', `Bearer ${memberToken}`)
 
+      logTestResponse(response, 200)
       expect(response.status).toBe(200)
       expect(Array.isArray(response.body)).toBe(true)
       expect(response.body.length).toBe(1)
@@ -263,6 +271,7 @@ describe('Onboarding Routes - Fluxo Completo', () => {
         .get('/churches')
         .set('Authorization', `Bearer ${memberToken1}`)
 
+      logTestResponse(response, 200)
       expect(response.status).toBe(200)
       expect(Array.isArray(response.body)).toBe(true)
       expect(response.body.length).toBe(1)
@@ -373,7 +382,8 @@ describe('Onboarding Routes - Fluxo Completo', () => {
               churchId,
             })
 
-          expect(response.status).toBe(201)
+          logTestResponse(response, 201)
+      expect(response.status).toBe(201)
           expect(response.body).toHaveProperty('id')
           expect(response.body.name).toBe('Filial Centro')
           expect(response.body.churchId).toBe(churchId)
@@ -406,6 +416,7 @@ describe('Onboarding Routes - Fluxo Completo', () => {
           churchId: 'invalid-church-id',
         })
 
+      logTestResponse(response, 400)
       expect(response.status).toBe(400)
     })
   })

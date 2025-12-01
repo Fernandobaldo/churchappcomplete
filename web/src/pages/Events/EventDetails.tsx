@@ -6,6 +6,7 @@ import toast from 'react-hot-toast'
 import { format } from 'date-fns'
 import ptBR from 'date-fns/locale/pt-BR'
 import PermissionGuard from '../../components/PermissionGuard'
+import { useAuthStore } from '../../stores/authStore'
 
 interface Event {
   id: string
@@ -72,6 +73,7 @@ export default function EventDetails() {
   return (
     <div className="space-y-6">
       <button
+        id="back-button"
         onClick={() => navigate('/app/events')}
         className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
       >
@@ -89,10 +91,11 @@ export default function EventDetails() {
 
       <div className="card">
         <div className="flex justify-between items-start mb-4">
-          <h1 className="text-3xl font-bold">{event.title}</h1>
+          <h1 id="event-title" className="text-3xl font-bold">{event.title}</h1>
           <PermissionGuard permission="events_manage">
             <div className="flex gap-2">
               <button
+                id="edit-button"
                 onClick={() => navigate(`/app/events/${id}/edit`)}
                 className="btn-secondary flex items-center gap-2"
               >
@@ -100,6 +103,7 @@ export default function EventDetails() {
                 Editar
               </button>
               <button
+                id="delete-button"
                 onClick={handleDelete}
                 className="btn-secondary flex items-center gap-2 text-red-600 hover:bg-red-50"
               >
@@ -126,16 +130,17 @@ export default function EventDetails() {
           {event.description && (
             <div>
               <h3 className="font-semibold mb-2">Descrição</h3>
-              <p className="text-gray-700 whitespace-pre-wrap">{event.description}</p>
+              <p id="event-description" className="text-gray-700 whitespace-pre-wrap">{event.description}</p>
             </div>
           )}
 
           {event.hasDonation && (
-            <div className="bg-primary-light p-4 rounded-lg">
+            <div id="donation-section" className="bg-primary-light p-4 rounded-lg">
               <h3 className="font-semibold mb-2">Doações</h3>
-              {event.donationReason && <p className="text-gray-700 mb-2">{event.donationReason}</p>}
+              {event.donationReason && <p id="donation-reason" className="text-gray-700 mb-2">{event.donationReason}</p>}
               {event.donationLink && (
                 <a
+                  id="donation-link"
                   href={event.donationLink}
                   target="_blank"
                   rel="noopener noreferrer"

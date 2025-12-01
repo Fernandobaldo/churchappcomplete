@@ -14,6 +14,7 @@ import bcrypt from 'bcryptjs'
 import { resetTestDatabase } from '../utils/resetTestDatabase'
 import { registerRoutes } from '../../src/routes/registerRoutes'
 import { authenticate } from '../../src/middlewares/authenticate'
+import { logTestResponse } from '../utils/testResponseHelper'
 
 describe('Notices Routes', () => {
   const app = Fastify()
@@ -120,6 +121,7 @@ describe('Notices Routes', () => {
         .get('/notices')
         .set('Authorization', `Bearer ${userToken}`)
 
+      logTestResponse(response, 200)
       expect(response.status).toBe(200)
       expect(response.body).toEqual([])
     })
@@ -139,6 +141,7 @@ describe('Notices Routes', () => {
         .get('/notices')
         .set('Authorization', `Bearer ${userToken}`)
 
+      logTestResponse(response, 200)
       expect(response.status).toBe(200)
       expect(Array.isArray(response.body)).toBe(true)
       expect(response.body.length).toBeGreaterThan(0)
@@ -163,6 +166,7 @@ describe('Notices Routes', () => {
         .get('/notices')
         .set('Authorization', `Bearer ${userToken}`)
 
+      logTestResponse(response, 200)
       expect(response.status).toBe(200)
       expect(Array.isArray(response.body)).toBe(true)
       const noticeInResponse = response.body.find((n: any) => n.id === notice.id)
@@ -193,6 +197,7 @@ describe('Notices Routes', () => {
         .get('/notices')
         .set('Authorization', `Bearer ${tokenWithoutMember}`)
 
+      logTestResponse(response, 400)
       expect(response.status).toBe(400)
       expect(response.body).toHaveProperty('message', 'Usuário não vinculado a uma filial.')
     })
@@ -210,6 +215,7 @@ describe('Notices Routes', () => {
         .set('Authorization', `Bearer ${userToken}`)
         .send(noticeData)
 
+      logTestResponse(response, 201)
       expect(response.status).toBe(201)
       expect(response.body).toHaveProperty('id')
       expect(response.body).toHaveProperty('title', 'Novo Aviso')
@@ -230,6 +236,7 @@ describe('Notices Routes', () => {
         .set('Authorization', `Bearer ${userToken}`)
         .send(noticeData)
 
+      logTestResponse(response, 400)
       expect(response.status).toBe(400)
       expect(response.body).toHaveProperty('error', 'Dados inválidos')
     })
@@ -275,6 +282,7 @@ describe('Notices Routes', () => {
         .set('Authorization', `Bearer ${tokenWithoutPermission}`)
         .send(noticeData)
 
+      logTestResponse(response, 403)
       expect(response.status).toBe(403)
     })
   })
@@ -294,6 +302,7 @@ describe('Notices Routes', () => {
         .post(`/notices/${notice.id}/read`)
         .set('Authorization', `Bearer ${userToken}`)
 
+      logTestResponse(response, 200)
       expect(response.status).toBe(200)
       expect(response.body).toHaveProperty('message', 'Aviso marcado como lido')
 
@@ -310,6 +319,7 @@ describe('Notices Routes', () => {
         .post(`/notices/${fakeId}/read`)
         .set('Authorization', `Bearer ${userToken}`)
 
+      logTestResponse(response, 404)
       expect(response.status).toBe(404)
       expect(response.body).toHaveProperty('message', 'Aviso não encontrado')
     })
@@ -328,6 +338,7 @@ describe('Notices Routes', () => {
         .post(`/notices/${notice.id}/read`)
         .set('Authorization', `Bearer ${userToken}`)
 
+      logTestResponse(response, 200)
       expect(response.status).toBe(200)
 
       // Verificar que não foi adicionado duplicado

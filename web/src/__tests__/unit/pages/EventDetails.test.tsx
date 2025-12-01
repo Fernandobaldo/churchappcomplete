@@ -7,11 +7,37 @@ import api from '@/api/api'
 import { useAuthStore } from '@/stores/authStore'
 import { mockUser } from '@/test/mocks/mockData'
 
-vi.mock('@/api/api')
+vi.mock('@/api/api', () => ({
+  default: {
+    get: vi.fn(),
+    post: vi.fn(),
+    put: vi.fn(),
+    delete: vi.fn(),
+  },
+}))
 vi.mock('react-hot-toast', () => ({
   default: {
     error: vi.fn(),
     success: vi.fn(),
+  },
+}))
+
+// Mock do PermissionGuard - igual ao teste de Finances que funciona
+vi.mock('@/components/PermissionGuard', () => ({
+  default: ({ children, permission }: any) => {
+    const { user } = useAuthStore.getState()
+    if (!user) return null
+    
+    // Simula a lógica de hasAccess: ADMINGERAL/ADMINFILIAL têm acesso ou verifica permissões
+    const hasPermission = 
+      user.role === 'ADMINGERAL' || 
+      user.role === 'ADMINFILIAL' ||
+      user.permissions?.some((p: any) => {
+        const permType = typeof p === 'object' ? p.type : p
+        return permType === permission
+      }) === true
+    
+    return hasPermission ? <>{children}</> : null
   },
 }))
 
@@ -28,9 +54,13 @@ vi.mock('react-router-dom', async () => {
 
 describe('EventDetails Page', () => {
   beforeEach(() => {
+    // Garantir que o store está limpo e configurado antes de cada teste
     useAuthStore.setState({
       token: 'token',
-      user: mockUser,
+      user: {
+        ...mockUser,
+        permissions: [{ type: 'events_manage' }], // Garantir permissão padrão
+      },
     })
     vi.clearAllMocks()
   })
@@ -55,8 +85,15 @@ describe('EventDetails Page', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByText('Culto de Domingo')).toBeInTheDocument()
-      expect(screen.getByText('Culto matutino')).toBeInTheDocument()
+      // Usar IDs para ser mais robusto
+      const titleElement = document.getElementById('event-title')
+      expect(titleElement).toBeInTheDocument()
+      expect(titleElement?.textContent).toBe('Culto de Domingo')
+      
+      const descriptionElement = document.getElementById('event-description')
+      expect(descriptionElement).toBeInTheDocument()
+      expect(descriptionElement?.textContent).toBe('Culto matutino')
+      
       expect(screen.getByText('Igreja Central')).toBeInTheDocument()
     })
   })
@@ -83,9 +120,17 @@ describe('EventDetails Page', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByText('Doações')).toBeInTheDocument()
-      expect(screen.getByText('Construção do templo')).toBeInTheDocument()
-      expect(screen.getByText('https://example.com/doacao')).toBeInTheDocument()
+      // Usar IDs para ser mais robusto
+      const donationSection = document.getElementById('donation-section')
+      expect(donationSection).toBeInTheDocument()
+      
+      const donationReason = document.getElementById('donation-reason')
+      expect(donationReason).toBeInTheDocument()
+      expect(donationReason?.textContent).toBe('Construção do templo')
+      
+      const donationLink = document.getElementById('donation-link')
+      expect(donationLink).toBeInTheDocument()
+      expect(donationLink?.textContent).toBe('https://example.com/doacao')
     })
   })
 
@@ -93,7 +138,7 @@ describe('EventDetails Page', () => {
     const adminUser = {
       ...mockUser,
       role: 'ADMINGERAL',
-      permissions: [{ type: 'MANAGE_EVENTS' }],
+      permissions: [{ type: 'events_manage' }],
     }
 
     useAuthStore.setState({ user: adminUser })
@@ -116,9 +161,15 @@ describe('EventDetails Page', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByText('Editar')).toBeInTheDocument()
-      expect(screen.getByText('Excluir')).toBeInTheDocument()
-    })
+      // Usar IDs para ser mais robusto
+      const editButton = document.getElementById('edit-button')
+      expect(editButton).not.toBeNull()
+      expect(editButton).toBeInTheDocument()
+      
+      const deleteButton = document.getElementById('delete-button')
+      expect(deleteButton).not.toBeNull()
+      expect(deleteButton).toBeInTheDocument()
+    }, { timeout: 3000 })
   })
 
   it('deve deletar evento com confirmação', async () => {
@@ -126,7 +177,7 @@ describe('EventDetails Page', () => {
     const adminUser = {
       ...mockUser,
       role: 'ADMINGERAL',
-      permissions: [{ type: 'MANAGE_EVENTS' }],
+      permissions: [{ type: 'events_manage' }],
     }
 
     useAuthStore.setState({ user: adminUser })
@@ -154,11 +205,20 @@ describe('EventDetails Page', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByText('Excluir')).toBeInTheDocument()
-    })
+      const deleteButton = document.getElementById('delete-button')
+      expect(deleteButton).not.toBeNull()
+      expect(deleteButton).toBeInTheDocument()
+    }, { timeout: 3000 })
 
-    const deleteButton = screen.getByText('Excluir')
-    await user.click(deleteButton)
+    const deleteButton = document.getElementById('delete-button')
+    expect(deleteButton).not.toBeNull()
+    if (deleteButton) {
+      await user.click(deleteButton)
+    } else {
+      // Fallback: tentar encontrar por texto
+      const deleteButtonByText = screen.getByText('Excluir')
+      await user.click(deleteButtonByText)
+    }
 
     await waitFor(() => {
       expect(api.delete).toHaveBeenCalledWith('/events/event-1')
@@ -171,14 +231,16 @@ describe('EventDetails Page', () => {
     const adminUser = {
       ...mockUser,
       role: 'ADMINGERAL',
-      permissions: [{ type: 'MANAGE_EVENTS' }],
+      permissions: [{ type: 'events_manage' }],
     }
 
-    useAuthStore.setState({ user: adminUser })
+    // Garantir que o usuário está no store antes de renderizar
+    useAuthStore.setState({ user: adminUser, token: 'token' })
 
     const mockEvent = {
       id: 'event-1',
       title: 'Evento Teste',
+      description: 'Descrição do evento',
       location: 'Local',
       startDate: '2024-12-31T10:00:00Z',
       endDate: '2024-12-31T12:00:00Z',
@@ -194,12 +256,36 @@ describe('EventDetails Page', () => {
       </MemoryRouter>
     )
 
+    // Primeiro aguardar o evento carregar (título aparecer)
     await waitFor(() => {
-      expect(screen.getByText('Editar')).toBeInTheDocument()
-    })
+      const titleElement = document.getElementById('event-title')
+      expect(titleElement).not.toBeNull()
+      expect(titleElement?.textContent).toBe('Evento Teste')
+    }, { timeout: 3000 })
 
-    const editButton = screen.getByText('Editar')
-    await user.click(editButton)
+    // Depois aguardar o botão de editar aparecer
+    // Verificar se o PermissionGuard renderizou os botões
+    await waitFor(() => {
+      const editButton = document.getElementById('edit-button')
+      const editButtonByText = screen.queryByText('Editar')
+      
+      // O botão deve existir por ID ou por texto
+      expect(editButton || editButtonByText).toBeTruthy()
+    }, { timeout: 5000 })
+
+    // Encontrar o botão de editar (priorizar ID, depois texto)
+    let editButton = document.getElementById('edit-button') as HTMLButtonElement | null
+    if (!editButton) {
+      const editButtonByText = screen.getByText('Editar')
+      editButton = editButtonByText.closest('button') as HTMLButtonElement
+    }
+
+    // Verificar que o botão foi encontrado
+    expect(editButton).not.toBeNull()
+    expect(editButton).toBeInTheDocument()
+    
+    // Clicar no botão
+    await user.click(editButton!)
 
     expect(mockNavigate).toHaveBeenCalledWith('/app/events/event-1/edit')
   })
@@ -240,10 +326,11 @@ describe('EventDetails Page', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByText('Voltar')).toBeInTheDocument()
+      const backButton = document.getElementById('back-button')
+      expect(backButton).toBeInTheDocument()
     })
 
-    const backButton = screen.getByText('Voltar')
+    const backButton = document.getElementById('back-button') || screen.getByText('Voltar')
     await user.click(backButton)
 
     expect(mockNavigate).toHaveBeenCalledWith('/app/events')

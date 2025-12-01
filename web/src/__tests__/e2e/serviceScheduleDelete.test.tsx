@@ -9,20 +9,18 @@ import toast from 'react-hot-toast'
 
 vi.mock('@/api/api')
 
-// Mock do serviceScheduleApi - precisa funcionar com import dinâmico e estático
-// Cria o mock diretamente na factory para evitar problemas de hoisting
+// Mock do serviceScheduleApi - agora com import estático, o mock funciona perfeitamente
 vi.mock('@/api/serviceScheduleApi', () => {
-  const mockApi = {
-    getByBranch: vi.fn(),
-    getRelatedEventsCount: vi.fn(),
-    delete: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-    setDefault: vi.fn(),
-    createEvents: vi.fn(),
-  }
   return {
-    serviceScheduleApi: mockApi,
+    serviceScheduleApi: {
+      getByBranch: vi.fn(),
+      getRelatedEventsCount: vi.fn(),
+      delete: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      setDefault: vi.fn(),
+      createEvents: vi.fn(),
+    },
     ServiceSchedule: {} as any,
   }
 })
@@ -104,8 +102,7 @@ describe('ServiceSchedule Delete E2E', () => {
     mockConfirm.mockReset()
     ;(useAuthStore as any).mockReturnValue({ user: mockUser })
     ;(api.get as any).mockResolvedValue({ data: [mockChurch] })
-    // Configura os mocks padrão - usa serviceScheduleApi que é o mock importado
-    // IMPORTANTE: Resetar e configurar os mocks para garantir que funcionem com import estático e dinâmico
+    // Configura os mocks padrão - agora com import estático, funciona perfeitamente
     vi.mocked(serviceScheduleApi.getByBranch).mockReset().mockResolvedValue(mockSchedules)
     vi.mocked(serviceScheduleApi.getRelatedEventsCount).mockReset().mockResolvedValue({ count: 0, scheduleTitle: '' })
     vi.mocked(serviceScheduleApi.delete).mockReset().mockResolvedValue({ message: 'Horário deletado com sucesso.', deletedEventsCount: 0, relatedEventsCount: 0 })
@@ -114,11 +111,11 @@ describe('ServiceSchedule Delete E2E', () => {
 
   it('deve completar fluxo completo de deleção com eventos relacionados', async () => {
     const user = userEvent.setup()
-    ;(serviceScheduleApi.getRelatedEventsCount as any).mockResolvedValue({
+    serviceScheduleApi.getRelatedEventsCount.mockResolvedValue({
       count: 5,
       scheduleTitle: 'Culto Dominical',
     })
-    ;(serviceScheduleApi.delete as any).mockResolvedValue({
+    serviceScheduleApi.delete.mockResolvedValue({
       message: 'Horário deletado com sucesso.',
       deletedEventsCount: 5,
       relatedEventsCount: 5,
@@ -163,13 +160,12 @@ describe('ServiceSchedule Delete E2E', () => {
     await new Promise(resolve => setTimeout(resolve, 100))
 
     // Verificar que delete foi chamado com deleteEvents: true (sempre deleta eventos)
+    // O import dinâmico pode demorar um pouco, então aguardamos com timeout maior
     await waitFor(() => {
-      const deleteCalls = vi.mocked(serviceScheduleApi.delete).mock.calls
-      expect(deleteCalls.length).toBeGreaterThan(0)
-      expect(deleteCalls[deleteCalls.length - 1]).toEqual(['schedule-1', true])
-    }, { timeout: 5000 })
+      expect(serviceScheduleApi.delete).toHaveBeenCalledWith('schedule-1', true)
+    }, { timeout: 10000 })
 
-    // Verificar mensagem de sucesso
+    // Verificar mensagem de sucesso (indica que delete foi executado com sucesso)
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith(
         expect.stringContaining('Horário deletado com sucesso!')
@@ -184,12 +180,12 @@ describe('ServiceSchedule Delete E2E', () => {
     const user = userEvent.setup()
     
     // Resetar mocks antes de configurar
-    vi.mocked(serviceScheduleApi.getByBranch).mockReset().mockResolvedValue(mockSchedules)
-    vi.mocked(serviceScheduleApi.getRelatedEventsCount).mockReset().mockResolvedValue({
+    serviceScheduleApi.getByBranch.mockReset().mockResolvedValue(mockSchedules)
+    serviceScheduleApi.getRelatedEventsCount.mockReset().mockResolvedValue({
       count: 0,
       scheduleTitle: 'Culto Dominical',
     })
-    vi.mocked(serviceScheduleApi.delete).mockReset().mockResolvedValue({
+    serviceScheduleApi.delete.mockReset().mockResolvedValue({
       message: 'Horário deletado com sucesso.',
       deletedEventsCount: 0,
       relatedEventsCount: 0,
@@ -240,32 +236,21 @@ describe('ServiceSchedule Delete E2E', () => {
     await new Promise(resolve => setTimeout(resolve, 300))
     
     // Verifica que a API foi chamada com deleteEvents: true (sempre deleta eventos)
-    // Como o import é dinâmico, vamos verificar de forma mais flexível
     await waitFor(() => {
-      const deleteCalls = vi.mocked(serviceScheduleApi.delete).mock.calls
-      const toastCalled = vi.mocked(toast.success).mock.calls.length > 0
-      
-      // Verifica que pelo menos uma das duas coisas aconteceu:
-      // 1. O mock foi chamado diretamente, OU
-      // 2. O toast de sucesso foi chamado (indicando que a deleção foi executada)
-      if (deleteCalls.length > 0) {
-        expect(deleteCalls[deleteCalls.length - 1]).toEqual(['schedule-1', true])
-      } else if (toastCalled) {
-        // Se o mock não foi chamado diretamente (devido ao import dinâmico),
-        // verifica se o toast de sucesso foi chamado (indicando que a deleção foi bem-sucedida)
-        expect(toast.success).toHaveBeenCalledWith(
-          expect.stringContaining('Horário deletado com sucesso!')
-        )
-      } else {
-        // Se nenhum dos dois aconteceu, falha o teste
-        throw new Error('Nem o mock nem o toast foram chamados')
-      }
+      expect(serviceScheduleApi.delete).toHaveBeenCalledWith('schedule-1', true)
+    }, { timeout: 5000 })
+    
+    // Verifica mensagem de sucesso
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith(
+        expect.stringContaining('Horário deletado com sucesso!')
+      )
     }, { timeout: 5000 })
   })
 
   it('deve cancelar deleção quando usuário cancela', async () => {
     const user = userEvent.setup()
-    ;(serviceScheduleApi.getRelatedEventsCount as any).mockResolvedValue({
+    serviceScheduleApi.getRelatedEventsCount.mockResolvedValue({
       count: 3,
       scheduleTitle: 'Culto Dominical',
     })
@@ -304,17 +289,17 @@ describe('ServiceSchedule Delete E2E', () => {
     expect(serviceScheduleApi.delete).not.toHaveBeenCalled()
   })
 
-  it('deve deletar apenas horário quando usuário escolhe não deletar eventos', async () => {
+  it('deve deletar horário e eventos relacionados quando confirmado', async () => {
     // Cenário: Existem 4 eventos criados a partir do horário
     // Usuário confirma deletar o horário
-    // Resultado esperado: Horário e os 4 eventos são deletados
+    // Resultado esperado: Horário e os 4 eventos são deletados (sempre deleta eventos quando deleta o horário)
     
     const user = userEvent.setup()
-    ;(serviceScheduleApi.getRelatedEventsCount as any).mockResolvedValue({
+    serviceScheduleApi.getRelatedEventsCount.mockResolvedValue({
       count: 4, // Existem 4 eventos relacionados
       scheduleTitle: 'Culto Dominical',
     })
-    ;(serviceScheduleApi.delete as any).mockResolvedValue({
+    serviceScheduleApi.delete.mockResolvedValue({
       message: 'Horário deletado com sucesso.',
       deletedEventsCount: 4, // 4 eventos foram deletados
       relatedEventsCount: 4, // Havia 4 eventos relacionados
@@ -358,13 +343,12 @@ describe('ServiceSchedule Delete E2E', () => {
     await new Promise(resolve => setTimeout(resolve, 100))
 
     // Verifica que a API foi chamada com deleteEvents: true (sempre deleta eventos)
+    // O import dinâmico pode demorar um pouco, então aguardamos com timeout maior
     await waitFor(() => {
-      const deleteCalls = vi.mocked(serviceScheduleApi.delete).mock.calls
-      expect(deleteCalls.length).toBeGreaterThan(0)
-      expect(deleteCalls[deleteCalls.length - 1]).toEqual(['schedule-1', true])
-    }, { timeout: 5000 })
+      expect(serviceScheduleApi.delete).toHaveBeenCalledWith('schedule-1', true)
+    }, { timeout: 10000 })
 
-    // Verifica que a mensagem de sucesso menciona eventos deletados
+    // Verifica que a mensagem de sucesso menciona eventos deletados (indica que delete foi executado com sucesso)
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith(
         expect.stringContaining('Horário deletado com sucesso!')

@@ -8,7 +8,7 @@ import { useAuthStore } from '../../stores/authStore'
 import { hasAccess } from '../../utils/authUtils'
 import ServiceScheduleList from './ServiceScheduleList'
 import ServiceScheduleForm from './ServiceScheduleForm'
-import { ServiceSchedule } from '../../api/serviceScheduleApi'
+import { ServiceSchedule, serviceScheduleApi } from '../../api/serviceScheduleApi'
 
 interface ChurchForm {
   name: string
@@ -98,7 +98,6 @@ export default function ChurchSettings() {
     if (!user?.branchId) return
 
     try {
-      const { serviceScheduleApi } = await import('@/api/serviceScheduleApi')
       const data = await serviceScheduleApi.getByBranch(user.branchId)
       setSchedules(data)
     } catch (error: any) {
@@ -135,7 +134,6 @@ export default function ChurchSettings() {
 
   const handleDeleteSchedule = async (id: string, deleteEvents: boolean = false) => {
     try {
-      const { serviceScheduleApi } = await import('@/api/serviceScheduleApi')
       const result = await serviceScheduleApi.delete(id, deleteEvents)
       
       let message = 'Horário deletado com sucesso!'

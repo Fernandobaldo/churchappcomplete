@@ -1,10 +1,24 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
 import App from '@/App'
 import { useAuthStore } from '@/stores/authStore'
 import api from '@/api/api'
+
+// Variável global para controlar a rota inicial nos testes
+let testInitialEntries = ['/']
+
+// Mock do BrowserRouter para usar MemoryRouter nos testes
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual('react-router-dom')
+  return {
+    ...actual,
+    BrowserRouter: ({ children }: any) => {
+      const { MemoryRouter } = actual as any
+      return <MemoryRouter initialEntries={testInitialEntries}>{children}</MemoryRouter>
+    },
+  }
+})
 
 vi.mock('@/api/api')
 vi.mock('@/stores/authStore', () => ({
@@ -16,6 +30,7 @@ vi.mock('react-hot-toast', () => ({
     success: vi.fn(),
     error: vi.fn(),
   },
+  Toaster: () => null,
 }))
 
 describe('Proteção de Permissões - Integração', () => {
@@ -45,6 +60,7 @@ describe('Proteção de Permissões - Integração', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    testInitialEntries = ['/']
     ;(api.get as any).mockResolvedValue({ data: [] })
   })
 
@@ -56,13 +72,15 @@ describe('Proteção de Permissões - Integração', () => {
       setToken: vi.fn(),
     })
 
-    render(
-      <MemoryRouter initialEntries={['/app/events']}>
-        <App />
-      </MemoryRouter>
-    )
+    ;(api.get as any).mockResolvedValue({
+      data: [],
+    })
+
+    testInitialEntries = ['/app/events']
+    render(<App />)
 
     await waitFor(() => {
+      // A página de eventos é acessível, mas o botão "Novo Evento" não deve aparecer
       expect(screen.queryByText(/Novo Evento/i)).not.toBeInTheDocument()
     })
   })
@@ -75,11 +93,8 @@ describe('Proteção de Permissões - Integração', () => {
       setToken: vi.fn(),
     })
 
-    render(
-      <MemoryRouter initialEntries={['/app/events']}>
-        <App />
-      </MemoryRouter>
-    )
+    testInitialEntries = ['/app/events/new']
+    render(<App />)
 
     await waitFor(() => {
       expect(screen.getByText('403')).toBeInTheDocument()
@@ -95,11 +110,12 @@ describe('Proteção de Permissões - Integração', () => {
       setToken: vi.fn(),
     })
 
-    render(
-      <MemoryRouter initialEntries={['/app/events']}>
-        <App />
-      </MemoryRouter>
-    )
+    ;(api.get as any).mockResolvedValue({
+      data: [],
+    })
+
+    testInitialEntries = ['/app/events']
+    render(<App />)
 
     await waitFor(() => {
       expect(screen.getByText(/Novo Evento/i)).toBeInTheDocument()
@@ -119,11 +135,12 @@ describe('Proteção de Permissões - Integração', () => {
       setToken: vi.fn(),
     })
 
-    render(
-      <MemoryRouter initialEntries={['/app/events']}>
-        <App />
-      </MemoryRouter>
-    )
+    ;(api.get as any).mockResolvedValue({
+      data: [],
+    })
+
+    testInitialEntries = ['/app/events']
+    render(<App />)
 
     await waitFor(() => {
       expect(screen.getByText(/Novo Evento/i)).toBeInTheDocument()
@@ -143,11 +160,12 @@ describe('Proteção de Permissões - Integração', () => {
       setToken: vi.fn(),
     })
 
-    render(
-      <MemoryRouter initialEntries={['/app/events']}>
-        <App />
-      </MemoryRouter>
-    )
+    ;(api.get as any).mockResolvedValue({
+      data: [],
+    })
+
+    testInitialEntries = ['/app/events']
+    render(<App />)
 
     await waitFor(() => {
       expect(screen.getByText(/Novo Evento/i)).toBeInTheDocument()
@@ -179,11 +197,8 @@ describe('Proteção de Permissões - Integração', () => {
       ],
     })
 
-    render(
-      <MemoryRouter initialEntries={['/app/members']}>
-        <App />
-      </MemoryRouter>
-    )
+    testInitialEntries = ['/app/members']
+    render(<App />)
 
     await waitFor(() => {
       expect(screen.getByText('João Silva')).toBeInTheDocument()
@@ -218,11 +233,8 @@ describe('Proteção de Permissões - Integração', () => {
       ],
     })
 
-    render(
-      <MemoryRouter initialEntries={['/app/members']}>
-        <App />
-      </MemoryRouter>
-    )
+    testInitialEntries = ['/app/members']
+    render(<App />)
 
     await waitFor(() => {
       expect(screen.getByText('João Silva')).toBeInTheDocument()
