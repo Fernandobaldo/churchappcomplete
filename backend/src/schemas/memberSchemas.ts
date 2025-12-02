@@ -12,3 +12,9 @@ export const updateMemberBodySchema = z.object({
   address: z.string().optional(),
   avatarUrl: z.string().url().optional(),
 })
+
+export const updateMemberRoleBodySchema = z.object({
+  role: z.enum(['MEMBER', 'COORDINATOR', 'ADMINFILIAL', 'ADMINGERAL'], {
+    errorMap: () => ({ message: 'Role inválida. Valores permitidos: MEMBER, COORDINATOR, ADMINFILIAL, ADMINGERAL' }),
+  }),
+})

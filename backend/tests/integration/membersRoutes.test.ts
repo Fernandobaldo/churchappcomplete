@@ -187,6 +187,12 @@ describe('Members Routes', () => {
       expect(response.status).toBe(200)
       expect(Array.isArray(response.body)).toBe(true)
       expect(response.body.length).toBeGreaterThanOrEqual(3) // Admin, Coordinator, Member
+      
+      // Verifica que cada membro tem permissões na resposta
+      response.body.forEach((member: any) => {
+        expect(member).toHaveProperty('permissions')
+        expect(Array.isArray(member.permissions)).toBe(true)
+      })
     })
 
     it('COORDINATOR deve ver apenas membros da sua filial', async () => {
@@ -272,6 +278,9 @@ describe('Members Routes', () => {
       logTestResponse(response, 200)
       expect(response.status).toBe(200)
       expect(response.body).toHaveProperty('id', memberId)
+      // Verifica que permissões estão presentes na resposta
+      expect(response.body).toHaveProperty('permissions')
+      expect(Array.isArray(response.body.permissions)).toBe(true)
     })
 
     it('COORDINATOR deve ver membros da sua filial', async () => {
@@ -282,6 +291,9 @@ describe('Members Routes', () => {
       logTestResponse(response, 200)
       expect(response.status).toBe(200)
       expect(response.body).toHaveProperty('id', memberId)
+      // Verifica que permissões estão presentes na resposta
+      expect(response.body).toHaveProperty('permissions')
+      expect(Array.isArray(response.body.permissions)).toBe(true)
     })
 
     it('MEMBER deve ver apenas a si mesmo', async () => {
@@ -292,6 +304,9 @@ describe('Members Routes', () => {
       logTestResponse(response, 200)
       expect(response.status).toBe(200)
       expect(response.body).toHaveProperty('id', memberId)
+      // Verifica que permissões estão presentes na resposta
+      expect(response.body).toHaveProperty('permissions')
+      expect(Array.isArray(response.body.permissions)).toBe(true)
     })
 
     it('MEMBER pode ver outros membros da mesma filial', async () => {

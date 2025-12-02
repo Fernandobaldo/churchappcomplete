@@ -1,9 +1,10 @@
 import { FastifyReply, FastifyRequest } from 'fastify'
-import { memberIdParamSchema, updateMemberBodySchema } from '../schemas/memberSchemas'
-import { findAllMembers, findMemberById, formatDate, updateMember } from '../services/memberService'
+import { memberIdParamSchema, updateMemberBodySchema, updateMemberRoleBodySchema } from '../schemas/memberSchemas'
+import { findAllMembers, findMemberById, formatDate, updateMember, updateMemberRole } from '../services/memberService'
 import { parse } from 'date-fns'
-import { getMemberFromUserId, validateMemberEditPermission, hasAccess } from '../utils/authorization'
+import { getMemberFromUserId, validateMemberEditPermission, validateRoleChangePermission, hasAccess } from '../utils/authorization'
 import { AuditLogger } from '../utils/auditHelper'
+import { Role } from '@prisma/client'
 
 export async function getAllMembers(request: FastifyRequest, reply: FastifyReply) {
   try {
@@ -95,10 +96,29 @@ export async function getMemberById(request: FastifyRequest, reply: FastifyReply
       return reply.code(404).send({ message: 'Membro não encontrado' })
     }
 
-    return reply.send({
-      ...memberData,
-      birthDate: formatDate(memberData.birthDate),
+    console.log(`[PERMISSIONS DEBUG] getMemberById retornando dados para ${id}:`, {
+      hasPermissions: !!memberData.permissions,
+      permissionsCount: memberData.permissions?.length || 0,
+      permissions: memberData.permissions,
+      memberDataKeys: Object.keys(memberData),
+      memberDataFull: JSON.stringify(memberData, null, 2)
     })
+
+    // Garante que as permissões sempre sejam incluídas na resposta
+    const responseData = {
+      ...memberData,
+      permissions: memberData.permissions || [], // Garante que permissions sempre exista
+      birthDate: formatDate(memberData.birthDate),
+    }
+
+    console.log(`[PERMISSIONS DEBUG] Dados que serão enviados na resposta:`, {
+      hasPermissions: !!responseData.permissions,
+      permissionsCount: responseData.permissions?.length || 0,
+      permissions: responseData.permissions,
+      responseKeys: Object.keys(responseData)
+    })
+
+    return reply.send(responseData)
   } catch (error: any) {
     return reply.status(500).send({ error: error.message })
   }
@@ -187,5 +207,54 @@ export async function updateMemberById(request: FastifyRequest, reply: FastifyRe
     }
     
     return reply.status(500).send({ error: error.message || 'Erro ao atualizar membro' })
+  }
+}
+
+export async function updateMemberRoleById(request: FastifyRequest, reply: FastifyReply) {
+  try {
+    const { id } = memberIdParamSchema.parse(request.params)
+    const { role } = updateMemberRoleBodySchema.parse(request.body)
+    const user = request.user
+
+    if (!user || !user.memberId) {
+      return reply.status(401).send({ error: 'Autenticação necessária' })
+    }
+
+    // Validar permissão para alterar role
+    await validateRoleChangePermission(user.memberId, id, role as Role)
+
+    // Atualizar role e permissões
+    const updated = await updateMemberRole(id, role as Role)
+
+    // Log de auditoria
+    await AuditLogger.memberUpdated(request, id, { role })
+
+    return reply.send(updated)
+  } catch (error: any) {
+    // Erros de permissão/autorização
+    if (error.message?.includes('permissão') || 
+        error.message?.includes('não pode') ||
+        error.message?.includes('só pode') ||
+        error.message?.includes('Apenas') ||
+        error.message?.includes('Você não pode') ||
+        error.message?.includes('Você só pode')) {
+      return reply.status(403).send({ error: error.message })
+    }
+    
+    // Erro quando membro não encontrado
+    if (error.code === 'P2025' || 
+        error.message?.includes('Record to update not found') ||
+        error.message?.includes('Membro alvo não encontrado') ||
+        error.message?.includes('Membro editor não encontrado') ||
+        error.message?.includes('não encontrado')) {
+      return reply.status(404).send({ error: 'Membro não encontrado' })
+    }
+    
+    // Erro de validação do Zod
+    if (error.name === 'ZodError') {
+      return reply.status(400).send({ error: 'Dados inválidos', details: error.errors })
+    }
+    
+    return reply.status(500).send({ error: error.message || 'Erro ao atualizar role do membro' })
   }
 }

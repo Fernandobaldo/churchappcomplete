@@ -110,3 +110,4 @@ expect(response.status).toBe(200)
 3. **Compare status esperado vs recebido** - isso ajuda a identificar o problema
 4. **Use o preview do HTML** - geralmente contém informações úteis sobre o erro
 
+

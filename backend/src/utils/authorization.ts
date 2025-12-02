@@ -189,6 +189,42 @@ export async function validateMemberEditPermission(
 }
 
 /**
+ * Verifica se um membro pode alterar a role de outro membro
+ * @param editorMemberId ID do membro que está editando
+ * @param targetMemberId ID do membro que terá a role alterada
+ * @param newRole Nova role que será atribuída
+ * @throws Error se não tiver permissão
+ */
+export async function validateRoleChangePermission(
+  editorMemberId: string,
+  targetMemberId: string,
+  newRole: Role
+): Promise<void> {
+  // 1. Buscar dados do editor
+  const editor = await prisma.member.findUnique({
+    where: { id: editorMemberId },
+    include: {
+      Branch: true,
+    },
+  })
+
+  if (!editor) {
+    throw new Error('Membro editor não encontrado')
+  }
+
+  // 2. Verificar se COORDINATOR ou MEMBER podem alterar roles (não podem)
+  if (editor.role === Role.COORDINATOR || editor.role === Role.MEMBER) {
+    throw new Error('Você não tem permissão para alterar roles')
+  }
+
+  // 3. Validar hierarquia de roles
+  validateRoleHierarchy(editor.role, newRole)
+
+  // 4. Validar se o editor pode editar o membro alvo (mesma igreja/filial)
+  await validateMemberEditPermission(editorMemberId, targetMemberId)
+}
+
+/**
  * Verifica se um membro tem uma permissão específica
  * @param member Membro com Permission incluído
  * @param permission Tipo de permissão a verificar

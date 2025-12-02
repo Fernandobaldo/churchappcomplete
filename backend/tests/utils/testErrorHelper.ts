@@ -115,3 +115,4 @@ export function isHtmlResponse(response: any): boolean {
   )
 }
 
+

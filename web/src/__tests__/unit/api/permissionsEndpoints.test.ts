@@ -57,32 +57,83 @@ describe('Permissions Endpoints - Unit Tests', () => {
   })
 
   describe('POST /permissions/:memberId', () => {
-    it('deve adicionar permissão a membro com sucesso', async () => {
+    it('deve atualizar permissões de membro com sucesso', async () => {
       const mockResponse = {
         data: {
           success: true,
-          message: 'Permissão adicionada com sucesso',
+          added: 2,
+          permissions: [
+            { id: 'perm-1', type: 'devotional_manage' },
+            { id: 'perm-2', type: 'members_view' },
+          ],
         },
       }
 
       vi.mocked(api.post).mockResolvedValue(mockResponse)
 
       const response = await api.post('/permissions/member-1', {
-        type: 'contribution_manage',
+        permissions: ['devotional_manage', 'members_view'],
       })
 
       expect(api.post).toHaveBeenCalledWith('/permissions/member-1', {
-        type: 'contribution_manage',
+        permissions: ['devotional_manage', 'members_view'],
       })
       expect(response.data.success).toBe(true)
+      expect(response.data.added).toBe(2)
+      expect(Array.isArray(response.data.permissions)).toBe(true)
+      expect(response.data.permissions.length).toBe(2)
     })
 
-    it('deve retornar erro 400 quando permissão já existe', async () => {
+    it('deve retornar permissões atualizadas na resposta', async () => {
+      const mockResponse = {
+        data: {
+          success: true,
+          added: 1,
+          permissions: [
+            { id: 'perm-1', type: 'devotional_manage' },
+          ],
+        },
+      }
+
+      vi.mocked(api.post).mockResolvedValue(mockResponse)
+
+      const response = await api.post('/permissions/member-1', {
+        permissions: ['devotional_manage'],
+      })
+
+      expect(response.data.permissions).toBeDefined()
+      expect(Array.isArray(response.data.permissions)).toBe(true)
+      expect(response.data.permissions[0]).toHaveProperty('id')
+      expect(response.data.permissions[0]).toHaveProperty('type')
+    })
+
+    it('deve permitir remover todas as permissões enviando array vazio', async () => {
+      const mockResponse = {
+        data: {
+          success: true,
+          added: 0,
+          permissions: [],
+        },
+      }
+
+      vi.mocked(api.post).mockResolvedValue(mockResponse)
+
+      const response = await api.post('/permissions/member-1', {
+        permissions: [],
+      })
+
+      expect(response.data.success).toBe(true)
+      expect(response.data.permissions).toBeInstanceOf(Array)
+      expect(response.data.permissions.length).toBe(0)
+    })
+
+    it('deve retornar erro 400 quando permissions não é um array', async () => {
       const mockError = {
         response: {
           status: 400,
           data: {
-            message: 'Membro já possui esta permissão',
+            message: 'Dados inválidos',
+            errors: [{ path: ['permissions'], message: 'Expected array' }],
           },
         },
       }
@@ -91,7 +142,7 @@ describe('Permissions Endpoints - Unit Tests', () => {
 
       await expect(
         api.post('/permissions/member-1', {
-          type: 'contribution_manage',
+          permissions: 'not-an-array',
         })
       ).rejects.toMatchObject({
         response: {
@@ -100,12 +151,12 @@ describe('Permissions Endpoints - Unit Tests', () => {
       })
     })
 
-    it('deve retornar erro 404 quando membro não existe', async () => {
+    it('deve retornar erro 403 quando usuário não tem permissão', async () => {
       const mockError = {
         response: {
-          status: 404,
+          status: 403,
           data: {
-            message: 'Membro não encontrado',
+            message: 'Acesso negado',
           },
         },
       }
@@ -113,51 +164,12 @@ describe('Permissions Endpoints - Unit Tests', () => {
       vi.mocked(api.post).mockRejectedValue(mockError)
 
       await expect(
-        api.post('/permissions/invalid-id', {
-          type: 'contribution_manage',
+        api.post('/permissions/member-1', {
+          permissions: ['devotional_manage'],
         })
       ).rejects.toMatchObject({
         response: {
-          status: 404,
-        },
-      })
-    })
-  })
-
-  describe('DELETE /permissions/:memberId/:permissionType', () => {
-    it('deve remover permissão de membro com sucesso', async () => {
-      const mockResponse = {
-        data: {
-          success: true,
-          message: 'Permissão removida com sucesso',
-        },
-      }
-
-      vi.mocked(api.delete).mockResolvedValue(mockResponse)
-
-      const response = await api.delete('/permissions/member-1/contribution_manage')
-
-      expect(api.delete).toHaveBeenCalledWith('/permissions/member-1/contribution_manage')
-      expect(response.data.success).toBe(true)
-    })
-
-    it('deve retornar erro 404 quando permissão não existe', async () => {
-      const mockError = {
-        response: {
-          status: 404,
-          data: {
-            message: 'Permissão não encontrada',
-          },
-        },
-      }
-
-      vi.mocked(api.delete).mockRejectedValue(mockError)
-
-      await expect(
-        api.delete('/permissions/member-1/invalid_permission')
-      ).rejects.toMatchObject({
-        response: {
-          status: 404,
+          status: 403,
         },
       })
     })

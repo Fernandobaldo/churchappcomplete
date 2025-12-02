@@ -15,38 +15,106 @@ export async function getAllPermissionsController(request: FastifyRequest, reply
 
 // ✅ Atribuir permissões a um membro
 export async function assignPermissionsController(request: FastifyRequest, reply: FastifyReply) {
-  const paramsSchema = z.object({ id: z.string().cuid() })
-  const bodySchema = z.object({
-    permissions: z.array(z.string()), // Permite array vazio para remover todas as permissões
-  })
-
-  const { id } = paramsSchema.parse(request.params)
-  const { permissions } = bodySchema.parse(request.body)
-
-  // Primeiro, remove todas as permissões existentes do membro
-  await prisma.permission.deleteMany({
-    where: { memberId: id },
-  })
-
-  // Depois, adiciona as novas permissões (se houver)
-  let added = 0
-  if (permissions.length > 0) {
-    const result = await prisma.permission.createMany({
-      data: permissions.map((type) => ({
-        memberId: id,
-        type,
-      })),
-      skipDuplicates: true,
+  try {
+    const paramsSchema = z.object({ id: z.string().cuid() })
+    const bodySchema = z.object({
+      permissions: z.array(z.string()), // Permite array vazio para remover todas as permissões
     })
-    added = result.count
-  }
+
+    let id: string
+    let permissions: string[]
+
+    try {
+      id = paramsSchema.parse(request.params).id
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return reply.code(400).send({ 
+          message: 'ID inválido',
+          errors: error.errors 
+        })
+      }
+      throw error
+    }
+
+    try {
+      permissions = bodySchema.parse(request.body).permissions
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return reply.code(400).send({ 
+          message: 'Dados inválidos',
+          errors: error.errors 
+        })
+      }
+      throw error
+    }
+
+  console.log(`[PERMISSIONS DEBUG] POST /permissions/${id}`)
+  console.log(`[PERMISSIONS DEBUG] Permissões recebidas:`, permissions)
+  console.log(`[PERMISSIONS DEBUG] Quantidade de permissões:`, permissions.length)
+
+  // Usa transação para garantir atomicidade
+  const result = await prisma.$transaction(async (tx) => {
+    // Primeiro, busca permissões existentes antes de remover
+    const existingPermissions = await tx.permission.findMany({
+      where: { memberId: id },
+      select: { id: true, type: true },
+    })
+    console.log(`[PERMISSIONS DEBUG] Permissões existentes antes de remover:`, existingPermissions)
+
+    // Primeiro, remove todas as permissões existentes do membro
+    const deleteResult = await tx.permission.deleteMany({
+      where: { memberId: id },
+    })
+    console.log(`[PERMISSIONS DEBUG] Permissões removidas:`, deleteResult.count)
+
+    // Depois, adiciona as novas permissões (se houver)
+    let added = 0
+    if (permissions.length > 0) {
+      const createResult = await tx.permission.createMany({
+        data: permissions.map((type) => ({
+          memberId: id,
+          type,
+        })),
+        skipDuplicates: true,
+      })
+      added = createResult.count
+      console.log(`[PERMISSIONS DEBUG] Permissões criadas:`, added)
+    }
+
+    // Busca as permissões atualizadas para garantir que foram salvas corretamente
+    const updatedPermissions = await tx.permission.findMany({
+      where: { memberId: id },
+      select: { id: true, type: true },
+    })
+
+    console.log(`[PERMISSIONS DEBUG] Permissões encontradas após salvar (dentro da transação):`, updatedPermissions)
+    console.log(`[PERMISSIONS DEBUG] Quantidade de permissões encontradas:`, updatedPermissions.length)
+
+    return { added, permissions: updatedPermissions }
+  })
 
   // Log de auditoria
   await AuditLogger.memberPermissionsChanged(request, id, permissions)
 
-  return reply.send({
+  console.log(`[PERMISSIONS DEBUG] Resposta final do POST:`, {
     success: true,
-    added,
-    removed: true, // Indica que todas as permissões anteriores foram removidas
+    added: result.added,
+    permissionsCount: result.permissions.length,
+    permissions: result.permissions
   })
+
+    return reply.send({
+      success: true,
+      added: result.added,
+      permissions: result.permissions, // Retorna as permissões atualizadas
+    })
+  } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      return reply.code(400).send({ 
+        message: 'Dados inválidos',
+        errors: error.errors 
+      })
+    }
+    throw error
+  }
 }

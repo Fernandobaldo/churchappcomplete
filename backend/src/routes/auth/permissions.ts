@@ -10,7 +10,8 @@ export async function permissionsRoutes(app: FastifyInstance) {
     preHandler: [app.authenticate, checkRole(['ADMINGERAL', 'ADMINFILIAL', 'COORDINATOR'])],
   }, getAllPermissionsController)
 
+  // Apenas ADMINGERAL e ADMINFILIAL podem atribuir permissões
   app.post('/:id', {
-    preHandler: [app.authenticate, checkRole(['ADMINGERAL', 'ADMINFILIAL', 'COORDINATOR'])],
+    preHandler: [app.authenticate, checkRole(['ADMINGERAL', 'ADMINFILIAL'])],
   }, assignPermissionsController)
 }
