@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
-import { Settings, Plus, Building2 } from 'lucide-react'
+import { Settings, Plus, Building2, Upload, X } from 'lucide-react'
 import api from '../../api/api'
 import toast from 'react-hot-toast'
 import { useAuthStore } from '../../stores/authStore'
@@ -19,6 +19,7 @@ interface Church {
   id: string
   name: string
   logoUrl?: string
+  avatarUrl?: string
   isActive: boolean
 }
 
@@ -30,6 +31,10 @@ export default function ChurchSettings() {
   const [loading, setLoading] = useState(true)
   const [showScheduleForm, setShowScheduleForm] = useState(false)
   const [editingSchedule, setEditingSchedule] = useState<ServiceSchedule | null>(null)
+  const [avatarFile, setAvatarFile] = useState<File | null>(null)
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+  const [currentAvatarUrl, setCurrentAvatarUrl] = useState<string | null>(null)
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const {
     register,
     handleSubmit,
@@ -72,6 +77,7 @@ export default function ChurchSettings() {
               id: church.id,
               name: church.name,
               logoUrl: church.logoUrl,
+              avatarUrl: church.avatarUrl,
               isActive: church.isActive,
             }
             break
@@ -84,6 +90,9 @@ export default function ChurchSettings() {
         setValue('name', userChurch.name)
         if (userChurch.logoUrl) {
           setValue('logoUrl', userChurch.logoUrl)
+        }
+        if (userChurch.avatarUrl) {
+          setCurrentAvatarUrl(userChurch.avatarUrl)
         }
       }
     } catch (error: any) {
@@ -106,15 +115,96 @@ export default function ChurchSettings() {
     }
   }
 
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Validar tipo de arquivo
+    if (!file.type.startsWith('image/')) {
+      toast.error('Por favor, selecione uma imagem válida')
+      return
+    }
+
+    // Validar tamanho (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('A imagem deve ter no máximo 5MB')
+      return
+    }
+
+    setAvatarFile(file)
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      setAvatarPreview(reader.result as string)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleRemoveAvatar = () => {
+    if (avatarFile) {
+      // Se há um arquivo novo selecionado, apenas remove o preview
+      setAvatarFile(null)
+      setAvatarPreview(null)
+    } else {
+      // Se não há arquivo novo, remove o avatar atual
+      setCurrentAvatarUrl(null)
+    }
+  }
+
+  const uploadAvatar = async (): Promise<string | null> => {
+    if (!avatarFile) return null
+
+    try {
+      setUploadingAvatar(true)
+      const formData = new FormData()
+      formData.append('file', avatarFile)
+
+      const response = await api.post('/upload/church-avatar', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      })
+
+      return response.data.url
+    } catch (error: any) {
+      console.error('Erro ao fazer upload do avatar:', error)
+      toast.error(error.response?.data?.error || 'Erro ao fazer upload do avatar')
+      throw error
+    } finally {
+      setUploadingAvatar(false)
+    }
+  }
+
   const onSubmit = async (data: ChurchForm) => {
     if (!church) return
 
     try {
+      let avatarUrl = currentAvatarUrl
+
+      // Se há um novo arquivo de avatar, faz upload primeiro
+      if (avatarFile) {
+        avatarUrl = await uploadAvatar()
+        if (!avatarUrl) {
+          toast.error('Erro ao fazer upload do avatar')
+          return
+        }
+      }
+
+      // Se o usuário removeu o avatar (currentAvatarUrl foi removido e não há novo arquivo)
+      const finalAvatarUrl = avatarUrl !== undefined 
+        ? avatarUrl 
+        : (!currentAvatarUrl && !avatarFile) 
+          ? null 
+          : undefined
+
       await api.put(`/churches/${church.id}`, {
         name: data.name,
         logoUrl: data.logoUrl || undefined,
+        avatarUrl: finalAvatarUrl,
       })
+      
       toast.success('Configurações da igreja atualizadas com sucesso!')
+      setAvatarFile(null)
+      setAvatarPreview(null)
       fetchChurchData()
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Erro ao atualizar configurações da igreja')
@@ -181,8 +271,28 @@ export default function ChurchSettings() {
       {/* Formulário de edição da igreja */}
       <div className="card">
         <div className="flex items-center gap-4 mb-6">
-          <div className="w-16 h-16 rounded-lg bg-primary-light flex items-center justify-center">
-            <Building2 className="w-8 h-8 text-primary" />
+          <div className="relative">
+            {(avatarPreview || currentAvatarUrl) ? (
+              <div className="relative w-16 h-16 rounded-lg overflow-hidden group">
+                <img
+                  src={avatarPreview || (currentAvatarUrl?.startsWith('http') ? currentAvatarUrl : `${api.defaults.baseURL}${currentAvatarUrl}`)}
+                  alt="Avatar da Igreja"
+                  className="w-full h-full object-cover"
+                />
+                <button
+                  type="button"
+                  onClick={handleRemoveAvatar}
+                  className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Remover avatar"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ) : (
+              <div className="w-16 h-16 rounded-lg bg-primary-light flex items-center justify-center">
+                <Building2 className="w-8 h-8 text-primary" />
+              </div>
+            )}
           </div>
           <div>
             <h2 className="text-2xl font-bold text-gray-900">Informações da Igreja</h2>
@@ -191,6 +301,34 @@ export default function ChurchSettings() {
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <div>
+            <label htmlFor="church-avatar" className="block text-sm font-medium text-gray-700 mb-1">
+              Avatar da Igreja
+            </label>
+            <div className="flex items-center gap-4">
+              <label
+                htmlFor="avatar-upload"
+                className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
+              >
+                <Upload className="w-4 h-4" />
+                {avatarFile ? 'Alterar Avatar' : 'Selecionar Avatar'}
+              </label>
+              <input
+                id="avatar-upload"
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarChange}
+                className="hidden"
+              />
+              {avatarFile && (
+                <span className="text-sm text-gray-600">{avatarFile.name}</span>
+              )}
+            </div>
+            <p className="mt-1 text-xs text-gray-500">
+              O avatar da igreja será usado como padrão para todos os membros que não tiverem avatar próprio.
+            </p>
+          </div>
+
           <div>
             <label htmlFor="church-name" className="block text-sm font-medium text-gray-700 mb-1">
               Nome da Igreja *
@@ -222,8 +360,12 @@ export default function ChurchSettings() {
             )}
           </div>
 
-          <button type="submit" className="btn-primary">
-            Salvar Alterações
+          <button 
+            type="submit" 
+            className="btn-primary"
+            disabled={uploadingAvatar}
+          >
+            {uploadingAvatar ? 'Enviando...' : 'Salvar Alterações'}
           </button>
         </form>
       </div>

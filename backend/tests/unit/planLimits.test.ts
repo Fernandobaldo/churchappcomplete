@@ -12,6 +12,9 @@ vi.mock('../../src/lib/prisma', () => ({
       findMany: vi.fn(),
       count: vi.fn(),
     },
+    member: {
+      findFirst: vi.fn(),
+    },
   },
 }))
 
@@ -104,14 +107,24 @@ describe('planLimits', () => {
     })
 
     it('deve lançar erro quando usuário não tem plano', async () => {
+      // Usuário com Member e Branch, mas sem Subscription (sem plano próprio)
       prisma.user.findUnique.mockResolvedValue({
         id: mockUserId,
         Subscription: [],
-        Member: null,
+        Member: {
+          id: 'member-1',
+          Branch: {
+            id: 'branch-1',
+            churchId: mockChurchId,
+          },
+        },
       })
 
+      // Quando busca o plano do ADMINGERAL, também não encontra
+      prisma.member.findFirst.mockResolvedValue(null)
+
       await expect(checkPlanMembersLimit(mockUserId)).rejects.toThrow(
-        'Plano não encontrado para o usuário'
+        'Plano não encontrado para o usuário ou para a igreja'
       )
     })
 
@@ -243,14 +256,26 @@ describe('planLimits', () => {
     })
 
     it('deve lançar erro quando usuário não tem plano', async () => {
+      const mockChurchId = 'church-1'
+      
+      // Usuário com Member e Branch, mas sem Subscription (sem plano próprio)
       prisma.user.findUnique.mockResolvedValue({
         id: mockUserId,
         Subscription: [],
-        Member: null,
+        Member: {
+          id: 'member-1',
+          Branch: {
+            id: 'branch-1',
+            churchId: mockChurchId,
+          },
+        },
       })
 
+      // Quando busca o plano do ADMINGERAL, também não encontra
+      prisma.member.findFirst.mockResolvedValue(null)
+
       await expect(checkPlanBranchesLimit(mockUserId)).rejects.toThrow(
-        'Plano não encontrado para o usuário'
+        'Plano não encontrado para o usuário ou para a igreja'
       )
     })
 

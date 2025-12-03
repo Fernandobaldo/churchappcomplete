@@ -434,6 +434,85 @@ describe('Members Routes', () => {
       expect(response.body).toHaveProperty('phone', '11999999999')
     })
 
+    it('deve atualizar membro com avatarUrl', async () => {
+      const updateData = {
+        avatarUrl: 'http://localhost:3000/uploads/avatars/test-avatar.png',
+      }
+
+      const response = await request(app.server)
+        .put(`/members/${memberId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(updateData)
+
+      logTestResponse(response, 200)
+      expect(response.status).toBe(200)
+      expect(response.body).toHaveProperty('avatarUrl', 'http://localhost:3000/uploads/avatars/test-avatar.png')
+    })
+
+    it('deve atualizar membro com positionId', async () => {
+      // Criar um cargo primeiro
+      const position = await prisma.churchPosition.create({
+        data: {
+          name: 'Pastor',
+          churchId: adminChurchId,
+          isDefault: true,
+        },
+      })
+
+      const updateData = {
+        positionId: position.id,
+      }
+
+      const response = await request(app.server)
+        .put(`/members/${memberId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(updateData)
+
+      logTestResponse(response, 200)
+      expect(response.status).toBe(200)
+      // Verifica se a resposta contém os campos esperados
+      expect(response.body).toHaveProperty('id')
+      // Verifica se positionId foi atualizado no banco
+      const updatedMember = await prisma.member.findUnique({
+        where: { id: memberId },
+        include: { Position: true },
+      })
+      expect(updatedMember?.positionId).toBe(position.id)
+      expect(updatedMember?.Position?.name).toBe('Pastor')
+    })
+
+    it('deve remover cargo do membro (positionId null)', async () => {
+      // Primeiro atribuir um cargo
+      const position = await prisma.churchPosition.findFirst({
+        where: { churchId: adminChurchId },
+      })
+
+      if (position) {
+        await prisma.member.update({
+          where: { id: memberId },
+          data: { positionId: position.id },
+        })
+
+        // Agora remover o cargo - enviar null diretamente
+        const updateData = {
+          positionId: null,
+        }
+
+        const response = await request(app.server)
+          .put(`/members/${memberId}`)
+          .set('Authorization', `Bearer ${adminToken}`)
+          .send(updateData)
+
+        logTestResponse(response, 200)
+        expect(response.status).toBe(200)
+        // Verifica se positionId foi removido no banco
+        const updatedMember = await prisma.member.findUnique({
+          where: { id: memberId },
+        })
+        expect(updatedMember?.positionId).toBeNull()
+      }
+    })
+
     it('deve retornar 403 quando MEMBER tenta atualizar outro membro', async () => {
       const updateData = {
         name: 'Tentativa de Atualização',

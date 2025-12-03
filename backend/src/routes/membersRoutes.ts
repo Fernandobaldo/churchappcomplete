@@ -22,7 +22,7 @@ Lista todos os membros.
       tags: ['Membros'],
       summary: 'Listar membros',
       security: [{ bearerAuth: [] }],
-      response: {
+          response: {
         200: {
           description: 'Lista de membros',
           type: 'array',
@@ -34,6 +34,7 @@ Lista todos os membros.
               email: { type: 'string' },
               role: { type: 'string' },
               branchId: { type: 'string' },
+              avatarUrl: { type: ['string', 'null'] },
               permissions: {
                 type: 'array',
                 items: {
@@ -44,6 +45,7 @@ Lista todos os membros.
                 },
               },
             },
+            additionalProperties: true, // Permite campos adicionais não definidos no schema
           },
         },
         401: {
@@ -72,9 +74,35 @@ Lista todos os membros.
             id: { type: 'string' },
             name: { type: 'string' },
             email: { type: 'string' },
+            phone: { type: ['string', 'null'] },
+            address: { type: ['string', 'null'] },
+            birthDate: { type: ['string', 'null'] },
+            avatarUrl: { type: ['string', 'null'] },
             role: { type: 'string' },
             branchId: { type: 'string' },
+            positionId: { type: ['string', 'null'] },
+            position: {
+              type: ['object', 'null'],
+              properties: {
+                id: { type: 'string' },
+                name: { type: 'string' },
+              },
+            },
+            permissions: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string' },
+                  type: { type: 'string' },
+                },
+              },
+            },
+            branch: {
+              type: ['object', 'null'],
+            },
           },
+          additionalProperties: true, // Permite campos adicionais não definidos no schema
         },
         404: {
           description: 'Usuário não encontrado',
@@ -199,6 +227,10 @@ Atualiza um membro.
             type: ['string', 'null'],
             description: 'URL do avatar do membro (pode ser null ou string vazia). Se fornecido, deve ser uma URI válida.',
           },
+          positionId: {
+            type: ['string', 'null'],
+            description: 'ID do cargo do membro (pode ser null)',
+          },
         },
       },
       response: {
@@ -213,6 +245,7 @@ Atualiza um membro.
             address: { type: 'string', nullable: true },
             avatarUrl: { type: 'string', nullable: true },
             birthDate: { type: 'string', nullable: true },
+            positionId: { type: 'string', nullable: true },
           },
         },
         400: {

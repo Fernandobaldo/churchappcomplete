@@ -50,7 +50,19 @@ export async function registerUserService(data: RegisterUserInput) {
 
   // 🔗 Se for registro via link de convite
   if (inviteToken) {
-    // 1. Validar o link de convite
+    // 1. Verificar se email já existe PRIMEIRO (antes de validar link)
+    // Isso garante que erros de validação (400) sejam retornados antes de erros de permissão (403)
+    const existingUser = await prisma.user.findUnique({ where: { email } })
+    if (existingUser) {
+      throw new Error('Email já cadastrado como usuário.')
+    }
+
+    const existingMember = await prisma.member.findUnique({ where: { email } })
+    if (existingMember) {
+      throw new Error('Email já cadastrado como membro.')
+    }
+
+    // 2. Validar o link de convite (após verificar email)
     const validation = await validateInviteLink(inviteToken)
     
     if (!validation.valid) {
@@ -61,17 +73,6 @@ export async function registerUserService(data: RegisterUserInput) {
     }
 
     const inviteLink = validation.inviteLink!
-
-    // 2. Verificar se email já existe
-    const existingUser = await prisma.user.findUnique({ where: { email } })
-    if (existingUser) {
-      throw new Error('Email já cadastrado como usuário.')
-    }
-
-    const existingMember = await prisma.member.findUnique({ where: { email } })
-    if (existingMember) {
-      throw new Error('Email já cadastrado como membro.')
-    }
 
     // 3. Criar User
     const newUser = await prisma.user.create({

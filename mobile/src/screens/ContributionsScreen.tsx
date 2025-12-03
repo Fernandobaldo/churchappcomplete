@@ -18,7 +18,9 @@ export default function ContributionsScreen() {
     const fetchContributions = useCallback(async () => {
         try {
             const res = await api.get('/contributions')
-            setContributions(res.data || [])
+            // Filtrar apenas contribuições ativas
+            const activeContributions = (res.data || []).filter((c: any) => c.isActive)
+            setContributions(activeContributions)
         } catch (error) {
             console.error('Erro ao carregar contribuições:', error)
         }
@@ -70,7 +72,19 @@ export default function ContributionsScreen() {
                     <View style={styles.card}>
                         <View style={{ flex: 1 }}>
                             <Text style={styles.title}>{item.title}</Text>
-                            <Text style={styles.description}>{item.description}</Text>
+                            {item.description && (
+                                <Text style={styles.description}>{item.description}</Text>
+                            )}
+                            {item.goal && (
+                                <Text style={styles.goalText}>
+                                    Meta: R$ {item.goal.toFixed(2).replace('.', ',')}
+                                </Text>
+                            )}
+                            {item.raised !== undefined && (
+                                <Text style={styles.raisedText}>
+                                    Arrecadado: R$ {(item.raised || 0).toFixed(2).replace('.', ',')}
+                                </Text>
+                            )}
                         </View>
                         <TouchableOpacity style={styles.contributeButton} onPress={() => navigation.navigate('ContributionDetail', { contribution: item })}>
                             <Text style={styles.buttonText}>Contribuir</Text>
@@ -136,6 +150,16 @@ const styles = StyleSheet.create({
     description: {
         color: '#666',
         marginTop: 4,
+    },
+    goalText: {
+        color: '#3366FF',
+        marginTop: 4,
+        fontWeight: '600',
+    },
+    raisedText: {
+        color: '#22c55e',
+        marginTop: 2,
+        fontWeight: '600',
     },
     contributeButton: {
         backgroundColor: '#D6E4FF',

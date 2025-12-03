@@ -35,13 +35,12 @@ describe('Contributions CRUD Integration', () => {
       )
 
       await waitFor(() => {
-        const dizimoElements = screen.getAllByText('Dízimo')
-        expect(dizimoElements.length).toBeGreaterThan(0)
-        expect(dizimoElements[0]).toBeInTheDocument()
+        const campaignElements = screen.getAllByText('Campanha de Construção')
+        expect(campaignElements.length).toBeGreaterThan(0)
+        expect(campaignElements[0]).toBeInTheDocument()
         
-        const ofertaElements = screen.getAllByText('Oferta')
-        expect(ofertaElements.length).toBeGreaterThan(0)
-        expect(ofertaElements[0]).toBeInTheDocument()
+        const activeContributions = screen.getByText(/Contribuições Ativas/i)
+        expect(activeContributions).toBeInTheDocument()
       })
 
       expect(api.get).toHaveBeenCalledWith('/contributions')

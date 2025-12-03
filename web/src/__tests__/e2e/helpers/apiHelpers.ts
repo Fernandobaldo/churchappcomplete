@@ -216,16 +216,20 @@ export async function createEvent(
 }
 
 /**
- * Cria uma contribuição (requer autenticação, role e permissão)
+ * Cria uma campanha de contribuição (requer autenticação, role e permissão)
  */
 export async function createContribution(
   token: string,
   contributionData: {
     title: string
     description?: string
-    value: number
-    date: string // ISO string
-    type: 'DIZIMO' | 'OFERTA' | 'OUTRO'
+    goal?: number
+    endDate?: string // ISO string
+    isActive?: boolean
+    paymentMethods?: Array<{
+      type: 'PIX' | 'CONTA_BR' | 'IBAN'
+      data: Record<string, any>
+    }>
   }
 ) {
   try {

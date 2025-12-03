@@ -129,6 +129,32 @@ describe('Churches Routes - CRUD Completo', () => {
       expect(response.body.church).toHaveProperty('name', 'Nova Igreja')
     })
 
+    it('deve criar igreja com todos os campos opcionais', async () => {
+      const plan = await prisma.plan.findFirst()
+      if (!plan) throw new Error('Plano não encontrado')
+
+      const churchData = {
+        name: 'Igreja Completa',
+        address: 'Rua Teste, 123',
+        phone: '(11) 99999-9999',
+        email: 'contato@igreja.com',
+        website: 'https://www.igreja.com',
+        socialMedia: {
+          facebook: 'https://facebook.com/igreja',
+          instagram: 'https://instagram.com/igreja',
+        },
+      }
+
+      const response = await request(app.server)
+        .post('/churches')
+        .set('Authorization', `Bearer ${userToken}`)
+        .send(churchData)
+
+      expect(response.status).toBe(201)
+      expect(response.body).toHaveProperty('church')
+      expect(response.body.church).toHaveProperty('name', 'Igreja Completa')
+    })
+
     it('deve retornar 400 quando dados inválidos', async () => {
       const churchData = {
         // Faltando name (obrigatório)
@@ -220,6 +246,36 @@ describe('Churches Routes - CRUD Completo', () => {
       logTestResponse(response, 200)
       expect(response.status).toBe(200)
       expect(response.body).toHaveProperty('name', 'Igreja Atualizada')
+    })
+
+    it('deve atualizar igreja com novos campos (endereço, telefone, email, website, redes sociais)', async () => {
+      const updateData = {
+        name: 'Igreja Completa',
+        address: 'Rua Teste, 123',
+        phone: '(11) 99999-9999',
+        email: 'contato@igreja.com',
+        website: 'https://www.igreja.com',
+        socialMedia: {
+          facebook: 'https://facebook.com/igreja',
+          instagram: 'https://instagram.com/igreja',
+          youtube: 'https://youtube.com/igreja',
+          twitter: 'https://twitter.com/igreja',
+        },
+      }
+
+      const response = await request(app.server)
+        .put(`/churches/${churchId}`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .send(updateData)
+
+      logTestResponse(response, 200)
+      expect(response.status).toBe(200)
+      expect(response.body).toHaveProperty('name', 'Igreja Completa')
+      expect(response.body).toHaveProperty('address', 'Rua Teste, 123')
+      expect(response.body).toHaveProperty('phone', '(11) 99999-9999')
+      expect(response.body).toHaveProperty('email', 'contato@igreja.com')
+      expect(response.body).toHaveProperty('website', 'https://www.igreja.com')
+      expect(response.body).toHaveProperty('socialMedia')
     })
 
     it('deve retornar 404 quando igreja não existe', async () => {

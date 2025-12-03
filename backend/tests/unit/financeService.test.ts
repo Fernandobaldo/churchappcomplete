@@ -56,6 +56,21 @@ describe('FinanceService', () => {
 
       expect(prisma.transaction.findMany).toHaveBeenCalledWith({
         where: { branchId: mockBranchId },
+        include: {
+          CreatedByUser: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+          Contribution: {
+            select: {
+              id: true,
+              title: true,
+            },
+          },
+        },
         orderBy: { createdAt: 'desc' },
       })
       expect(result).toEqual(mockTransactions)
@@ -241,10 +256,29 @@ describe('FinanceService', () => {
           type: transactionData.type,
           category: transactionData.category,
           entryType: transactionData.entryType,
+          exitType: undefined,
+          exitTypeOther: undefined,
+          contributionId: undefined,
+          createdBy: undefined,
           tithePayerMemberId: transactionData.tithePayerMemberId,
           tithePayerName: transactionData.tithePayerName,
           isTithePayerMember: transactionData.isTithePayerMember,
           branchId: transactionData.branchId,
+        },
+        include: {
+          CreatedByUser: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+          Contribution: {
+            select: {
+              id: true,
+              title: true,
+            },
+          },
         },
       })
       expect(result).toEqual(mockCreatedTransaction)
@@ -281,10 +315,29 @@ describe('FinanceService', () => {
           type: transactionData.type,
           category: transactionData.category,
           entryType: undefined,
+          exitType: undefined,
+          exitTypeOther: undefined,
+          contributionId: undefined,
+          createdBy: undefined,
           tithePayerMemberId: undefined,
           tithePayerName: undefined,
           isTithePayerMember: undefined,
           branchId: transactionData.branchId,
+        },
+        include: {
+          CreatedByUser: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+          Contribution: {
+            select: {
+              id: true,
+              title: true,
+            },
+          },
         },
       })
       expect(result).toEqual(mockCreatedTransaction)
@@ -349,10 +402,29 @@ describe('FinanceService', () => {
           type: transactionData.type,
           category: transactionData.category,
           entryType: transactionData.entryType,
+          exitType: undefined,
+          exitTypeOther: undefined,
+          contributionId: undefined,
+          createdBy: undefined,
           tithePayerMemberId: undefined,
           tithePayerName: transactionData.tithePayerName,
           isTithePayerMember: transactionData.isTithePayerMember,
           branchId: transactionData.branchId,
+        },
+        include: {
+          CreatedByUser: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+          Contribution: {
+            select: {
+              id: true,
+              title: true,
+            },
+          },
         },
       })
       expect(result).toEqual(mockCreatedTransaction)
@@ -571,14 +643,39 @@ describe('FinanceService', () => {
         category: 'Dízimo',
       })
 
-      expect(prisma.transaction.findMany).toHaveBeenCalledWith({
-        where: {
-          branchId: mockBranchId,
-          category: { contains: 'Dízimo', mode: 'insensitive' },
+      // Verifica que foi chamado com os parâmetros corretos
+      const call = (prisma.transaction.findMany as any).mock.calls[0][0]
+      
+      // Verifica o branchId
+      expect(call.where.branchId).toBe(mockBranchId)
+      
+      // Verifica o filtro de categoria
+      expect(call.where.category).toEqual({ contains: 'Dízimo', mode: 'insensitive' })
+      
+      // Verifica que filtros de data foram adicionados automaticamente (mês atual)
+      expect(call.where.createdAt).toBeDefined()
+      expect(call.where.createdAt.gte).toBeInstanceOf(Date)
+      expect(call.where.createdAt.lte).toBeInstanceOf(Date)
+      
+      // Verifica o include com a estrutura esperada
+      expect(call.include).toEqual({
+        CreatedByUser: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
         },
-        include: expect.any(Object),
-        orderBy: { createdAt: 'desc' },
+        Contribution: {
+          select: {
+            id: true,
+            title: true,
+          },
+        },
       })
+      
+      // Verifica o orderBy
+      expect(call.orderBy).toEqual({ createdAt: 'desc' })
     })
 
     it('deve aplicar filtro de tipo', async () => {
@@ -600,14 +697,39 @@ describe('FinanceService', () => {
         type: 'ENTRY',
       })
 
-      expect(prisma.transaction.findMany).toHaveBeenCalledWith({
-        where: {
-          branchId: mockBranchId,
-          type: 'ENTRY',
+      // Verifica que foi chamado com os parâmetros corretos
+      const call = (prisma.transaction.findMany as any).mock.calls[0][0]
+      
+      // Verifica o branchId
+      expect(call.where.branchId).toBe(mockBranchId)
+      
+      // Verifica o filtro de tipo
+      expect(call.where.type).toBe('ENTRY')
+      
+      // Verifica que filtros de data foram adicionados automaticamente (mês atual)
+      expect(call.where.createdAt).toBeDefined()
+      expect(call.where.createdAt.gte).toBeInstanceOf(Date)
+      expect(call.where.createdAt.lte).toBeInstanceOf(Date)
+      
+      // Verifica o include com a estrutura esperada
+      expect(call.include).toEqual({
+        CreatedByUser: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
         },
-        include: expect.any(Object),
-        orderBy: { createdAt: 'desc' },
+        Contribution: {
+          select: {
+            id: true,
+            title: true,
+          },
+        },
       })
+      
+      // Verifica o orderBy
+      expect(call.orderBy).toEqual({ createdAt: 'desc' })
     })
 
     it('deve aplicar filtro de pesquisa', async () => {
@@ -629,18 +751,43 @@ describe('FinanceService', () => {
         search: 'João',
       })
 
-      expect(prisma.transaction.findMany).toHaveBeenCalledWith({
-        where: {
-          branchId: mockBranchId,
-          OR: [
-            { title: { contains: 'João', mode: 'insensitive' } },
-            { category: { contains: 'João', mode: 'insensitive' } },
-            { tithePayerName: { contains: 'João', mode: 'insensitive' } },
-          ],
+      // Verifica que foi chamado com os parâmetros corretos
+      const call = (prisma.transaction.findMany as any).mock.calls[0][0]
+      
+      // Verifica o branchId
+      expect(call.where.branchId).toBe(mockBranchId)
+      
+      // Verifica o filtro de pesquisa (OR)
+      expect(call.where.OR).toEqual([
+        { title: { contains: 'João', mode: 'insensitive' } },
+        { category: { contains: 'João', mode: 'insensitive' } },
+        { tithePayerName: { contains: 'João', mode: 'insensitive' } },
+      ])
+      
+      // Verifica que filtros de data foram adicionados automaticamente (mês atual)
+      expect(call.where.createdAt).toBeDefined()
+      expect(call.where.createdAt.gte).toBeInstanceOf(Date)
+      expect(call.where.createdAt.lte).toBeInstanceOf(Date)
+      
+      // Verifica o include com a estrutura esperada
+      expect(call.include).toEqual({
+        CreatedByUser: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
         },
-        include: expect.any(Object),
-        orderBy: { createdAt: 'desc' },
+        Contribution: {
+          select: {
+            id: true,
+            title: true,
+          },
+        },
       })
+      
+      // Verifica o orderBy
+      expect(call.orderBy).toEqual({ createdAt: 'desc' })
     })
 
     it('deve usar mês atual como padrão quando não há filtros de data', async () => {

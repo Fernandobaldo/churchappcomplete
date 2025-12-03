@@ -16,7 +16,18 @@ interface Member {
   birthDate?: string
   role: string
   avatarUrl?: string
+  positionId?: string | null
+  position?: {
+    id: string
+    name: string
+  } | null
   permissions?: Array<{ id: string; type: string }>
+}
+
+interface Position {
+  id: string
+  name: string
+  isDefault: boolean
 }
 
 export default function MemberDetails() {
@@ -24,11 +35,14 @@ export default function MemberDetails() {
   const navigate = useNavigate()
   const { user } = useAuthStore()
   const [member, setMember] = useState<Member | null>(null)
+  const [positions, setPositions] = useState<Position[]>([])
   const [loading, setLoading] = useState(true)
+  const [updatingPosition, setUpdatingPosition] = useState(false)
 
   useEffect(() => {
     if (id) {
       fetchMember()
+      fetchPositions()
     }
   }, [id])
 
@@ -41,6 +55,30 @@ export default function MemberDetails() {
       navigate('/app/members')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchPositions = async () => {
+    try {
+      const response = await api.get('/positions')
+      setPositions(response.data)
+    } catch (error) {
+      console.error('Erro ao carregar cargos:', error)
+    }
+  }
+
+  const handlePositionChange = async (positionId: string | null) => {
+    if (!member || !id) return
+    
+    setUpdatingPosition(true)
+    try {
+      await api.put(`/members/${id}`, { positionId })
+      toast.success('Cargo atualizado com sucesso!')
+      fetchMember() // Recarrega os dados do membro
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Erro ao atualizar cargo')
+    } finally {
+      setUpdatingPosition(false)
     }
   }
 
@@ -68,6 +106,15 @@ export default function MemberDetails() {
 
   const canManagePermissions = user?.permissions?.some(p => p.type === 'MANAGE_PERMISSIONS') || user?.role === 'ADMINGERAL'
   const canViewSensitiveData = hasAccess(user, 'members_manage')
+  const isOwnProfile = id === user?.memberId
+  const canViewPermissions = canManagePermissions || isOwnProfile
+  
+  // Verifica se pode alterar cargo: ADMINGERAL, ADMINFILIAL, COORDINATOR ou tem members_manage
+  const canChangePosition = 
+    user?.role === 'ADMINGERAL' || 
+    user?.role === 'ADMINFILIAL' || 
+    user?.role === 'COORDINATOR' || 
+    hasAccess(user, 'members_manage')
 
   return (
     <div className="space-y-6">
@@ -83,11 +130,17 @@ export default function MemberDetails() {
         <div className="flex items-start gap-6 mb-6">
           {member.avatarUrl ? (
             <img
-              src={member.avatarUrl}
+              src={member.avatarUrl.startsWith('http') ? member.avatarUrl : `${api.defaults.baseURL}${member.avatarUrl}`}
               alt={member.name}
               className="w-24 h-24 rounded-full object-cover"
+              onError={(e) => {
+                // Se a imagem falhar ao carregar, mostra o placeholder
+                e.currentTarget.style.display = 'none'
+                e.currentTarget.nextElementSibling?.classList.remove('hidden')
+              }}
             />
-          ) : (
+          ) : null}
+          {!member.avatarUrl && (
             <div className="w-24 h-24 rounded-full bg-primary-light flex items-center justify-center">
               <span className="text-primary font-semibold text-3xl">
                 {member.name.charAt(0).toUpperCase()}
@@ -151,14 +204,47 @@ export default function MemberDetails() {
                 <div>
                   <p className="text-sm text-gray-600">Data de Nascimento</p>
                   <p className="font-medium">
-                    {new Date(member.birthDate).toLocaleDateString('pt-BR')}
+                    {member.birthDate.includes('/') 
+                      ? member.birthDate 
+                      : new Date(member.birthDate).toLocaleDateString('pt-BR')}
                   </p>
+                </div>
+              </div>
+            )}
+
+            {canViewSensitiveData && (
+              <div className="flex items-center gap-3">
+                <div className="flex-1">
+                  <p className="text-sm text-gray-600 mb-2">Cargo na Igreja</p>
+                  <select
+                    value={member.positionId || ''}
+                    onChange={(e) => handlePositionChange(e.target.value || null)}
+                    disabled={updatingPosition || !canChangePosition}
+                    className="input"
+                    title={!canChangePosition ? 'Você não tem permissão para alterar o cargo' : ''}
+                  >
+                    <option value="">Nenhum cargo</option>
+                    {positions.map((position) => (
+                      <option key={position.id} value={position.id}>
+                        {position.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {!canViewSensitiveData && member.position && (
+              <div className="flex items-center gap-3">
+                <div>
+                  <p className="text-sm text-gray-600">Cargo na Igreja</p>
+                  <p className="font-medium">{member.position.name}</p>
                 </div>
               </div>
             )}
           </div>
 
-          {member.permissions && member.permissions.length > 0 && (
+          {canViewPermissions && member.permissions && member.permissions.length > 0 && (
             <div>
               <h3 className="font-semibold mb-3 flex items-center gap-2">
                 <Shield className="w-5 h-5" />

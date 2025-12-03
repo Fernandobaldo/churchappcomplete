@@ -7,6 +7,7 @@ import { format } from 'date-fns'
 import ptBR from 'date-fns/locale/pt-BR'
 import PermissionGuard from '../../components/PermissionGuard'
 import { useAuthStore } from '../../stores/authStore'
+import { DEFAULT_EVENT_IMAGE } from '../../constants/defaultImages'
 
 interface Event {
   id: string
@@ -81,13 +82,14 @@ export default function EventDetails() {
         Voltar
       </button>
 
-      {event.imageUrl && (
-        <img
-          src={event.imageUrl}
-          alt={event.title}
-          className="w-full h-64 object-cover rounded-lg"
-        />
-      )}
+      <img
+        src={event.imageUrl 
+          ? (event.imageUrl.startsWith('http') ? event.imageUrl : `${api.defaults.baseURL}${event.imageUrl}`)
+          : DEFAULT_EVENT_IMAGE
+        }
+        alt={event.title}
+        className="w-full h-64 object-cover rounded-lg"
+      />
 
       <div className="card">
         <div className="flex justify-between items-start mb-4">

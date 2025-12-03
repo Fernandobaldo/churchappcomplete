@@ -154,3 +154,114 @@ export async function validateMemberEditPermission(editorMemberId, targetMemberI
         throw new Error('Você só pode editar seu próprio perfil');
     }
 }
+/**
+ * Verifica se um membro pode alterar o cargo (position) de outro membro
+ * @param editorMemberId ID do membro que está editando
+ * @param targetMemberId ID do membro que terá o cargo alterado
+ * @param editorRole Role do editor
+ * @param editorPermissions Permissões do editor
+ * @throws Error se não tiver permissão
+ */
+export async function validatePositionChangePermission(editorMemberId, targetMemberId, editorRole, editorPermissions) {
+    // Verifica se tem permissão para editar membros
+    const hasMembersManage = editorPermissions.some(p => p.type === 'members_manage');
+    // Verifica se o usuário tem uma das permissões necessárias
+    const hasPermission = editorRole === Role.ADMINGERAL ||
+        editorRole === Role.ADMINFILIAL ||
+        editorRole === Role.COORDINATOR ||
+        hasMembersManage;
+    if (!hasPermission) {
+        throw new Error('Você não tem permissão para alterar o cargo. Apenas administradores, coordenadores ou usuários com permissão para editar membros podem fazer isso.');
+    }
+    // Se é o próprio perfil e tem permissão, pode alterar
+    if (editorMemberId === targetMemberId) {
+        return;
+    }
+    // Se está editando outro membro, usa a mesma lógica de validateMemberEditPermission
+    // mas também verifica se tem permissão members_manage
+    const editor = await prisma.member.findUnique({
+        where: { id: editorMemberId },
+        include: {
+            Branch: true,
+            Permission: true,
+        },
+    });
+    if (!editor) {
+        throw new Error('Membro editor não encontrado');
+    }
+    const target = await prisma.member.findUnique({
+        where: { id: targetMemberId },
+        include: {
+            Branch: true,
+        },
+    });
+    if (!target) {
+        throw new Error('Membro alvo não encontrado');
+    }
+    // Verifica se tem permissão members_manage (buscando do banco para garantir dados atualizados)
+    const editorHasMembersManage = editor.Permission.some(p => p.type === 'members_manage');
+    // ADMINGERAL pode alterar cargo de qualquer membro da igreja
+    if (editor.role === Role.ADMINGERAL) {
+        if (editor.Branch.churchId !== target.Branch.churchId) {
+            throw new Error('Você só pode editar membros da sua igreja');
+        }
+        return;
+    }
+    // ADMINFILIAL pode alterar cargo de membros da sua filial
+    if (editor.role === Role.ADMINFILIAL) {
+        if (editor.branchId !== target.branchId) {
+            throw new Error('Você só pode editar membros da sua filial');
+        }
+        return;
+    }
+    // COORDINATOR pode alterar cargo se tiver permissão members_manage
+    if (editor.role === Role.COORDINATOR && editorHasMembersManage) {
+        if (editor.branchId !== target.branchId) {
+            throw new Error('Você só pode editar membros da sua filial');
+        }
+        return;
+    }
+    // Se não tem permissão, não pode alterar
+    throw new Error('Você não tem permissão para alterar o cargo. Apenas administradores, coordenadores ou usuários com permissão para editar membros podem fazer isso.');
+}
+/**
+ * Verifica se um membro pode alterar a role de outro membro
+ * @param editorMemberId ID do membro que está editando
+ * @param targetMemberId ID do membro que terá a role alterada
+ * @param newRole Nova role que será atribuída
+ * @throws Error se não tiver permissão
+ */
+export async function validateRoleChangePermission(editorMemberId, targetMemberId, newRole) {
+    // 1. Buscar dados do editor
+    const editor = await prisma.member.findUnique({
+        where: { id: editorMemberId },
+        include: {
+            Branch: true,
+        },
+    });
+    if (!editor) {
+        throw new Error('Membro editor não encontrado');
+    }
+    // 2. Verificar se COORDINATOR ou MEMBER podem alterar roles (não podem)
+    if (editor.role === Role.COORDINATOR || editor.role === Role.MEMBER) {
+        throw new Error('Você não tem permissão para alterar roles');
+    }
+    // 3. Validar hierarquia de roles
+    validateRoleHierarchy(editor.role, newRole);
+    // 4. Validar se o editor pode editar o membro alvo (mesma igreja/filial)
+    await validateMemberEditPermission(editorMemberId, targetMemberId);
+}
+/**
+ * Verifica se um membro tem uma permissão específica
+ * @param member Membro com Permission incluído
+ * @param permission Tipo de permissão a verificar
+ * @returns true se tiver permissão, false caso contrário
+ */
+export function hasAccess(member, permission) {
+    // ADMINGERAL e ADMINFILIAL têm acesso a tudo
+    if (member.role === Role.ADMINGERAL || member.role === Role.ADMINFILIAL) {
+        return true;
+    }
+    // Verifica se tem a permissão específica
+    return member.Permission.some((p) => p.type === permission);
+}

@@ -12,16 +12,8 @@ export async function registerUserService(data) {
     const hashedPassword = await bcrypt.hash(password, 10);
     // 🔗 Se for registro via link de convite
     if (inviteToken) {
-        // 1. Validar o link de convite
-        const validation = await validateInviteLink(inviteToken);
-        if (!validation.valid) {
-            if (validation.error === 'LIMIT_REACHED') {
-                throw new Error('LIMIT_REACHED');
-            }
-            throw new Error(validation.error || 'Link de convite inválido');
-        }
-        const inviteLink = validation.inviteLink;
-        // 2. Verificar se email já existe
+        // 1. Verificar se email já existe PRIMEIRO (antes de validar link)
+        // Isso garante que erros de validação (400) sejam retornados antes de erros de permissão (403)
         const existingUser = await prisma.user.findUnique({ where: { email } });
         if (existingUser) {
             throw new Error('Email já cadastrado como usuário.');
@@ -30,6 +22,15 @@ export async function registerUserService(data) {
         if (existingMember) {
             throw new Error('Email já cadastrado como membro.');
         }
+        // 2. Validar o link de convite (após verificar email)
+        const validation = await validateInviteLink(inviteToken);
+        if (!validation.valid) {
+            if (validation.error === 'LIMIT_REACHED') {
+                throw new Error('LIMIT_REACHED');
+            }
+            throw new Error(validation.error || 'Link de convite inválido');
+        }
+        const inviteLink = validation.inviteLink;
         // 3. Criar User
         const newUser = await prisma.user.create({
             data: {
@@ -65,6 +66,13 @@ export async function registerUserService(data) {
                 phone,
                 address,
                 avatarUrl,
+            },
+        });
+        // 5.1. Adicionar permissão members_view automaticamente para todos os membros
+        await prisma.permission.create({
+            data: {
+                memberId: member.id,
+                type: 'members_view',
             },
         });
         // 6. Incrementar uso do link
@@ -207,11 +215,13 @@ export async function registerUserService(data) {
     const typesToAssign = finalRole === Role.ADMINGERAL || finalRole === Role.ADMINFILIAL
         ? ALL_PERMISSION_TYPES
         : permissions ?? [];
-    if (typesToAssign.length > 0) {
+    // Garantir que members_view sempre seja incluído para todos os membros
+    const permissionsToCreate = [...new Set([...typesToAssign, 'members_view'])];
+    if (permissionsToCreate.length > 0) {
         // Cria as permissões diretamente para o member
         // Permission tem memberId obrigatório, então não pode existir sem um member
         await prisma.permission.createMany({
-            data: typesToAssign.map((type) => ({
+            data: permissionsToCreate.map((type) => ({
                 memberId: member.id,
                 type,
             })),

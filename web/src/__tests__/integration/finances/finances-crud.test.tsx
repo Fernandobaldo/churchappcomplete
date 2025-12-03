@@ -34,17 +34,14 @@ vi.mock('@/components/PermissionGuard', () => ({
 }))
 
 const mockNavigate = vi.fn()
-const mockSetSearchParams = vi.fn()
 
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom')
   return {
     ...actual,
     useNavigate: () => mockNavigate,
-    useSearchParams: () => {
-      // Retornar parâmetros vazios por padrão, pode ser sobrescrito nos testes
-      return [new URLSearchParams(), mockSetSearchParams]
-    },
+    // Não mockar useSearchParams - usar o hook real do react-router-dom
+    // Isso permite que funcione corretamente com MemoryRouter
   }
 })
 
@@ -116,22 +113,32 @@ describe('Finances CRUD Integration', () => {
         // Verificar se a tabela foi renderizada
         const transactionsTable = document.getElementById('transactions-table')
         expect(transactionsTable).toBeInTheDocument()
-        
-        // Verificar transações usando IDs específicos
+      }, { timeout: 3000 })
+      
+      // Verificar transações usando IDs específicos
+      await waitFor(() => {
         const trans1Title = document.getElementById('transaction-title-trans-1')
         expect(trans1Title).toBeInTheDocument()
         expect(trans1Title?.textContent).toBe('Dízimo')
-        
+      }, { timeout: 3000 })
+      
+      await waitFor(() => {
         const trans2Title = document.getElementById('transaction-title-trans-2')
         expect(trans2Title).toBeInTheDocument()
         expect(trans2Title?.textContent).toBe('Oferta')
-        
+      }, { timeout: 3000 })
+      
+      await waitFor(() => {
         const trans3Title = document.getElementById('transaction-title-trans-3')
         expect(trans3Title).toBeInTheDocument()
         expect(trans3Title?.textContent).toBe('Pagamento')
-      })
+      }, { timeout: 3000 })
 
-      expect(api.get).toHaveBeenCalledWith('/finances')
+      // Verificar que a API foi chamada (pode ter parâmetros)
+      expect(api.get).toHaveBeenCalledWith(
+        '/finances',
+        expect.any(Object)
+      )
     })
 
     it('deve exibir valores formatados corretamente', async () => {
@@ -315,15 +322,22 @@ describe('Finances CRUD Integration', () => {
         expect(document.getElementById('transactions-card')).toBeInTheDocument()
       })
 
-      const filterButton = screen.getByText('Filtros')
+      // Encontrar o botão de filtros usando testid ou texto
+      const filterButton = screen.getByTestId('filters-toggle-button') || screen.getByText('Filtros')
       await user.click(filterButton)
 
+      // Aguardar que o painel de filtros apareça
       await waitFor(() => {
-        // Verificar se os presets de meses aparecem
+        const filtersPanel = screen.queryByTestId('filters-panel')
+        expect(filtersPanel).toBeInTheDocument()
+      }, { timeout: 3000 })
+
+      // Verificar se os presets de meses aparecem
+      await waitFor(() => {
         expect(screen.getByText('Este Mês')).toBeInTheDocument()
         expect(screen.getByText('Mês Passado')).toBeInTheDocument()
         expect(screen.getByText('Últimos 3 Meses')).toBeInTheDocument()
-      })
+      }, { timeout: 3000 })
     })
 
     it('deve aplicar preset de mês ao clicar', async () => {
@@ -345,16 +359,25 @@ describe('Finances CRUD Integration', () => {
         expect(document.getElementById('transactions-card')).toBeInTheDocument()
       })
 
-      const filterButton = screen.getByText('Filtros')
+      // Abrir painel de filtros
+      const filterButton = screen.getByTestId('filters-toggle-button') || screen.getByText('Filtros')
       await user.click(filterButton)
 
+      // Aguardar que o painel apareça
+      await waitFor(() => {
+        const filtersPanel = screen.queryByTestId('filters-panel')
+        expect(filtersPanel).toBeInTheDocument()
+      }, { timeout: 3000 })
+
+      // Aguardar que o botão "Mês Passado" apareça
       await waitFor(() => {
         expect(screen.getByText('Mês Passado')).toBeInTheDocument()
-      })
+      }, { timeout: 3000 })
 
-      const lastMonthButton = screen.getByText('Mês Passado')
+      const lastMonthButton = screen.getByTestId('preset-last') || screen.getByText('Mês Passado')
       await user.click(lastMonthButton)
 
+      // Aguardar que a API seja chamada com os parâmetros corretos
       await waitFor(() => {
         expect(api.get).toHaveBeenCalledWith(
           '/finances',
@@ -365,7 +388,7 @@ describe('Finances CRUD Integration', () => {
             }),
           })
         )
-      })
+      }, { timeout: 3000 })
     })
 
     it('deve exibir labels de filtros ativos quando há filtros aplicados', async () => {
@@ -398,21 +421,29 @@ describe('Finances CRUD Integration', () => {
         expect(document.getElementById('transactions-card')).toBeInTheDocument()
       })
 
-      // Aplicar filtro de categoria
-      const filterButton = screen.getByText('Filtros')
+      // Abrir painel de filtros
+      const filterButton = screen.getByTestId('filters-toggle-button') || screen.getByText('Filtros')
       await user.click(filterButton)
 
+      // Aguardar que o painel apareça
       await waitFor(() => {
-        const categorySelect = document.querySelector('select') as HTMLSelectElement
-        expect(categorySelect).toBeInTheDocument()
-      })
+        const filtersPanel = screen.queryByTestId('filters-panel')
+        expect(filtersPanel).toBeInTheDocument()
+      }, { timeout: 3000 })
 
-      const categorySelect = document.querySelector('select') as HTMLSelectElement
+      // Aguardar que o select de categoria apareça
+      await waitFor(() => {
+        const categorySelect = screen.queryByTestId('filter-category') || document.querySelector('select[id="filter-category"]')
+        expect(categorySelect).toBeInTheDocument()
+      }, { timeout: 3000 })
+
+      const categorySelect = (screen.queryByTestId('filter-category') || document.querySelector('select[id="filter-category"]')) as HTMLSelectElement
       await user.selectOptions(categorySelect, 'Dízimo')
 
+      // Aguardar que o label de filtro ativo apareça
       await waitFor(() => {
         expect(screen.getByText(/Categoria: Dízimo/)).toBeInTheDocument()
-      })
+      }, { timeout: 3000 })
     })
 
     it('deve remover filtro ao clicar no X do label', async () => {
@@ -438,16 +469,6 @@ describe('Finances CRUD Integration', () => {
       // Configurar o mock para retornar dados em todas as chamadas
       vi.mocked(api.get).mockResolvedValue(mockResponse)
 
-      render(
-        <MemoryRouter>
-          <Finances />
-        </MemoryRouter>
-      )
-
-      await waitFor(() => {
-        expect(document.getElementById('transactions-card')).toBeInTheDocument()
-      })
-
       const user = userEvent.setup()
       
       // Renderizar com showFilters=true via URL para evitar depender do clique
@@ -465,33 +486,31 @@ describe('Finances CRUD Integration', () => {
       await waitFor(() => {
         const filtersPanel = screen.queryByTestId('filters-panel')
         expect(filtersPanel).toBeInTheDocument()
-      }, { timeout: 5000 })
+      }, { timeout: 3000 })
 
       // Aguardar que o select de categoria apareça
       await waitFor(() => {
-        const categorySelect = document.getElementById('filter-category')
+        const categorySelect = screen.queryByTestId('filter-category') || document.getElementById('filter-category')
         expect(categorySelect).toBeInTheDocument()
-      }, { timeout: 5000 })
+      }, { timeout: 3000 })
 
       // Selecionar a categoria usando userEvent
-      const categorySelect = document.getElementById('filter-category') as HTMLSelectElement
-      expect(categorySelect).toBeInTheDocument()
+      const categorySelect = (screen.queryByTestId('filter-category') || document.getElementById('filter-category')) as HTMLSelectElement
       await user.selectOptions(categorySelect, 'Dízimo')
 
       // Aguardar que o label apareça após selecionar a categoria
       await waitFor(() => {
         const labelText = screen.queryByText(/Categoria: Dízimo/)
         expect(labelText).toBeInTheDocument()
-      }, { timeout: 5000 })
+      }, { timeout: 3000 })
 
-      // Encontrar e clicar no botão de remover filtro usando fireEvent
+      // Encontrar e clicar no botão de remover filtro
       await waitFor(() => {
-        const removeButton = document.getElementById('remove-filter-category')
+        const removeButton = screen.queryByTestId('remove-filter-category') || document.getElementById('remove-filter-category')
         expect(removeButton).toBeInTheDocument()
       }, { timeout: 3000 })
 
-      const removeButton = document.getElementById('remove-filter-category')
-      expect(removeButton).toBeInTheDocument()
+      const removeButton = screen.queryByTestId('remove-filter-category') || document.getElementById('remove-filter-category')
       await user.click(removeButton!)
 
       // Aguardar que o label desapareça após remover o filtro
@@ -510,36 +529,31 @@ describe('Finances CRUD Integration', () => {
       })
 
       const user = userEvent.setup()
-      // Renderizar com showFilters=true e monthPreset=custom via URL para evitar depender do clique
       render(
         <MemoryRouter initialEntries={['/app/finances?showFilters=true&monthPreset=custom']}>
           <Finances />
         </MemoryRouter>
       )
 
+      // Aguardar que o componente carregue completamente
       await waitFor(() => {
         expect(document.getElementById('transactions-card')).toBeInTheDocument()
       })
 
-      // Aguardar que o painel de filtros apareça (já deve estar aberto via URL)
+      // Aguardar que o painel de filtros apareça
       await waitFor(() => {
         const filtersPanel = screen.queryByTestId('filters-panel')
         expect(filtersPanel).toBeInTheDocument()
-      }, { timeout: 5000 })
+      }, { timeout: 3000 })
 
-      // Verificar se os campos de data aparecem (já devem estar visíveis com monthPreset=custom)
+      // Aguardar que os campos de data personalizada apareçam
+      // Eles só aparecem quando monthPreset === 'custom' E showFilters === true
       await waitFor(() => {
-        const startDateInput = document.getElementById('custom-start-date')
-        const endDateInput = document.getElementById('custom-end-date')
+        const startDateInput = screen.queryByTestId('custom-start-date')
+        const endDateInput = screen.queryByTestId('custom-end-date')
         expect(startDateInput).toBeInTheDocument()
         expect(endDateInput).toBeInTheDocument()
-      }, { timeout: 5000 })
-
-      // Verificação final
-      const startDateInput = document.getElementById('custom-start-date')
-      const endDateInput = document.getElementById('custom-end-date')
-      expect(startDateInput).toBeInTheDocument()
-      expect(endDateInput).toBeInTheDocument()
+      }, { timeout: 3000 })
     })
 
     it('deve aplicar filtro de pesquisa com múltiplos caracteres', async () => {

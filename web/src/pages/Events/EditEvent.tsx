@@ -1,7 +1,7 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Upload, X } from 'lucide-react'
 import api from '../../api/api'
 import toast from 'react-hot-toast'
 
@@ -20,6 +20,10 @@ export default function EditEvent() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<EventForm>()
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null)
+  const [uploadingImage, setUploadingImage] = useState(false)
 
   const hasDonation = watch('hasDonation')
 
@@ -64,24 +68,108 @@ export default function EditEvent() {
       setValue('hasDonation', event.hasDonation || false)
       setValue('donationLink', event.donationLink || '')
       setValue('donationReason', event.donationReason || '')
-      setValue('imageUrl', event.imageUrl || '')
+      if (event.imageUrl) {
+        setCurrentImageUrl(event.imageUrl)
+      }
     } catch (error) {
       toast.error('Erro ao carregar evento')
       navigate('/app/events')
     }
   }
 
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Validar tipo de arquivo
+    if (!file.type.startsWith('image/')) {
+      toast.error('Por favor, selecione uma imagem válida')
+      return
+    }
+
+    // Validar tamanho (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('A imagem deve ter no máximo 5MB')
+      return
+    }
+
+    setImageFile(file)
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      setImagePreview(reader.result as string)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleRemoveImage = () => {
+    if (imageFile) {
+      setImageFile(null)
+      setImagePreview(null)
+    } else {
+      setCurrentImageUrl(null)
+    }
+  }
+
+  const uploadImage = async (): Promise<string | null> => {
+    if (!imageFile) return null
+
+    try {
+      setUploadingImage(true)
+      const formData = new FormData()
+      formData.append('file', imageFile)
+
+      const response = await api.post('/upload/event-image', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      })
+
+      return response.data.url
+    } catch (error: any) {
+      console.error('Erro ao fazer upload da imagem:', error)
+      toast.error(error.response?.data?.error || 'Erro ao fazer upload da imagem')
+      throw error
+    } finally {
+      setUploadingImage(false)
+    }
+  }
+
   const onSubmit = async (data: EventForm) => {
     try {
+      let imageUrl: string | null | undefined = undefined
+
+      // Se há um novo arquivo de imagem, faz upload primeiro
+      if (imageFile) {
+        imageUrl = await uploadImage()
+        if (!imageUrl) {
+          toast.error('Erro ao fazer upload da imagem')
+          return
+        }
+      } else if (!currentImageUrl) {
+        // Se não há imagem nova nem existente, remove a imagem (null)
+        imageUrl = null
+      }
+      // Se há currentImageUrl mas não há novo arquivo, não altera (undefined = não envia)
+
       // Converte date (datetime-local) para startDate e endDate (ISO)
       const dateValue = data.date ? new Date(data.date).toISOString() : ''
       
-      await api.put(`/events/${id}`, {
-        ...data,
+      // Remove imageUrl do data para não enviar valor do formulário
+      const { imageUrl: _, ...eventData } = data
+      
+      // Prepara o payload
+      const payload: any = {
+        ...eventData,
         startDate: dateValue,
-        endDate: dateValue, // Por padrão, usa a mesma data para início e fim
-        date: undefined, // Remove o campo date
-      })
+        endDate: dateValue,
+      }
+      
+      // Só inclui imageUrl se houver alteração (nova imagem ou remoção)
+      if (imageUrl !== undefined) {
+        payload.imageUrl = imageUrl
+      }
+      
+      await api.put(`/events/${id}`, payload)
       toast.success('Evento atualizado com sucesso!')
       navigate(`/app/events/${id}`)
     } catch (error: any) {
@@ -157,14 +245,48 @@ export default function EditEvent() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              URL da Imagem
+            <label htmlFor="event-image" className="block text-sm font-medium text-gray-700 mb-1">
+              Imagem do Evento
             </label>
-            <input
-              {...register('imageUrl')}
-              type="url"
-              className="input"
-            />
+            <div className="space-y-4">
+              <div className="flex items-center gap-4">
+                <label
+                  htmlFor="image-upload"
+                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
+                >
+                  <Upload className="w-4 h-4" />
+                  {imageFile ? 'Alterar Imagem' : 'Selecionar Imagem'}
+                </label>
+                <input
+                  id="image-upload"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageChange}
+                  className="hidden"
+                />
+                {imageFile && (
+                  <span className="text-sm text-gray-600">{imageFile.name}</span>
+                )}
+              </div>
+              
+              {(imagePreview || currentImageUrl) && (
+                <div className="relative w-full max-w-md">
+                  <img
+                    src={imagePreview || (currentImageUrl?.startsWith('http') ? currentImageUrl : `${api.defaults.baseURL}${currentImageUrl}`)}
+                    alt="Preview da imagem"
+                    className="w-full h-auto rounded-lg border border-gray-300"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleRemoveImage}
+                    className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-2 hover:bg-red-600"
+                    title="Remover imagem"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="flex items-center gap-2">
@@ -212,8 +334,12 @@ export default function EditEvent() {
             >
               Cancelar
             </button>
-            <button type="submit" className="btn-primary flex-1">
-              Salvar Alterações
+            <button 
+              type="submit" 
+              className="btn-primary flex-1"
+              disabled={uploadingImage}
+            >
+              {uploadingImage ? 'Enviando...' : 'Salvar Alterações'}
             </button>
           </div>
         </form>

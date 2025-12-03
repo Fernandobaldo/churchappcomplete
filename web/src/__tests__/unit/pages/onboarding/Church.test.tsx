@@ -44,6 +44,10 @@ describe('Church - Criação de Igreja', () => {
     expect(screen.getByLabelText(/cidade/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/idioma padrão/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/cor principal/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/endereço/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/telefone/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/email/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/website/i)).toBeInTheDocument()
   })
 
   it('deve validar campos obrigatórios', async () => {
@@ -90,6 +94,50 @@ describe('Church - Criação de Igreja', () => {
         name: 'Igreja Teste',
         withBranch: true,
         branchName: 'Sede',
+      }))
+    })
+  })
+
+  it('deve criar igreja com todos os campos opcionais', async () => {
+    const user = userEvent.setup()
+    const mockResponse = {
+      data: {
+        church: { id: 'church-123', name: 'Igreja Completa' },
+      },
+    }
+
+    vi.mocked(api.get).mockResolvedValue({ data: [] })
+    vi.mocked(api.post).mockResolvedValue(mockResponse)
+
+    render(
+      <MemoryRouter>
+        <Church />
+      </MemoryRouter>
+    )
+
+    await user.type(screen.getByLabelText(/nome da igreja/i), 'Igreja Completa')
+    await user.type(screen.getByLabelText(/cidade/i), 'São Paulo')
+    await user.type(screen.getByLabelText(/endereço/i), 'Rua Teste, 123')
+    await user.type(screen.getByLabelText(/telefone/i), '(11) 99999-9999')
+    await user.type(screen.getByLabelText(/email/i), 'contato@igreja.com')
+    await user.type(screen.getByLabelText(/website/i), 'https://www.igreja.com')
+    await user.type(screen.getByLabelText(/facebook/i), 'https://facebook.com/igreja')
+    await user.type(screen.getByLabelText(/instagram/i), 'https://instagram.com/igreja')
+
+    const submitButton = screen.getByRole('button', { name: /continuar/i })
+    await user.click(submitButton)
+
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith('/churches', expect.objectContaining({
+        name: 'Igreja Completa',
+        address: 'Rua Teste, 123',
+        phone: '(11) 99999-9999',
+        email: 'contato@igreja.com',
+        website: 'https://www.igreja.com',
+        socialMedia: expect.objectContaining({
+          facebook: 'https://facebook.com/igreja',
+          instagram: 'https://instagram.com/igreja',
+        }),
       }))
     })
 

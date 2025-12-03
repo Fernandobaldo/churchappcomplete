@@ -187,18 +187,24 @@ describe('E2E: Fluxo Completo - Registro até Contribuição', () => {
         app,
         memberToken,
         {
-          title: `Contribuição E2E ${timestamp}`,
-          description: 'Contribuição criada via teste E2E',
-          value: 150.50,
-          date: new Date().toISOString(),
-          type: 'DIZIMO',
+          title: `Campanha E2E ${timestamp}`,
+          description: 'Campanha criada via teste E2E',
+          goal: 15000.50,
+          endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          isActive: true,
+          paymentMethods: [
+            {
+              type: 'PIX',
+              data: { chave: '12345678900' },
+            },
+          ],
         }
       )
 
       expect(contributionResult.id).toBeDefined()
-      expect(contributionResult.title).toBe(`Contribuição E2E ${timestamp}`)
-      expect(contributionResult.value).toBe(150.50)
-      expect(contributionResult.type).toBe('DIZIMO')
+      expect(contributionResult.title).toBe(`Campanha E2E ${timestamp}`)
+      expect(contributionResult.goal).toBe(15000.50)
+      expect(contributionResult.isActive).toBe(true)
       expect(contributionResult.branchId).toBe(branchId)
       console.log('[E2E] ✅ Contribuição criada:', contributionResult.id)
 
@@ -342,23 +348,22 @@ describe('E2E: Fluxo Completo - Registro até Contribuição', () => {
       // Criar 3 contribuições
       console.log('[E2E] 💰 Criando múltiplas contribuições...')
       const contributions = []
-      const types: Array<'DIZIMO' | 'OFERTA' | 'OUTRO'> = [
-        'DIZIMO',
-        'OFERTA',
-        'OUTRO',
-      ]
-
       for (let i = 0; i < 3; i++) {
         const contribution = await createContribution(app, auth.token, {
-          title: `Contribuição ${i + 1} - E2E ${timestamp}`,
-          value: (i + 1) * 100,
-          date: new Date().toISOString(),
-          type: types[i],
+          title: `Campanha ${i + 1} - E2E ${timestamp}`,
+          goal: (i + 1) * 1000,
+          isActive: true,
+          paymentMethods: [
+            {
+              type: 'PIX',
+              data: { chave: `1234567890${i}` },
+            },
+          ],
         })
 
         contributions.push(contribution)
         expect(contribution.id).toBeDefined()
-        expect(contribution.type).toBe(types[i])
+        expect(contribution.goal).toBe((i + 1) * 1000)
       }
 
       expect(contributions).toHaveLength(3)
@@ -424,7 +429,9 @@ describe('E2E: Fluxo Completo - Registro até Contribuição', () => {
         }
       )
 
-      // Tentar criar contribuição sem valor (deve falhar)
+      // Tentar criar campanha de contribuição sem título (deve falhar)
+      // O modelo atual de Contribution é uma campanha, não uma contribuição individual
+      // O único campo obrigatório é 'title'
       const response = await app.inject({
         method: 'POST',
         url: '/contributions',
@@ -432,10 +439,8 @@ describe('E2E: Fluxo Completo - Registro até Contribuição', () => {
           authorization: `Bearer ${auth.token}`,
         },
         payload: {
-          title: 'Contribuição sem valor',
-          date: new Date().toISOString(),
-          type: 'DIZIMO',
-          // valor ausente
+          description: 'Campanha sem título',
+          // title ausente (campo obrigatório)
         },
       })
 
@@ -562,6 +567,7 @@ describe('E2E: Fluxo Completo - Registro até Contribuição', () => {
         amount: 300.0,
         type: 'EXIT',
         category: 'Despesas',
+        exitType: 'ALUGUEL',
       })
 
       expect(exitTransaction.id).toBeDefined()
@@ -660,12 +666,14 @@ describe('E2E: Fluxo Completo - Registro até Contribuição', () => {
       // Criar 3 transações de saída
       console.log('[E2E] 💰 Criando múltiplas transações de saída...')
       const exits = []
+      const exitTypes: Array<'ALUGUEL' | 'ENERGIA' | 'AGUA' | 'INTERNET' | 'OUTROS'> = ['ALUGUEL', 'ENERGIA', 'AGUA']
       for (let i = 1; i <= 3; i++) {
         const transaction = await createTransaction(app, auth.token, {
           title: `Saída ${i} - E2E ${timestamp}`,
           amount: i * 50,
           type: 'EXIT',
           category: `Despesa ${i}`,
+          exitType: exitTypes[i - 1],
         })
         exits.push(transaction)
         expect(transaction.id).toBeDefined()

@@ -53,19 +53,23 @@ describe('Contributions Page', () => {
     const mockContributions = [
       {
         id: 'contrib-1',
-        title: 'Dízimo Mensal',
-        description: 'Dízimo do mês',
-        value: 100.0,
-        date: '2024-01-15',
-        type: 'DIZIMO',
+        title: 'Campanha de Construção',
+        description: 'Campanha para construção',
+        goal: 50000.0,
+        endDate: '2024-12-31',
+        raised: 25000.0,
+        isActive: true,
+        PaymentMethods: [],
       },
       {
         id: 'contrib-2',
-        title: 'Oferta Especial',
-        description: 'Oferta especial',
-        value: 50.0,
-        date: '2024-01-20',
-        type: 'OFERTA',
+        title: 'Campanha de Missões',
+        description: 'Campanha para missões',
+        goal: 10000.0,
+        endDate: '2024-06-30',
+        raised: 5000.0,
+        isActive: true,
+        PaymentMethods: [],
       },
     ]
 
@@ -80,8 +84,8 @@ describe('Contributions Page', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByText('Dízimo Mensal')).toBeInTheDocument()
-      expect(screen.getByText('Oferta Especial')).toBeInTheDocument()
+      expect(screen.getByText('Campanha de Construção')).toBeInTheDocument()
+      expect(screen.getByText('Campanha de Missões')).toBeInTheDocument()
     })
   })
 

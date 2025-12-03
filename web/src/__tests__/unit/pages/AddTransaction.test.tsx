@@ -165,6 +165,7 @@ describe('AddTransaction Page', () => {
         title: 'Pagamento',
         amount: 300.0,
         type: 'EXIT',
+        exitType: 'ALUGUEL',
         category: 'Despesas',
       },
     }
@@ -191,6 +192,16 @@ describe('AddTransaction Page', () => {
     const typeSelect = document.getElementById('type') as HTMLSelectElement
     await user.selectOptions(typeSelect, 'EXIT')
 
+    // Aguardar campo exitType aparecer (obrigatório para EXIT)
+    await waitFor(() => {
+      const exitTypeSelect = document.getElementById('exitType')
+      expect(exitTypeSelect).toBeInTheDocument()
+    })
+
+    // Selecionar exitType usando ID
+    const exitTypeSelect = document.getElementById('exitType') as HTMLSelectElement
+    await user.selectOptions(exitTypeSelect, 'ALUGUEL')
+
     // Preencher categoria usando ID
     const categoryInput = document.getElementById('category') as HTMLInputElement
     await user.type(categoryInput, 'Despesas')
@@ -209,6 +220,7 @@ describe('AddTransaction Page', () => {
         title: 'Pagamento',
         amount: 300,
         type: 'EXIT',
+        exitType: 'ALUGUEL',
         category: 'Despesas',
       }))
     })
@@ -394,6 +406,7 @@ describe('AddTransaction Page', () => {
     await waitFor(() => {
       expect(toast.default.error).toHaveBeenCalledWith('Erro ao criar transação')
     })
+  })
 
   it('deve exibir campo exitType quando tipo é EXIT', async () => {
     const user = userEvent.setup()
@@ -603,6 +616,5 @@ describe('AddTransaction Page', () => {
       }))
     })
   })
-})
 })
 

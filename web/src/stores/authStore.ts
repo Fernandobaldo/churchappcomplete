@@ -33,6 +33,7 @@ type AuthStore = {
   user: User | null
   token: string | null
   setUserFromToken: (token: string) => void
+  updateUser: (updates: Partial<User>) => void
   logout: () => void
   setToken: (token: string) => void
 }
@@ -75,6 +76,20 @@ export const useAuthStore = create<AuthStore>()(
           // Em caso de erro, ainda salva o token
           set({ token })
         }
+      },
+      updateUser: (updates) => {
+        set((state) => {
+          if (!state.user) {
+            return state
+          }
+          return {
+            ...state,
+            user: {
+              ...state.user,
+              ...updates,
+            },
+          }
+        })
       },
       logout: () => set({ user: null, token: null }),
       setToken: (token) => set({ token }),

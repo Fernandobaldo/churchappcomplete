@@ -23,15 +23,39 @@ export async function checkPlanMembersLimit(userId: string): Promise<void> {
     },
   })
 
-  if (!user?.Subscription[0]?.Plan) {
-    throw new Error('Plano não encontrado para o usuário')
+  if (!user?.Member?.Branch?.churchId) {
+    throw new Error('Igreja não encontrada para o usuário')
   }
 
-  const plan = user.Subscription[0].Plan
-  const churchId = user.Member?.Branch.churchId
+  const churchId = user.Member.Branch.churchId
+  let plan = user?.Subscription[0]?.Plan
 
-  if (!churchId) {
-    throw new Error('Igreja não encontrada para o usuário')
+  // 2. Se o usuário não tiver plano, buscar o plano do ADMINGERAL da igreja
+  if (!plan) {
+    const adminMember = await prisma.member.findFirst({
+      where: {
+        Branch: {
+          churchId,
+        },
+        role: 'ADMINGERAL',
+      },
+      include: {
+        User: {
+          include: {
+            Subscription: {
+              where: { status: 'active' },
+              include: { Plan: true },
+            },
+          },
+        },
+      },
+    })
+
+    if (!adminMember?.User?.Subscription[0]?.Plan) {
+      throw new Error('Plano não encontrado para o usuário ou para a igreja')
+    }
+
+    plan = adminMember.User.Subscription[0].Plan
   }
 
   // 2. Se maxMembers for null, significa ilimitado
@@ -88,15 +112,39 @@ export async function checkPlanBranchesLimit(userId: string): Promise<void> {
     },
   })
 
-  if (!user?.Subscription[0]?.Plan) {
-    throw new Error('Plano não encontrado para o usuário')
+  if (!user?.Member?.Branch?.churchId) {
+    throw new Error('Igreja não encontrada para o usuário')
   }
 
-  const plan = user.Subscription[0].Plan
-  const churchId = user.Member?.Branch.churchId
+  const churchId = user.Member.Branch.churchId
+  let plan = user?.Subscription[0]?.Plan
 
-  if (!churchId) {
-    throw new Error('Igreja não encontrada para o usuário')
+  // 2. Se o usuário não tiver plano, buscar o plano do ADMINGERAL da igreja
+  if (!plan) {
+    const adminMember = await prisma.member.findFirst({
+      where: {
+        Branch: {
+          churchId,
+        },
+        role: 'ADMINGERAL',
+      },
+      include: {
+        User: {
+          include: {
+            Subscription: {
+              where: { status: 'active' },
+              include: { Plan: true },
+            },
+          },
+        },
+      },
+    })
+
+    if (!adminMember?.User?.Subscription[0]?.Plan) {
+      throw new Error('Plano não encontrado para o usuário ou para a igreja')
+    }
+
+    plan = adminMember.User.Subscription[0].Plan
   }
 
   // 2. Se maxBranches for null, significa ilimitado

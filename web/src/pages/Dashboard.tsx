@@ -6,12 +6,14 @@ import { useAuthStore } from '../stores/authStore'
 import toast from 'react-hot-toast'
 import PermissionGuard from '../components/PermissionGuard'
 import { hasAccess } from '../utils/authUtils'
+import { DEFAULT_EVENT_IMAGE } from '../constants/defaultImages'
 
 interface NextEvent {
   id: string
   title: string
   startDate: string
   location: string
+  imageUrl?: string
 }
 
 export default function Dashboard() {
@@ -119,16 +121,26 @@ export default function Dashboard() {
         })}
       </div>
 
-      {nextEvent && (
-        <div className="card">
-          <h2 className="text-xl font-semibold mb-4">Próximo Evento</h2>
-          <div className="flex items-center gap-4">
-            <div className="bg-primary-light p-4 rounded-lg">
-              <Calendar className="w-6 h-6 text-primary" />
-            </div>
-            <div className="flex-1">
-              <h3 className="font-semibold text-lg">{nextEvent.title}</h3>
-              <p className="text-gray-600">
+      <div>
+        <h2 className="text-xl font-semibold mb-4">Próximo Evento</h2>
+        <div className="relative w-full h-64 rounded-lg overflow-hidden shadow-lg cursor-pointer group"
+             onClick={() => nextEvent ? navigate(`/app/events/${nextEvent.id}`) : navigate('/app/events')}>
+        <img
+          src={nextEvent?.imageUrl 
+            ? (nextEvent.imageUrl.startsWith('http') ? nextEvent.imageUrl : `${api.defaults.baseURL}${nextEvent.imageUrl}`)
+            : DEFAULT_EVENT_IMAGE
+          }
+          alt={nextEvent?.title || 'Próximo Evento'}
+          className="w-full h-full object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
+        <div className="absolute bottom-0 left-0 right-0 p-6">
+          <h2 className="text-2xl font-bold text-white mb-2">
+            {nextEvent?.title || 'Próximo Evento'}
+          </h2>
+          {nextEvent && (
+            <>
+              <p className="text-white/90 text-sm mb-1">
                 {new Date(nextEvent.startDate).toLocaleDateString('pt-BR', {
                   day: 'numeric',
                   month: 'long',
@@ -137,17 +149,15 @@ export default function Dashboard() {
                   minute: '2-digit',
                 })}
               </p>
-              <p className="text-gray-600">{nextEvent.location}</p>
-            </div>
-            <button
-              onClick={() => navigate(`/app/events/${nextEvent.id}`)}
-              className="btn-primary"
-            >
-              Ver Detalhes
-            </button>
-          </div>
+              <p className="text-white/80 text-sm">{nextEvent.location}</p>
+            </>
+          )}
+          {!nextEvent && (
+            <p className="text-white/80 text-sm italic">Nenhum evento próximo cadastrado ainda.</p>
+          )}
         </div>
-      )}
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="card">

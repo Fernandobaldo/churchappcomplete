@@ -15,6 +15,13 @@ interface ChurchForm {
   primaryColor: string
   logoUrl: string
   address: string
+  phone?: string
+  email?: string
+  website?: string
+  facebook?: string
+  instagram?: string
+  youtube?: string
+  twitter?: string
 }
 
 export default function Church() {
@@ -77,11 +84,30 @@ export default function Church() {
   const onSubmit = async (data: ChurchForm) => {
     setLoading(true)
     try {
+      const socialMedia = {
+        facebook: data.facebook || undefined,
+        instagram: data.instagram || undefined,
+        youtube: data.youtube || undefined,
+        twitter: data.twitter || undefined,
+      }
+
+      // Remove campos undefined
+      Object.keys(socialMedia).forEach(key => {
+        if (socialMedia[key as keyof typeof socialMedia] === undefined) {
+          delete socialMedia[key as keyof typeof socialMedia]
+        }
+      })
+
       if (churchId) {
         // Atualiza a igreja existente
         await api.put(`/churches/${churchId}`, {
           name: data.name,
           logoUrl: data.logoUrl || undefined,
+          address: data.address || undefined,
+          phone: data.phone || undefined,
+          email: data.email || undefined,
+          website: data.website || undefined,
+          socialMedia: Object.keys(socialMedia).length > 0 ? socialMedia : undefined,
         })
         toast.success('Configurações da igreja atualizadas!')
       } else {
@@ -89,6 +115,11 @@ export default function Church() {
         const response = await api.post('/churches', {
           name: data.name,
           logoUrl: data.logoUrl || undefined,
+          address: data.address || undefined,
+          phone: data.phone || undefined,
+          email: data.email || undefined,
+          website: data.website || undefined,
+          socialMedia: Object.keys(socialMedia).length > 0 ? socialMedia : undefined,
           withBranch: true,
           branchName: 'Sede',
         })
@@ -266,6 +297,103 @@ export default function Church() {
                 placeholder="https://exemplo.com/logo.png"
               />
               <p className="mt-1 text-xs text-gray-500">Campo opcional - Cole a URL da imagem do logo</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
+                  Telefone
+                </label>
+                <input
+                  id="phone"
+                  type="tel"
+                  {...register('phone')}
+                  className="input"
+                  placeholder="(00) 00000-0000"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                  Email
+                </label>
+                <input
+                  id="email"
+                  type="email"
+                  {...register('email')}
+                  className="input"
+                  placeholder="contato@igreja.com"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="website" className="block text-sm font-medium text-gray-700 mb-1">
+                Website
+              </label>
+              <input
+                id="website"
+                type="url"
+                {...register('website')}
+                className="input"
+                placeholder="https://www.igreja.com"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Redes Sociais
+              </label>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="facebook" className="block text-xs text-gray-600 mb-1">
+                    Facebook
+                  </label>
+                  <input
+                    id="facebook"
+                    type="url"
+                    {...register('facebook')}
+                    className="input"
+                    placeholder="https://facebook.com/igreja"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="instagram" className="block text-xs text-gray-600 mb-1">
+                    Instagram
+                  </label>
+                  <input
+                    id="instagram"
+                    type="url"
+                    {...register('instagram')}
+                    className="input"
+                    placeholder="https://instagram.com/igreja"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="youtube" className="block text-xs text-gray-600 mb-1">
+                    YouTube
+                  </label>
+                  <input
+                    id="youtube"
+                    type="url"
+                    {...register('youtube')}
+                    className="input"
+                    placeholder="https://youtube.com/igreja"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="twitter" className="block text-xs text-gray-600 mb-1">
+                    Twitter
+                  </label>
+                  <input
+                    id="twitter"
+                    type="url"
+                    {...register('twitter')}
+                    className="input"
+                    placeholder="https://twitter.com/igreja"
+                  />
+                </div>
+              </div>
             </div>
 
             <div className="pt-4 border-t border-gray-200 flex gap-4">

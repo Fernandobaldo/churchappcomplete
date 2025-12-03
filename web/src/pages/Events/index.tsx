@@ -79,13 +79,6 @@ export default function Events() {
               className="card hover:shadow-lg transition-shadow cursor-pointer"
               onClick={() => navigate(`/app/events/${event.id}`)}
             >
-              {event.imageUrl && (
-                <img
-                  src={event.imageUrl}
-                  alt={event.title}
-                  className="w-full h-48 object-cover rounded-t-lg -mx-6 -mt-6 mb-4"
-                />
-              )}
               <h3 className="text-xl font-semibold mb-2">{event.title}</h3>
               {event.description && (
                 <p className="text-gray-600 text-sm mb-4 line-clamp-2">{event.description}</p>

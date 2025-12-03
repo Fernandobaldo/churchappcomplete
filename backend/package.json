@@ -32,6 +32,8 @@
   "dependencies": {
     "@fastify/cors": "^8.2.1",
     "@fastify/jwt": "^7.2.4",
+    "@fastify/multipart": "^7.6.0",
+    "@fastify/static": "^6.12.0",
     "@fastify/swagger": "^8.0.0",
     "@fastify/swagger-ui": "^1.8.0",
     "@prisma/client": "^6.7.0",

@@ -264,7 +264,18 @@ export async function registerController(request: FastifyRequest, reply: Fastify
       )
     }
 
-    return reply.status(201).send(result)
+    // Retorna os campos diretamente no body para registro interno (conforme schema Swagger)
+    // Para registro via invite, retorna { member: ..., token: ... }
+    // Para registro público, retorna { user: ..., token: ... }
+    // Para registro interno, retorna os campos diretamente
+    return reply.status(201).send({
+      id: result.id,
+      name: result.name,
+      email: result.email,
+      role: result.role,
+      branchId: result.branchId,
+      permissions: result.Permission?.map(p => ({ type: p.type })) || [],
+    })
   } catch (error: any) {
     // Erros de validação do Zod retornam 400
     if (error.name === 'ZodError') {

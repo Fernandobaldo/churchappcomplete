@@ -131,9 +131,13 @@ export async function createContribution(
   contributionData: {
     title: string
     description?: string
-    value: number
-    date: string // ISO string
-    type: 'DIZIMO' | 'OFERTA' | 'OUTRO'
+    goal?: number
+    endDate?: string // ISO string
+    isActive?: boolean
+    paymentMethods?: Array<{
+      type: 'PIX' | 'CONTA_BR' | 'IBAN'
+      data: Record<string, any>
+    }>
   }
 ) {
   const response = await request(app.server)
@@ -161,10 +165,13 @@ export async function createTransaction(
     amount: number
     type: 'ENTRY' | 'EXIT'
     category?: string
-    entryType?: 'OFERTA' | 'DIZIMO'
+    entryType?: 'OFERTA' | 'DIZIMO' | 'CONTRIBUICAO'
+    exitType?: 'ALUGUEL' | 'ENERGIA' | 'AGUA' | 'INTERNET' | 'OUTROS'
+    exitTypeOther?: string
     tithePayerMemberId?: string
     tithePayerName?: string
     isTithePayerMember?: boolean
+    contributionId?: string
   }
 ) {
   const response = await request(app.server)
@@ -212,5 +219,159 @@ export async function setupCompleteUser(
     branchId: churchResult.branch?.id,
     churchId: churchResult.church?.id || churchResult.id,
   }
+}
+
+/**
+ * Concede uma permissão específica a um membro
+ */
+export async function assignPermission(
+  app: FastifyInstance,
+  adminToken: string,
+  memberId: string,
+  permissionType: string
+) {
+  const response = await request(app.server)
+    .post(`/permissions/${memberId}`)
+    .set('Authorization', `Bearer ${adminToken}`)
+    .send({ permissions: [permissionType] })
+
+  if (response.status !== 200) {
+    throw new Error(
+      `Falha ao conceder permissão: ${response.status} - ${JSON.stringify(response.body)}`
+    )
+  }
+
+  return response.body
+}
+
+/**
+ * Atualiza a role de um membro
+ */
+export async function updateMemberRole(
+  app: FastifyInstance,
+  adminToken: string,
+  memberId: string,
+  newRole: 'MEMBER' | 'COORDINATOR' | 'ADMINFILIAL'
+) {
+  const response = await request(app.server)
+    .patch(`/members/${memberId}/role`)
+    .set('Authorization', `Bearer ${adminToken}`)
+    .send({ role: newRole })
+
+  if (response.status !== 200) {
+    throw new Error(
+      `Falha ao atualizar role: ${response.status} - ${JSON.stringify(response.body)}`
+    )
+  }
+
+  return response.body
+}
+
+/**
+ * Cria um devocional (requer autenticação e permissão devotional_manage)
+ */
+export async function createDevotional(
+  app: FastifyInstance,
+  token: string,
+  devotionalData: {
+    title: string
+    passage: string
+    content?: string
+  }
+) {
+  const response = await request(app.server)
+    .post('/devotionals')
+    .set('Authorization', `Bearer ${token}`)
+    .send(devotionalData)
+
+  if (response.status !== 201) {
+    throw new Error(
+      `Falha ao criar devocional: ${response.status} - ${JSON.stringify(response.body)}`
+    )
+  }
+
+  return response.body
+}
+
+/**
+ * Cria um membro (requer autenticação e permissão members_manage)
+ */
+export async function createMember(
+  app: FastifyInstance,
+  token: string,
+  memberData: {
+    name: string
+    email: string
+    password: string
+    role?: 'MEMBER' | 'COORDINATOR' | 'ADMINFILIAL'
+    phone?: string
+    address?: string
+    birthDate?: string
+    branchId?: string
+  }
+) {
+  const response = await request(app.server)
+    .post('/register')
+    .set('Authorization', `Bearer ${token}`)
+    .send(memberData)
+
+  if (response.status !== 201) {
+    throw new Error(
+      `Falha ao criar membro: ${response.status} - ${JSON.stringify(response.body)}`
+    )
+  }
+
+  return response.body
+}
+
+/**
+ * Cria um horário de culto (requer autenticação, role e permissão church_manage)
+ */
+export async function createServiceSchedule(
+  app: FastifyInstance,
+  token: string,
+  scheduleData: {
+    title: string
+    time: string
+    dayOfWeek: number // 0 = Domingo, 1 = Segunda, ..., 6 = Sábado
+    description?: string
+    location?: string
+    branchId: string
+  }
+) {
+  const response = await request(app.server)
+    .post('/service-schedules')
+    .set('Authorization', `Bearer ${token}`)
+    .send(scheduleData)
+
+  if (response.status !== 201) {
+    throw new Error(
+      `Falha ao criar horário de culto: ${response.status} - ${JSON.stringify(response.body)}`
+    )
+  }
+
+  return response.body
+}
+
+/**
+ * Busca um recurso por ID (genérico)
+ */
+export async function getResourceById(
+  app: FastifyInstance,
+  token: string,
+  resourcePath: string,
+  resourceId: string
+) {
+  const response = await request(app.server)
+    .get(`/${resourcePath}/${resourceId}`)
+    .set('Authorization', `Bearer ${token}`)
+
+  if (response.status !== 200) {
+    throw new Error(
+      `Falha ao buscar recurso: ${response.status} - ${JSON.stringify(response.body)}`
+    )
+  }
+
+  return response.body
 }
 

@@ -9,6 +9,11 @@ export class ChurchService {
                 data: {
                     name: data.name,
                     logoUrl: data.logoUrl,
+                    address: data.address,
+                    phone: data.phone,
+                    email: data.email,
+                    website: data.website,
+                    socialMedia: data.socialMedia,
                     isActive: true,
                 },
             });
@@ -109,6 +114,11 @@ export class ChurchService {
             data: {
                 name: data.name,
                 logoUrl: data.logoUrl,
+                address: data.address,
+                phone: data.phone,
+                email: data.email,
+                website: data.website,
+                socialMedia: data.socialMedia,
             },
         });
     }

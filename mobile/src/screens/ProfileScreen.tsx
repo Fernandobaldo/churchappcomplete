@@ -150,10 +150,14 @@ export default function ProfileScreen() {
                     </View>
                 )}
                 <View style={styles.infoRow}>
-                    <Text style={styles.label}>Cargo</Text>
+                    <Text style={styles.label}>Cargo na Igreja</Text>
+                    <Text style={styles.value}> {profile.position?.name || 'Nenhum'}</Text>
+                </View>
+                <View style={styles.infoRow}>
+                    <Text style={styles.label}>Nível de Acesso</Text>
                     <Text style={styles.value}> {formatRole(profile.role) || 'Nenhum'}</Text>
                 </View>
-                {canManagePermissions && (
+                {(canManagePermissions || isOwnProfile) && (
                 <View style={styles.infoRow}>
                 <Text style={styles.label}>Permissões:</Text>
                 <Text style={styles.valuePermission}> {formatPermission(profile.permissions) || 'Nenhum'}

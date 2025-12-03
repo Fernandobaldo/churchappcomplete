@@ -5,7 +5,7 @@ dotenv.config({ path: '.env.test' })
 process.env.NODE_ENV = 'test'
 process.env.VITEST = 'true'
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
 import Fastify from 'fastify'
 import fastifyJwt from '@fastify/jwt'
 import request from 'supertest'
@@ -291,6 +291,7 @@ describe('Finances Routes', () => {
         amount: 200.0,
         type: 'EXIT',
         category: 'Despesas',
+        exitType: 'ALUGUEL',
       }
 
       const response = await request(app.server)
@@ -832,9 +833,9 @@ describe('Finances Routes', () => {
       const contribution = await prisma.contribution.create({
         data: {
           title: 'Contribuição Teste',
-          value: 1000.0,
-          date: new Date(),
-          type: 'OFERTA',
+          goal: 1000.0,
+          endDate: new Date(),
+          isActive: true,
           branchId: branchId,
         },
       })

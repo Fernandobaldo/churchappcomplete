@@ -35,10 +35,12 @@ describe('Contributions Endpoints - Unit Tests', () => {
         data: [
           {
             id: 'contrib-1',
-            title: 'Dízimo de Janeiro',
-            value: 1000.0,
-            date: '2024-01-15',
-            type: 'DIZIMO',
+            title: 'Campanha de Janeiro',
+            goal: 10000.0,
+            endDate: '2024-12-31',
+            raised: 5000.0,
+            isActive: true,
+            PaymentMethods: [],
           },
         ],
       }
@@ -50,7 +52,8 @@ describe('Contributions Endpoints - Unit Tests', () => {
       expect(api.get).toHaveBeenCalledWith('/contributions')
       expect(response.data).toBeInstanceOf(Array)
       expect(response.data[0]).toHaveProperty('id')
-      expect(response.data[0]).toHaveProperty('value')
+      expect(response.data[0]).toHaveProperty('goal')
+      expect(response.data[0]).toHaveProperty('isActive')
     })
 
     it('deve retornar erro 400 quando usuário não está vinculado a filial', async () => {
@@ -81,10 +84,12 @@ describe('Contributions Endpoints - Unit Tests', () => {
       const mockResponse = {
         data: {
           id: 'contrib-1',
-          title: 'Dízimo de Janeiro',
-          value: 1000.0,
-          date: '2024-01-15',
-          type: 'DIZIMO',
+          title: 'Campanha de Janeiro',
+          goal: 10000.0,
+          endDate: '2024-12-31',
+          raised: 5000.0,
+          isActive: true,
+          PaymentMethods: [],
         },
       }
 
@@ -94,7 +99,8 @@ describe('Contributions Endpoints - Unit Tests', () => {
 
       expect(api.get).toHaveBeenCalledWith('/contributions/contrib-1')
       expect(response.data.id).toBe('contrib-1')
-      expect(response.data.value).toBe(1000.0)
+      expect(response.data.goal).toBe(10000.0)
+      expect(response.data.isActive).toBe(true)
     })
 
     it('deve retornar erro 404 quando contribuição não existe', async () => {
@@ -122,27 +128,35 @@ describe('Contributions Endpoints - Unit Tests', () => {
       const mockResponse = {
         data: {
           id: 'contrib-1',
-          title: 'Nova Contribuição',
-          value: 500.0,
-          date: '2024-01-15',
-          type: 'OFERTA',
+          title: 'Nova Campanha',
+          goal: 5000.0,
+          endDate: '2024-12-31',
+          isActive: true,
+          PaymentMethods: [],
         },
       }
 
       vi.mocked(api.post).mockResolvedValue(mockResponse)
 
       const contributionData = {
-        title: 'Nova Contribuição',
-        value: 500.0,
-        date: '2024-01-15',
-        type: 'OFERTA',
+        title: 'Nova Campanha',
+        goal: 5000.0,
+        endDate: '2024-12-31',
+        isActive: true,
+        paymentMethods: [
+          {
+            type: 'PIX',
+            data: { chave: '12345678900' },
+          },
+        ],
       }
 
       const response = await api.post('/contributions', contributionData)
 
       expect(api.post).toHaveBeenCalledWith('/contributions', contributionData)
       expect(response.data).toHaveProperty('id')
-      expect(response.data.title).toBe('Nova Contribuição')
+      expect(response.data.title).toBe('Nova Campanha')
+      expect(response.data.goal).toBe(5000.0)
     })
 
     it('deve retornar erro 400 quando branchId não está presente', async () => {
@@ -161,9 +175,8 @@ describe('Contributions Endpoints - Unit Tests', () => {
 
       await expect(
         api.post('/contributions', {
-          title: 'Nova Contribuição',
-          value: 500.0,
-          type: 'OFERTA',
+          title: 'Nova Campanha',
+          goal: 5000.0,
         })
       ).rejects.toMatchObject({
         response: {

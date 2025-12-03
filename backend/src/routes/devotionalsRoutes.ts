@@ -1,5 +1,4 @@
 import { FastifyInstance } from 'fastify'
-import { checkRole } from '../middlewares/checkRole'
 import { checkPermission } from '../middlewares/checkPermission'
 import { DevotionalController } from '../controllers/devotionalController'
 import { createDevotionalSchema } from '../schemas/devotionalSchemas'
@@ -14,7 +13,6 @@ export async function devotionalsRoutes(app: FastifyInstance) {
   app.post('/', {
     preHandler: [
       app.authenticate,
-      checkRole(['ADMINGERAL', 'ADMINFILIAL', 'COORDINATOR']),
       checkPermission(['devotional_manage']),
     ],
     schema: createDevotionalSchema
@@ -31,7 +29,6 @@ export async function devotionalsRoutes(app: FastifyInstance) {
   app.put('/:id', {
     preHandler: [
       app.authenticate,
-      checkRole(['ADMINGERAL', 'ADMINFILIAL', 'COORDINATOR']),
       checkPermission(['devotional_manage']),
     ],
     schema: {
@@ -89,7 +86,6 @@ export async function devotionalsRoutes(app: FastifyInstance) {
   app.delete('/:id', {
     preHandler: [
       app.authenticate,
-      checkRole(['ADMINGERAL', 'ADMINFILIAL', 'COORDINATOR']),
       checkPermission(['devotional_manage']),
     ],
     schema: {

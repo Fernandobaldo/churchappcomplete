@@ -49,16 +49,16 @@ export class ContributionController {
 
       // branchId já foi validado pelo middleware checkBranchId
 
-      // Converte data YYYY-MM-DD para ISO 8601 se necessário
-      let dateValue = data.date
-      if (/^\d{4}-\d{2}-\d{2}$/.test(data.date)) {
+      // Converte endDate YYYY-MM-DD para ISO 8601 se necessário
+      let endDateValue = data.endDate
+      if (data.endDate && /^\d{4}-\d{2}-\d{2}$/.test(data.endDate)) {
         // Se for apenas data (YYYY-MM-DD), adiciona hora para ISO 8601
-        dateValue = `${data.date}T00:00:00.000Z`
+        endDateValue = `${data.endDate}T00:00:00.000Z`
       }
 
       const created = await this.service.create({
         ...data,
-        date: dateValue,
+        endDate: endDateValue,
         branchId: user.branchId
       })
 
@@ -79,11 +79,32 @@ export class ContributionController {
     }
   }
 
-  async getTypes(_: FastifyRequest, reply: FastifyReply) {
-    return reply.send([
-      { label: 'Dízimo', value: 'DIZIMO' },
-      { label: 'Oferta', value: 'OFERTA' },
-      { label: 'Outro', value: 'OUTRO' },
-    ])
+  async toggleActive(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const { id } = request.params as { id: string }
+      const user = request.user
+
+      if (!user?.branchId) {
+        return reply.status(400).send({ message: 'Usuário não vinculado a uma filial.' })
+      }
+
+      const contribution = await this.service.getById(id)
+
+      if (!contribution) {
+        return reply.status(404).send({ message: 'Contribuição não encontrada' })
+      }
+
+      // Verificar se a contribuição pertence à mesma filial do usuário
+      if (contribution.branchId !== user.branchId) {
+        return reply.status(403).send({ message: 'Você não tem permissão para alterar esta contribuição' })
+      }
+
+      const updated = await this.service.toggleActive(id)
+
+      return reply.send(updated)
+    } catch (error: any) {
+      console.error('❌ Erro ao alterar status da contribuição:', error)
+      return reply.status(500).send({ error: 'Erro interno ao alterar status', details: error.message })
+    }
   }
 }

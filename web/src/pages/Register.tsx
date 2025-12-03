@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form'
 import toast from 'react-hot-toast'
 import api from '../api/api'
 import { useAuthStore } from '../stores/authStore'
+import { Upload, X } from 'lucide-react'
 
 interface RegisterForm {
   name: string
@@ -16,15 +17,48 @@ export default function Register() {
   const navigate = useNavigate()
   const { setUserFromToken } = useAuthStore()
   const [loading, setLoading] = useState(false)
+  const [avatarFile, setAvatarFile] = useState<File | null>(null)
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const {
     register,
     handleSubmit,
     formState: { errors },
   } = useForm<RegisterForm>()
 
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('A imagem deve ter no máximo 5MB')
+        return
+      }
+      if (!file.type.startsWith('image/')) {
+        toast.error('Por favor, selecione uma imagem')
+        return
+      }
+      setAvatarFile(file)
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setAvatarPreview(reader.result as string)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const removeAvatar = () => {
+    setAvatarFile(null)
+    setAvatarPreview(null)
+  }
+
   const onSubmit = async (data: RegisterForm) => {
     setLoading(true)
     try {
+      let avatarUrl: string | undefined = undefined
+
+      // Upload do avatar se houver (após criar conta e ter token)
+      // Por enquanto, vamos fazer upload depois de criar a conta
+      // pois o endpoint de upload requer autenticação
+
       let response
       
       // Tenta primeiro o endpoint /register (registro público)
@@ -33,6 +67,7 @@ export default function Register() {
           name: data.name,
           email: data.email,
           password: data.password,
+          avatarUrl,
         })
         
         const { token } = response.data
@@ -43,6 +78,32 @@ export default function Register() {
         
         // Salva o token
         setUserFromToken(token)
+        
+        // Upload do avatar se houver (após ter token)
+        if (avatarFile) {
+          try {
+            const formData = new FormData()
+            formData.append('file', avatarFile)
+            const uploadResponse = await api.post('/upload/avatar', formData, {
+              headers: {
+                'Content-Type': 'multipart/form-data',
+              },
+            })
+            avatarUrl = uploadResponse.data.url
+            
+            // Atualiza o perfil com o avatar
+            try {
+              const profileResponse = await api.get('/members/me')
+              const memberId = profileResponse.data.id
+              await api.put(`/members/${memberId}`, { avatarUrl })
+            } catch (error) {
+              console.error('Erro ao atualizar avatar:', error)
+            }
+          } catch (uploadError: any) {
+            console.error('Erro ao fazer upload do avatar:', uploadError)
+            // Não bloqueia o fluxo se o upload falhar
+          }
+        }
         
         // Tenta criar a igreja com filial
         try {
@@ -80,6 +141,32 @@ export default function Register() {
           
           // Salva o token temporariamente
           setUserFromToken(token)
+          
+          // Upload do avatar se houver (após ter token)
+          if (avatarFile) {
+            try {
+              const formData = new FormData()
+              formData.append('file', avatarFile)
+              const uploadResponse = await api.post('/upload/avatar', formData, {
+                headers: {
+                  'Content-Type': 'multipart/form-data',
+                },
+              })
+              avatarUrl = uploadResponse.data.url
+              
+              // Atualiza o perfil com o avatar
+              try {
+                const profileResponse = await api.get('/members/me')
+                const memberId = profileResponse.data.id
+                await api.put(`/members/${memberId}`, { avatarUrl })
+              } catch (error) {
+                console.error('Erro ao atualizar avatar:', error)
+              }
+            } catch (uploadError: any) {
+              console.error('Erro ao fazer upload do avatar:', uploadError)
+              // Não bloqueia o fluxo se o upload falhar
+            }
+          }
           
           // Tenta criar a igreja com filial
           try {
@@ -177,6 +264,44 @@ export default function Register() {
                 placeholder="••••••••"
               />
               {errors.password && <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>}
+            </div>
+
+            <div>
+              <label htmlFor="avatar" className="block text-sm font-medium text-gray-700 mb-1">
+                Foto de perfil (opcional)
+              </label>
+              {avatarPreview ? (
+                <div className="relative inline-block">
+                  <img
+                    src={avatarPreview}
+                    alt="Preview"
+                    className="w-24 h-24 rounded-full object-cover border-2 border-primary"
+                  />
+                  <button
+                    type="button"
+                    onClick={removeAvatar}
+                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <label
+                  htmlFor="avatar"
+                  className="flex flex-col items-center justify-center w-24 h-24 border-2 border-dashed border-gray-300 rounded-full cursor-pointer hover:border-primary transition-colors"
+                >
+                  <Upload className="w-6 h-6 text-gray-400 mb-1" />
+                  <span className="text-xs text-gray-500">Adicionar</span>
+                  <input
+                    id="avatar"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleAvatarChange}
+                    className="hidden"
+                  />
+                </label>
+              )}
+              <p className="mt-1 text-xs text-gray-500">Máximo 5MB</p>
             </div>
 
             <div>

@@ -2,9 +2,10 @@ import { getAllPermissionsController, assignPermissionsController } from '../../
 import { checkRole } from '../../middlewares/checkRole';
 export async function permissionsRoutes(app) {
     app.get('/all', {
-        preHandler: [app.authenticate],
-    }, getAllPermissionsController);
-    app.post('/:id', {
         preHandler: [app.authenticate, checkRole(['ADMINGERAL', 'ADMINFILIAL', 'COORDINATOR'])],
+    }, getAllPermissionsController);
+    // Apenas ADMINGERAL e ADMINFILIAL podem atribuir permissões
+    app.post('/:id', {
+        preHandler: [app.authenticate, checkRole(['ADMINGERAL', 'ADMINFILIAL'])],
     }, assignPermissionsController);
 }

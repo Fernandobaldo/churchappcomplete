@@ -1,64 +1,139 @@
 import React from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, Linking, Image } from 'react-native'
+import { View, Text, StyleSheet, ScrollView, Image, Linking } from 'react-native'
 import { useRoute } from '@react-navigation/native'
+
+interface PaymentMethod {
+    id: string
+    type: string
+    data: Record<string, any>
+}
 
 export default function ContributionDetailScreen() {
     const route = useRoute()
     const { contribution } = route.params || {}
+    
     if (!contribution) {
         return (
             <View style={styles.container}>
-                <Text style={{ color: 'red' }}>Erro: contribuição não encontrada.</Text>
+                <Text style={{ color: 'red' }}>Erro: campanha não encontrada.</Text>
             </View>
         )
     }
 
+    const getPaymentMethodLabel = (type: string) => {
+        const labels: Record<string, string> = {
+            PIX: 'PIX',
+            CONTA_BR: 'Conta Bancária Brasileira',
+            IBAN: 'IBAN',
+        }
+        return labels[type] || type
+    }
+
     return (
-        <View style={styles.container}>
+        <ScrollView style={styles.container} contentContainerStyle={styles.content}>
             <Text style={styles.title}>{contribution.title}</Text>
-            <Text style={styles.subtitle}>{contribution.description}</Text>
+            {contribution.description && (
+                <Text style={styles.subtitle}>{contribution.description}</Text>
+            )}
 
             <View style={styles.stats}>
-                <View>
-                    <Text style={styles.label}>Objetivo</Text>
-                    <Text style={styles.amount}>${Number(contribution.goal || 0).toLocaleString('en-US')}</Text>
+                <View style={styles.statItem}>
+                    <Text style={styles.label}>Meta</Text>
+                    <Text style={styles.amount}>
+                        {contribution.goal 
+                            ? `R$ ${contribution.goal.toFixed(2).replace('.', ',')}`
+                            : 'Sem meta'
+                        }
+                    </Text>
                 </View>
-                <View>
-                    <Text style={styles.label}>Alcançado</Text>
-                    <Text style={styles.amount}>${Number(contribution.raised || 0).toLocaleString('en-US')}</Text>
+                <View style={styles.statItem}>
+                    <Text style={styles.label}>Arrecadado</Text>
+                    <Text style={[styles.amount, styles.raisedAmount]}>
+                        R$ {(contribution.raised || 0).toFixed(2).replace('.', ',')}
+                    </Text>
                 </View>
             </View>
 
-            <Text style={styles.sectionTitle}>Formas de contribuir</Text>
+            {contribution.endDate && (
+                <View style={styles.dateContainer}>
+                    <Text style={styles.label}>Data de Término</Text>
+                    <Text style={styles.dateText}>
+                        {new Date(contribution.endDate).toLocaleDateString('pt-BR')}
+                    </Text>
+                </View>
+            )}
 
-            <View style={styles.card}>
-                <Text style={styles.methodTitle}>QR Code PIX</Text>
-                <Text style={styles.text}>Banco: {contribution.bankName || '123 Bank'}</Text>
-                <Text style={styles.text}>Agencia: {contribution.agency || '45678'}</Text>
-                <Image
-                    source={{ uri: contribution.qrCodeUrl || 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=PIX' }}
-                    style={styles.qrCode}
-                />
-            </View>
+            {contribution.PaymentMethods && contribution.PaymentMethods.length > 0 && (
+                <>
+                    <Text style={styles.sectionTitle}>Formas de Pagamento</Text>
 
-            <View style={styles.card}>
-                <Text style={styles.methodTitle}>Transferencia Bancaria</Text>
-                <Text style={styles.text}>Banco: {contribution.bankName || '123 Bank'}</Text>
-                <Text style={styles.text}>Agencia: {contribution.agency || '45678'}</Text>
-                <Text style={styles.text}>Nome da conta: {contribution.accountName || 'First Church'}</Text>
-            </View>
+                    {contribution.PaymentMethods.map((pm: PaymentMethod) => (
+                        <View key={pm.id} style={styles.card}>
+                            <Text style={styles.methodTitle}>{getPaymentMethodLabel(pm.type)}</Text>
+                            
+                            {pm.type === 'PIX' && (
+                                <>
+                                    {pm.data.chave && (
+                                        <Text style={styles.text}>Chave: {pm.data.chave}</Text>
+                                    )}
+                                    {pm.data.qrCodeUrl && (
+                                        <>
+                                            <Image
+                                                source={{ uri: pm.data.qrCodeUrl }}
+                                                style={styles.qrCode}
+                                            />
+                                            <Text 
+                                                style={styles.link}
+                                                onPress={() => Linking.openURL(pm.data.qrCodeUrl)}
+                                            >
+                                                Abrir QR Code
+                                            </Text>
+                                        </>
+                                    )}
+                                </>
+                            )}
 
-            <View style={styles.card}>
-                <Text style={styles.methodTitle}>Link para pagamento</Text>
-                <TouchableOpacity onPress={() => Linking.openURL(contribution.paymentLink || 'https://example.com')}>
-                    <Text style={styles.link}>Faça uma contribuição online</Text>
-                </TouchableOpacity>
-            </View>
+                            {pm.type === 'CONTA_BR' && (
+                                <>
+                                    {pm.data.banco && (
+                                        <Text style={styles.text}>Banco: {pm.data.banco}</Text>
+                                    )}
+                                    {pm.data.agencia && (
+                                        <Text style={styles.text}>Agência: {pm.data.agencia}</Text>
+                                    )}
+                                    {pm.data.conta && (
+                                        <Text style={styles.text}>Conta: {pm.data.conta}</Text>
+                                    )}
+                                    {pm.data.tipo && (
+                                        <Text style={styles.text}>Tipo: {pm.data.tipo}</Text>
+                                    )}
+                                </>
+                            )}
 
-            <TouchableOpacity style={styles.proofButton}>
-                <Text style={styles.proofText}>Já contribuiu? Enviar comprovante</Text>
-            </TouchableOpacity>
-        </View>
+                            {pm.type === 'IBAN' && (
+                                <>
+                                    {pm.data.iban && (
+                                        <Text style={styles.text}>IBAN: {pm.data.iban}</Text>
+                                    )}
+                                    {pm.data.banco && (
+                                        <Text style={styles.text}>Banco: {pm.data.banco}</Text>
+                                    )}
+                                    {pm.data.nome && (
+                                        <Text style={styles.text}>Titular: {pm.data.nome}</Text>
+                                    )}
+                                </>
+                            )}
+                        </View>
+                    ))}
+                </>
+            )}
+
+            {(!contribution.PaymentMethods || contribution.PaymentMethods.length === 0) && (
+                <View style={styles.card}>
+                    <Text style={styles.text}>Nenhuma forma de pagamento cadastrada.</Text>
+                </View>
+            )}
+        </ScrollView>
     )
 }
 
@@ -66,6 +141,8 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#fff',
+    },
+    content: {
         padding: 20,
         paddingTop: 30,
     },
@@ -83,7 +160,10 @@ const styles = StyleSheet.create({
     stats: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        marginBottom: 30,
+        marginBottom: 20,
+    },
+    statItem: {
+        flex: 1,
     },
     label: {
         color: '#666',
@@ -93,11 +173,25 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: 'bold',
         marginTop: 4,
+        color: '#333',
+    },
+    raisedAmount: {
+        color: '#22c55e',
+    },
+    dateContainer: {
+        marginBottom: 20,
+    },
+    dateText: {
+        fontSize: 16,
+        fontWeight: '600',
+        marginTop: 4,
+        color: '#333',
     },
     sectionTitle: {
         fontSize: 18,
         fontWeight: 'bold',
         marginBottom: 12,
+        marginTop: 10,
     },
     card: {
         backgroundColor: '#f9f9f9',
@@ -109,30 +203,23 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
         marginBottom: 8,
+        color: '#3366FF',
     },
     text: {
         color: '#444',
         marginBottom: 4,
+        fontSize: 14,
     },
     qrCode: {
-        width: 120,
-        height: 120,
+        width: 150,
+        height: 150,
         marginTop: 12,
+        marginBottom: 8,
         alignSelf: 'center',
     },
     link: {
         color: '#3366FF',
         marginTop: 8,
-    },
-    proofButton: {
-        backgroundColor: '#f1f1f1',
-        padding: 14,
-        borderRadius: 8,
-        alignItems: 'center',
-        marginTop: 24,
-    },
-    proofText: {
-        color: '#444',
-        fontWeight: '500',
+        textDecorationLine: 'underline',
     },
 })

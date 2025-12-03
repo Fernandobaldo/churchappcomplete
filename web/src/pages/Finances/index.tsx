@@ -493,7 +493,7 @@ export default function Finances() {
       </div>
 
       {/* Filtros e Pesquisa */}
-      <div className="card">
+      <div id="transactions-card" className="card">
         {/* #region agent log */}
         {(() => {
           fetch('http://127.0.0.1:7242/ingest/8e8d7848-a9d0-4e21-9b61-3624bfb1ced4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Finances/index.tsx:render:filters-section',message:'Rendering filters section',data:{showFilters},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});

@@ -7,7 +7,9 @@ $ip = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object {
 
 if (-not $ip) {
     Write-Host "❌ IP não detectado automaticamente. Usando IP padrão: 192.168.1.23" -ForegroundColor Yellow
-    $ip = "192.168.1.23"
+   # $ip = "192.168.1.23"
+    $ip = "10.132.50.166"
+
 } else {
     Write-Host "✅ IP detectado: $ip" -ForegroundColor Green
 }

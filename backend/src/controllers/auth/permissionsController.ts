@@ -2,6 +2,8 @@ import { FastifyRequest, FastifyReply } from 'fastify'
 import { z } from 'zod'
 import { prisma } from '../../lib/prisma'
 import { AuditLogger } from '../../utils/auditHelper'
+import { Role } from '@prisma/client'
+import { RESTRICTED_PERMISSIONS } from '../../constants/permissions'
 
 // 🔍 Listar todas as permissões
 export async function getAllPermissionsController(request: FastifyRequest, reply: FastifyReply) {
@@ -51,6 +53,28 @@ export async function assignPermissionsController(request: FastifyRequest, reply
   console.log(`[PERMISSIONS DEBUG] POST /permissions/${id}`)
   console.log(`[PERMISSIONS DEBUG] Permissões recebidas:`, permissions)
   console.log(`[PERMISSIONS DEBUG] Quantidade de permissões:`, permissions.length)
+
+  // Validação: Verificar se membro com role MEMBER está tentando receber permissões restritas
+  const member = await prisma.member.findUnique({
+    where: { id },
+    select: { id: true, role: true },
+  })
+
+  if (!member) {
+    return reply.code(404).send({
+      message: 'Membro não encontrado',
+    })
+  }
+
+  // Permissões que requerem pelo menos role COORDINATOR
+  const requestedRestricted = permissions.filter(perm => RESTRICTED_PERMISSIONS.includes(perm))
+
+  if (member.role === Role.MEMBER && requestedRestricted.length > 0) {
+    return reply.code(403).send({
+      message: 'Esta permissão requer pelo menos a role de Coordenador',
+      error: `Membros com role MEMBER não podem receber as permissões: ${requestedRestricted.join(', ')}`,
+    })
+  }
 
   // Usa transação para garantir atomicidade
   const result = await prisma.$transaction(async (tx) => {

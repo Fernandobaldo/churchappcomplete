@@ -97,6 +97,22 @@ export const mockEvents = [
 export const mockContributions = [
   {
     id: 'contrib-1',
+    title: 'Campanha de Construção',
+    description: 'Campanha para construção da nova igreja',
+    goal: 50000.0,
+    endDate: '2024-12-31',
+    raised: 25000.0,
+    isActive: true,
+    PaymentMethods: [
+      {
+        id: 'pm-1',
+        type: 'PIX',
+        data: { chave: '12345678900' },
+      },
+    ],
+  },
+  {
+    id: 'contrib-2',
     title: 'Dízimo',
     description: 'Dízimo do mês',
     value: 100.0,
@@ -106,12 +122,24 @@ export const mockContributions = [
   },
   {
     id: 'contrib-2',
-    title: 'Oferta',
-    description: 'Oferta especial',
-    value: 50.0,
-    date: '2024-01-20',
-    type: 'OFERTA',
-    branchId: 'branch-123',
+    title: 'Campanha de Missões',
+    description: 'Campanha para missões',
+    goal: 10000.0,
+    endDate: '2024-06-30',
+    raised: 5000.0,
+    isActive: true,
+    PaymentMethods: [
+      {
+        id: 'pm-2',
+        type: 'CONTA_BR',
+        data: {
+          banco: 'Banco do Brasil',
+          agencia: '1234',
+          conta: '56789-0',
+          tipo: 'CORRENTE',
+        },
+      },
+    ],
   },
 ]
 

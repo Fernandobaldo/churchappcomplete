@@ -32,6 +32,8 @@ export default function Members() {
   const fetchMembers = async () => {
     try {
       const response = await api.get('/members')
+      console.log('[MEMBERS] Resposta do backend:', response.data)
+      console.log('[MEMBERS] Primeiro membro avatarUrl:', response.data[0]?.avatarUrl)
       setMembers(response.data)
     } catch (error) {
       toast.error('Erro ao carregar membros')
@@ -115,19 +117,34 @@ export default function Members() {
                 onClick={() => navigate(`/app/members/${member.id}`)}
               >
                 <div className="flex items-center gap-4 mb-4">
-                  {member.avatarUrl ? (
-                    <img
-                      src={member.avatarUrl}
-                      alt={member.name}
-                      className="w-12 h-12 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-12 h-12 rounded-full bg-primary-light flex items-center justify-center">
-                      <span className="text-primary font-semibold text-lg">
-                        {member.name.charAt(0).toUpperCase()}
-                      </span>
-                    </div>
-                  )}
+                  <div className="relative w-12 h-12 flex-shrink-0">
+                    {member.avatarUrl && typeof member.avatarUrl === 'string' && member.avatarUrl.trim().length > 0 ? (
+                      <>
+                        <img
+                          src={member.avatarUrl.startsWith('http') ? member.avatarUrl : `${api.defaults.baseURL}${member.avatarUrl}`}
+                          alt={member.name}
+                          className="w-12 h-12 rounded-full object-cover"
+                          onError={(e) => {
+                            console.error(`[MEMBERS] Erro ao carregar avatar de ${member.name}:`, member.avatarUrl)
+                            e.currentTarget.style.display = 'none'
+                            const placeholder = e.currentTarget.nextElementSibling as HTMLElement
+                            if (placeholder) placeholder.style.display = 'flex'
+                          }}
+                        />
+                        <div className="w-12 h-12 rounded-full bg-primary-light items-center justify-center hidden absolute inset-0" style={{ display: 'none' }}>
+                          <span className="text-primary font-semibold text-lg">
+                            {member.name.charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="w-12 h-12 rounded-full bg-primary-light flex items-center justify-center">
+                        <span className="text-primary font-semibold text-lg">
+                          {member.name.charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                    )}
+                  </div>
                   <div className="flex-1">
                     <h3 className="font-semibold text-gray-900">{member.name}</h3>
                     <span className="text-xs px-2 py-1 bg-primary-light text-primary rounded">

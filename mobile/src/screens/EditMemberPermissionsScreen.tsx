@@ -22,6 +22,7 @@ const PERMISSIONS = [
     { key: 'members_manage', label: 'Gerenciar Membros' },
     { key: 'devotional_manage', label: 'Gerenciar Devocionais' },
     { key: 'contributions_manage', label: 'Gerenciar Contribuições' },
+    { key: 'church_manage', label: 'Gerenciar Igreja' },
 ]
 
 export default function EditMemberPermissionsScreen({ route, navigation }: any) {
@@ -46,6 +47,20 @@ export default function EditMemberPermissionsScreen({ route, navigation }: any) 
     }, [memberId])
 
     const togglePermission = (key: string) => {
+        // Permissões restritas que requerem pelo menos role COORDINATOR
+        const restrictedPermissions = ['finances_manage', 'church_manage', 'contributions_manage']
+        const hasPermission = permissions.includes(key)
+        
+        // Se está tentando ativar uma permissão restrita e o membro tem role MEMBER
+        if (!hasPermission && restrictedPermissions.includes(key) && member?.role === 'MEMBER') {
+            Alert.alert(
+                'Permissão Restrita',
+                'Esta permissão requer pelo menos a role de Coordenador',
+                [{ text: 'OK' }]
+            )
+            return
+        }
+
         setPermissions((prev) =>
             prev.includes(key) ? prev.filter((p) => p !== key) : [...prev, key]
         )
@@ -86,15 +101,33 @@ export default function EditMemberPermissionsScreen({ route, navigation }: any) 
                 contentContainerStyle={{ padding: 20 }}
                 style={styles.scrollView}
             >
-                {PERMISSIONS.map((perm) => (
-                    <View key={perm.key} style={styles.row}>
-                        <Text style={styles.label}>{perm.label}</Text>
-                        <Switch
-                            value={permissions.includes(perm.key)}
-                            onValueChange={() => togglePermission(perm.key)}
-                        />
-                    </View>
-                ))}
+                {PERMISSIONS.map((perm) => {
+                    const restrictedPermissions = ['finances_manage', 'church_manage', 'contributions_manage']
+                    const isRestrictedPermission = restrictedPermissions.includes(perm.key)
+                    const isMemberRole = member?.role === 'MEMBER'
+                    const hasPermission = permissions.includes(perm.key)
+                    const shouldDisableSwitch = isRestrictedPermission && isMemberRole && !hasPermission
+
+                    return (
+                        <View key={perm.key} style={styles.permissionContainer}>
+                            <View style={styles.row}>
+                                <Text style={[styles.label, shouldDisableSwitch && styles.disabledLabel]}>
+                                    {perm.label}
+                                </Text>
+                                <Switch
+                                    value={hasPermission}
+                                    onValueChange={() => togglePermission(perm.key)}
+                                    disabled={shouldDisableSwitch}
+                                />
+                            </View>
+                            {shouldDisableSwitch && (
+                                <Text style={styles.alertText}>
+                                    Esta permissão requer pelo menos a role de Coordenador
+                                </Text>
+                            )}
+                        </View>
+                    )
+                })}
                 <TouchableOpacity style={styles.button} onPress={handleSave}>
                     <Text style={styles.buttonText}>Salvar Permissões</Text>
                 </TouchableOpacity>
@@ -109,13 +142,26 @@ const styles = StyleSheet.create({
         marginTop: 110, // Altura do header fixo
     },
     centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    permissionContainer: {
+        marginVertical: 12,
+    },
     row: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginVertical: 12,
     },
     label: { fontSize: 16, color: '#333' },
+    disabledLabel: {
+        opacity: 0.6,
+    },
+    alertText: {
+        fontSize: 12,
+        color: '#856404',
+        backgroundColor: '#fff3cd',
+        padding: 8,
+        borderRadius: 4,
+        marginTop: 4,
+    },
     button: {
         backgroundColor: '#3366FF',
         paddingVertical: 14,

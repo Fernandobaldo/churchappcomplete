@@ -20,6 +20,8 @@ import { noticesRoutes } from './noticesRoutes'
 import { financesRoutes } from './financesRoutes'
 import { serviceScheduleRoutes } from './serviceScheduleRoutes.js'
 import { inviteLinkRoutes } from './inviteLinkRoutes.js'
+import { uploadRoutes } from './uploadRoutes.js'
+import { positionRoutes } from './positionRoutes.js'
 
 
     export async function registerRoutes(app: FastifyInstance) {
@@ -42,6 +44,8 @@ import { inviteLinkRoutes } from './inviteLinkRoutes.js'
         // loginRoute já está registrado dentro de authRoutes, não precisa registrar novamente
         app.register(auditRoutes, { prefix: '/audit' })
         app.register(inviteLinkRoutes)
+        app.register(uploadRoutes)
+        app.register(positionRoutes)
 
 
 

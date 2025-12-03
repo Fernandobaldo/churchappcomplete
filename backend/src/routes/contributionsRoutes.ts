@@ -36,19 +36,24 @@ export async function contributionsRoutes(app: FastifyInstance) {
             id: { type: 'string' },
             title: { type: 'string' },
             description: { type: 'string', nullable: true },
-            value: { type: 'number' },
-            date: { type: 'string', format: 'date-time' },
-            type: { type: 'string' },
             goal: { type: 'number', nullable: true },
+            endDate: { type: 'string', format: 'date-time', nullable: true },
             raised: { type: 'number', nullable: true },
-            bankName: { type: 'string', nullable: true },
-            agency: { type: 'string', nullable: true },
-            accountName: { type: 'string', nullable: true },
-            qrCodeUrl: { type: 'string', nullable: true },
-            paymentLink: { type: 'string', nullable: true },
+            isActive: { type: 'boolean' },
             branchId: { type: 'string' },
             createdAt: { type: 'string', format: 'date-time' },
             updatedAt: { type: 'string', format: 'date-time' },
+            PaymentMethods: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string' },
+                  type: { type: 'string' },
+                  data: { type: 'object' },
+                },
+              },
+            },
           },
         },
         404: {
@@ -79,5 +84,53 @@ export async function contributionsRoutes(app: FastifyInstance) {
     schema: createContributionSchema
   }, controller.create.bind(controller))
 
-  app.get('/types', controller.getTypes.bind(controller))
+  app.patch('/:id/toggle-active', {
+    preHandler: [
+      authenticate,
+      checkBranchId(),
+      checkRole(['ADMINGERAL', 'ADMINFILIAL', 'COORDINATOR']),
+      checkPermission(['contributions_manage'])
+    ],
+    schema: {
+      description: 'Ativa ou desativa uma campanha de contribuição',
+      tags: ['Contribuições'],
+      summary: 'Alternar status ativo/inativo da campanha',
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['id'],
+        properties: {
+          id: {
+            type: 'string',
+            description: 'ID da contribuição',
+          },
+        },
+      },
+      response: {
+        200: {
+          description: 'Status da campanha alterado com sucesso',
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            title: { type: 'string' },
+            isActive: { type: 'boolean' },
+          },
+        },
+        404: {
+          description: 'Contribuição não encontrada',
+          type: 'object',
+          properties: {
+            message: { type: 'string' },
+          },
+        },
+        403: {
+          description: 'Sem permissão para alterar esta contribuição',
+          type: 'object',
+          properties: {
+            message: { type: 'string' },
+          },
+        },
+      },
+    },
+  }, controller.toggleActive.bind(controller))
 }

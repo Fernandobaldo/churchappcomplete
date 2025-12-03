@@ -123,12 +123,12 @@ export default function TransactionDetails() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Título</label>
-            <p className="text-gray-900 font-medium">{transaction.title}</p>
+            <p data-testid="transaction-title" className="text-gray-900 font-medium">{transaction.title}</p>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Valor</label>
-            <p className={`text-2xl font-bold ${transaction.type === 'ENTRY' ? 'text-green-600' : 'text-red-600'}`}>
+            <p data-testid="transaction-amount" className={`text-2xl font-bold ${transaction.type === 'ENTRY' ? 'text-green-600' : 'text-red-600'}`}>
               {transaction.type === 'ENTRY' ? '+' : '-'}R${' '}
               {Math.abs(transaction.amount).toFixed(2).replace('.', ',')}
             </p>
@@ -137,6 +137,7 @@ export default function TransactionDetails() {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
             <span
+              data-testid="transaction-type"
               className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                 transaction.type === 'ENTRY'
                   ? 'bg-green-100 text-green-800'
@@ -149,13 +150,13 @@ export default function TransactionDetails() {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
-            <p className="text-gray-900">{transaction.category || 'Sem categoria'}</p>
+            <p data-testid="transaction-category" className="text-gray-900">{transaction.category || 'Sem categoria'}</p>
           </div>
 
           {transaction.type === 'ENTRY' && transaction.entryType && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Entrada</label>
-              <p className="text-gray-900">{getEntryTypeLabel(transaction.entryType)}</p>
+              <p data-testid="transaction-entry-type" className="text-gray-900">{getEntryTypeLabel(transaction.entryType)}</p>
             </div>
           )}
 
@@ -163,12 +164,12 @@ export default function TransactionDetails() {
             <>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Saída</label>
-                <p className="text-gray-900">{getExitTypeLabel(transaction.exitType)}</p>
+                <p data-testid="transaction-exit-type" className="text-gray-900">{getExitTypeLabel(transaction.exitType)}</p>
               </div>
               {transaction.exitType === 'OUTROS' && transaction.exitTypeOther && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
-                  <p className="text-gray-900">{transaction.exitTypeOther}</p>
+                  <p data-testid="transaction-exit-type-other" className="text-gray-900">{transaction.exitTypeOther}</p>
                 </div>
               )}
             </>
@@ -178,16 +179,16 @@ export default function TransactionDetails() {
             <>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Contribuição Vinculada</label>
-                <p className="text-gray-900">{transaction.Contribution.title}</p>
+                <p data-testid="contribution-linked-title" className="text-gray-900">{transaction.Contribution.title}</p>
                 {transaction.Contribution.description && (
-                  <p className="text-sm text-gray-600 mt-1">{transaction.Contribution.description}</p>
+                  <p data-testid="contribution-linked-description" className="text-sm text-gray-600 mt-1">{transaction.Contribution.description}</p>
                 )}
               </div>
               {/* Mostrar contribuinte se houver informação */}
               {(transaction.TithePayerMember || transaction.tithePayerName || transaction.tithePayerMemberId) && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Contribuinte</label>
-                  <p className="text-gray-900">
+                  <p data-testid="contributor-name" className="text-gray-900">
                     {transaction.TithePayerMember?.name || transaction.tithePayerName || transaction.tithePayerMemberId || 'N/A'}
                   </p>
                 </div>

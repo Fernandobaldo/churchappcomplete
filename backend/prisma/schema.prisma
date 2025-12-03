@@ -44,32 +44,34 @@ model Branch {
 }
 
 model Church {
-  id       String   @id @default(cuid())
-  name     String
-  logoUrl  String?
-  isActive Boolean  @default(true)
-  Branch   Branch[]
+  id          String          @id @default(cuid())
+  name        String
+  logoUrl     String?
+  avatarUrl   String?
+  isActive    Boolean         @default(true)
+  address     String?
+  phone       String?
+  email       String?
+  website     String?
+  socialMedia Json?
+  Branch      Branch[]
+  Positions   ChurchPosition[]
 }
 
 model Contribution {
-  id          String           @id @default(cuid())
-  title       String
-  description String?
-  value       Float
-  date        DateTime
-  type        ContributionType
-  goal        Float?
-  raised      Float?           @default(0)
-  bankName    String?
-  agency      String?
-  accountName String?
-  qrCodeUrl   String?
-  paymentLink String?
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-  branchId    String
-  Branch      Branch           @relation(fields: [branchId], references: [id])
-  Transaction Transaction[]
+  id                String                      @id @default(cuid())
+  title             String
+  description       String?
+  goal              Float?
+  endDate           DateTime?
+  raised            Float?                       @default(0)
+  isActive          Boolean                      @default(true)
+  createdAt         DateTime                     @default(now())
+  updatedAt         DateTime                     @updatedAt
+  branchId          String
+  Branch            Branch                       @relation(fields: [branchId], references: [id])
+  Transaction      Transaction[]
+  PaymentMethods    ContributionPaymentMethod[]
 }
 
 model Devotional {
@@ -128,12 +130,14 @@ model Member {
   phone          String?
   userId         String?           @unique
   inviteLinkId   String?
+  positionId     String?
   Devotional     Devotional[]
   DevotionalLike DevotionalLike[]
   Branch         Branch            @relation(fields: [branchId], references: [id])
   User           User?             @relation(fields: [userId], references: [id])
   Permission     Permission[]
   InviteLink     MemberInviteLink? @relation(fields: [inviteLinkId], references: [id])
+  Position       ChurchPosition?   @relation(fields: [positionId], references: [id])
 }
 
 model Notice {
@@ -252,6 +256,31 @@ model MemberInviteLink {
   @@index([isActive])
 }
 
+model ChurchPosition {
+  id        String   @id @default(cuid())
+  name      String
+  churchId  String
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  Church    Church   @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  Members   Member[]
+
+  @@index([churchId])
+}
+
+model ContributionPaymentMethod {
+  id             String            @id @default(cuid())
+  contributionId String
+  type           PaymentMethodType
+  data           Json // Campos específicos por tipo: PIX (chave), CONTA_BR (banco, agencia, conta, tipo), IBAN (iban, banco, nome)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  Contribution   Contribution      @relation(fields: [contributionId], references: [id], onDelete: Cascade)
+
+  @@index([contributionId])
+}
+
 enum AuditAction {
   MEMBER_CREATED
   MEMBER_UPDATED
@@ -279,10 +308,10 @@ enum AuditAction {
   INVITE_LINK_DEACTIVATED
 }
 
-enum ContributionType {
-  OFERTA
-  DIZIMO
-  OUTRO
+enum PaymentMethodType {
+  PIX
+  CONTA_BR
+  IBAN
 }
 
 enum Role {

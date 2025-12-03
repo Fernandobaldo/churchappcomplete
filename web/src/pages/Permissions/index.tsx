@@ -11,6 +11,7 @@ interface Member {
   email: string
   role: string
   permissions: Array<{ id: string; type: string }>
+  avatarUrl?: string
 }
 
 // Lista completa de permissões disponíveis
@@ -67,7 +68,10 @@ export default function Permissions() {
         console.log(`[PERMISSIONS FRONTEND] Membro processado ${member.id} (${member.name}):`, {
           permissionsRaw: member.permissions,
           permissionsProcessed: processed.permissions,
-          permissionsCount: processed.permissions.length
+          permissionsCount: processed.permissions.length,
+          avatarUrl: member.avatarUrl,
+          avatarUrlType: typeof member.avatarUrl,
+          hasAvatar: member.avatarUrl && typeof member.avatarUrl === 'string' && member.avatarUrl.trim().length > 0
         })
         return processed
       })
@@ -158,6 +162,28 @@ export default function Permissions() {
     return member?.permissions || []
   }
 
+  // Verifica se uma permissão requer role de coordenador ou superior
+  const requiresCoordinatorRole = (permissionType: string): boolean => {
+    return permissionType === 'finances_manage' || 
+           permissionType === 'church_manage' || 
+           permissionType === 'contributions_manage' || 
+           permissionType === 'members_manage'
+  }
+
+  // Verifica se o membro tem role adequada para uma permissão específica
+  const hasRequiredRoleForPermission = (member: Member | null, permissionType: string): boolean => {
+    if (!member) return false
+    
+    // Se a permissão requer coordenador ou superior
+    if (requiresCoordinatorRole(permissionType)) {
+      const validRoles = ['COORDINATOR', 'ADMINFILIAL', 'ADMINGERAL']
+      return validRoles.includes(member.role)
+    }
+    
+    // Outras permissões não têm restrição de role
+    return true
+  }
+
   // Verifica se o usuário pode alterar roles
   const canChangeRole = (targetMember: Member | null) => {
     if (!user || !targetMember) return false
@@ -189,6 +215,7 @@ export default function Permissions() {
 
     // Salva o estado original para possível reversão
     const originalRole = selectedMember.role
+    const originalPermissions = [...(selectedMember.permissions || [])]
 
     // Atualização otimista do estado local
     setSelectedMember({
@@ -199,11 +226,14 @@ export default function Permissions() {
     try {
       const response = await api.patch(`/members/${selectedMember.id}/role`, { role: newRole })
       
-      // Atualiza o membro selecionado com os dados retornados pela API
+      // Recarrega os dados completos do membro para garantir sincronização
+      const memberResponse = await api.get(`/members/${selectedMember.id}`)
+      const updatedMemberData = memberResponse.data
+      
+      // Atualiza o membro selecionado com os dados completos do servidor
       const updatedMember = {
-        ...selectedMember,
-        role: response.data.role,
-        permissions: response.data.permissions || [],
+        ...updatedMemberData,
+        permissions: updatedMemberData.permissions || [],
       }
       
       setSelectedMember(updatedMember)
@@ -211,16 +241,31 @@ export default function Permissions() {
       // Atualiza também na lista de membros para manter sincronizado
       setMembers(members.map(m => 
         m.id === selectedMember.id 
-          ? { ...m, role: response.data.role, permissions: response.data.permissions || [] }
+          ? { ...m, role: updatedMemberData.role, permissions: updatedMemberData.permissions || [] }
           : m
       ))
 
-      toast.success(`Role alterada para ${ROLE_LABELS[newRole] || newRole} com sucesso!`)
+      // Mostra mensagem informando sobre permissões mantidas/removidas
+      const removedPermissions = originalPermissions
+        .map((p: any) => typeof p === 'string' ? p : p?.type)
+        .filter((perm: string) => !(updatedMemberData.permissions || []).some((p: any) => 
+          (typeof p === 'string' ? p : p?.type) === perm
+        ))
+      
+      if (removedPermissions.length > 0) {
+        toast.warning(
+          `Role alterada. ${removedPermissions.length} permissão(ões) foram removidas por não serem compatíveis com a nova role.`,
+          { duration: 5000 }
+        )
+      } else {
+        toast.success(`Role alterada para ${ROLE_LABELS[newRole] || newRole} com sucesso!`)
+      }
     } catch (error: any) {
       // Reverte a atualização otimista em caso de erro
       setSelectedMember({
         ...selectedMember,
         role: originalRole,
+        permissions: originalPermissions,
       })
       toast.error(error.response?.data?.error || 'Erro ao alterar role do membro')
     }
@@ -235,9 +280,21 @@ export default function Permissions() {
       return
     }
 
+    // Verifica se a permissão requer role de coordenador ou superior
+    if (requiresCoordinatorRole(permissionType) && !hasRequiredRoleForPermission(selectedMember, permissionType)) {
+      toast.error('Esta permissão requer que o membro tenha role de Coordenador ou superior.')
+      return
+    }
+
     // Salva o estado original para possível reversão
     const originalPermissions = [...(selectedMember.permissions || [])]
-    const currentPermissions = originalPermissions.map(p => p.type)
+
+    // Obtém as permissões atuais do membro (array de strings com os tipos)
+    const currentPermissions = (selectedMember.permissions || []).map((p: any) => 
+      typeof p === 'string' ? p : p?.type
+    ).filter(Boolean)
+
+    // Verifica se a permissão já está ativa
     const hasPermission = currentPermissions.includes(permissionType)
 
     // Cria o novo array de permissões
@@ -359,10 +416,32 @@ export default function Permissions() {
                       : 'bg-gray-50 hover:bg-gray-100'
                   }`}
                 >
-                  <p className="font-medium">{member.name}</p>
-                  <p className={`text-sm ${selectedMember?.id === member.id ? 'text-white/80' : 'text-gray-600'}`}>
-                    {member.email}
-                  </p>
+                  <div className="flex items-center gap-3">
+                    {member.avatarUrl && typeof member.avatarUrl === 'string' && member.avatarUrl.trim().length > 0 ? (
+                      <img
+                        src={member.avatarUrl.startsWith('http') ? member.avatarUrl : `${api.defaults.baseURL}${member.avatarUrl}`}
+                        alt={member.name}
+                        className="w-10 h-10 rounded-full object-cover"
+                        onError={(e) => {
+                          console.error(`[PERMISSIONS] Erro ao carregar avatar de ${member.name}:`, member.avatarUrl)
+                          e.currentTarget.style.display = 'none'
+                          const placeholder = e.currentTarget.nextElementSibling as HTMLElement
+                          if (placeholder) placeholder.style.display = 'flex'
+                        }}
+                      />
+                    ) : null}
+                    <div className={`w-10 h-10 rounded-full bg-primary-light flex items-center justify-center ${member.avatarUrl && typeof member.avatarUrl === 'string' && member.avatarUrl.trim().length > 0 ? 'hidden' : ''}`}>
+                      <span className={`font-semibold text-lg ${selectedMember?.id === member.id ? 'text-white' : 'text-primary'}`}>
+                        {member.name.charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                    <div>
+                      <p className="font-medium">{member.name}</p>
+                      <p className={`text-sm ${selectedMember?.id === member.id ? 'text-white/80' : 'text-gray-600'}`}>
+                        {member.email}
+                      </p>
+                    </div>
+                  </div>
                 </button>
                 ))
               )}
@@ -374,10 +453,30 @@ export default function Permissions() {
           {selectedMember ? (
             <div className="card">
               <div className="mb-6">
-                <h2 className="text-xl font-semibold flex items-center gap-2 mb-4">
-                  <Shield className="w-5 h-5" />
-                  Permissões de {selectedMember.name}
-                </h2>
+                <div className="flex items-center gap-4 mb-4">
+                  {selectedMember.avatarUrl && typeof selectedMember.avatarUrl === 'string' && selectedMember.avatarUrl.trim().length > 0 ? (
+                    <img
+                      src={selectedMember.avatarUrl.startsWith('http') ? selectedMember.avatarUrl : `${api.defaults.baseURL}${selectedMember.avatarUrl}`}
+                      alt={selectedMember.name}
+                      className="w-12 h-12 rounded-full object-cover"
+                      onError={(e) => {
+                        console.error(`[PERMISSIONS] Erro ao carregar avatar de ${selectedMember.name}:`, selectedMember.avatarUrl)
+                        e.currentTarget.style.display = 'none'
+                        const placeholder = e.currentTarget.nextElementSibling as HTMLElement
+                        if (placeholder) placeholder.style.display = 'flex'
+                      }}
+                    />
+                  ) : null}
+                  <div className={`w-12 h-12 rounded-full bg-primary-light flex items-center justify-center ${selectedMember.avatarUrl && typeof selectedMember.avatarUrl === 'string' && selectedMember.avatarUrl.trim().length > 0 ? 'hidden' : ''}`}>
+                    <span className="text-primary font-semibold text-lg">
+                      {selectedMember.name.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                  <h2 className="text-xl font-semibold flex items-center gap-2">
+                    <Shield className="w-5 h-5" />
+                    Permissões de {selectedMember.name}
+                  </h2>
+                </div>
                 <div className="flex flex-wrap items-center gap-4 mb-4">
                   <div className="flex items-center gap-2 text-sm">
                     <span className="font-medium text-gray-600">Email:</span>
@@ -487,42 +586,55 @@ export default function Permissions() {
                       : memberPermissions.some(
                           p => p && p.type === permission.type
                         )
-                    const isDisabled = isAdmin
+                    
+                    // Verifica se o toggle deve estar desabilitado
+                    const requiresRole = requiresCoordinatorRole(permission.type)
+                    const hasRequiredRole = hasRequiredRoleForPermission(selectedMember, permission.type)
+                    const shouldDisableToggle = isAdmin || (requiresRole && !hasRequiredRole)
                     
                     return (
-                      <div
-                        key={permission.type}
-                        className={`flex items-center justify-between p-4 rounded-lg border transition-all ${
-                          hasPermission
-                            ? 'bg-green-50 border-green-300 shadow-sm'
-                            : 'bg-white border-gray-200 hover:border-gray-300'
-                        } ${isDisabled ? 'opacity-75' : ''}`}
-                      >
-                        <div className="flex items-center gap-3 flex-1">
-                          {hasPermission ? (
-                            <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
-                          ) : (
-                            <Circle className="w-5 h-5 text-gray-400 flex-shrink-0" />
-                          )}
-                          <div>
-                            <p className={`font-medium ${hasPermission ? 'text-green-900' : 'text-gray-900'}`}>
-                              {permission.label}
-                            </p>
-                            <p className={`text-xs ${hasPermission ? 'text-green-700' : 'text-gray-500'}`}>
-                              {permission.type}
+                      <div key={permission.type}>
+                        <div
+                          className={`flex items-center justify-between p-4 rounded-lg border transition-all ${
+                            hasPermission
+                              ? 'bg-green-50 border-green-300 shadow-sm'
+                              : 'bg-white border-gray-200 hover:border-gray-300'
+                          } ${shouldDisableToggle ? 'opacity-75' : ''}`}
+                        >
+                          <div className="flex items-center gap-3 flex-1">
+                            {hasPermission ? (
+                              <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
+                            ) : (
+                              <Circle className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                            )}
+                            <div>
+                              <p className={`font-medium ${hasPermission ? 'text-green-900' : 'text-gray-900'}`}>
+                                {permission.label}
+                              </p>
+                              <p className={`text-xs ${hasPermission ? 'text-green-700' : 'text-gray-500'}`}>
+                                {permission.type}
+                              </p>
+                            </div>
+                          </div>
+                          <label className={`relative inline-flex items-center ml-4 ${shouldDisableToggle ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                            <input
+                              type="checkbox"
+                              checked={hasPermission}
+                              onChange={() => togglePermission(permission.type)}
+                              disabled={shouldDisableToggle}
+                              className="sr-only peer disabled:opacity-50"
+                            />
+                            <div className={`w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary ${shouldDisableToggle ? 'opacity-50 cursor-not-allowed' : ''}`}></div>
+                          </label>
+                        </div>
+                        {shouldDisableToggle && requiresRole && !hasRequiredRole && (
+                          <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                            <p className="text-sm text-yellow-800">
+                              ⚠️ Esta permissão requer que o membro tenha role de <strong>Coordenador</strong> ou superior. 
+                              Altere a role do membro para habilitar esta permissão.
                             </p>
                           </div>
-                        </div>
-                        <label className={`relative inline-flex items-center ml-4 ${isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
-                          <input
-                            type="checkbox"
-                            checked={hasPermission}
-                            onChange={() => togglePermission(permission.type)}
-                            disabled={isDisabled}
-                            className="sr-only peer disabled:opacity-50"
-                          />
-                          <div className={`w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}></div>
-                        </label>
+                        )}
                       </div>
                     )
                   })}

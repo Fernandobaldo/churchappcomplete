@@ -68,9 +68,16 @@ describe('TransactionDetails Page', () => {
 
     await waitFor(() => {
       expect(api.get).toHaveBeenCalledWith('/finances/trans-1')
-      expect(screen.getByText('Dízimo')).toBeInTheDocument()
-      expect(screen.getByText('R$ 1.000,00')).toBeInTheDocument()
-      expect(screen.getByText('Dízimo')).toBeInTheDocument()
+      // Verificar título usando testid
+      expect(screen.getByTestId('transaction-title')).toHaveTextContent('Dízimo')
+      // Verificar valor usando testid (formato: +R$ 1000,00)
+      const amountElement = screen.getByTestId('transaction-amount')
+      expect(amountElement).toHaveTextContent('R$')
+      expect(amountElement).toHaveTextContent('1000,00')
+      // Verificar tipo de entrada usando testid
+      expect(screen.getByTestId('transaction-entry-type')).toHaveTextContent('Dízimo')
+      // Verificar categoria usando testid
+      expect(screen.getByTestId('transaction-category')).toHaveTextContent('Dízimo')
       expect(screen.getByText('João Silva')).toBeInTheDocument()
       expect(screen.getByText('Test User')).toBeInTheDocument()
     })
@@ -143,8 +150,10 @@ describe('TransactionDetails Page', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByText('Aluguel')).toBeInTheDocument()
-      expect(screen.getByText('Aluguel')).toBeInTheDocument() // exitType label
+      // Verificar título usando testid
+      expect(screen.getByTestId('transaction-title')).toHaveTextContent('Aluguel')
+      // Verificar tipo de saída usando testid
+      expect(screen.getByTestId('transaction-exit-type')).toHaveTextContent('Aluguel')
     })
   })
 
@@ -187,11 +196,26 @@ describe('TransactionDetails Page', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByText('Contribuição')).toBeInTheDocument()
-      expect(screen.getByText('Contribuição Teste')).toBeInTheDocument()
-      expect(screen.getByText('Descrição da contribuição')).toBeInTheDocument()
+      // Verificar tipo de entrada "Contribuição" usando testid
+      const entryTypeElement = screen.getByTestId('transaction-entry-type')
+      expect(entryTypeElement).toBeInTheDocument()
+      expect(entryTypeElement).toHaveTextContent('Contribuição')
+      
+      // Verificar título da contribuição vinculada usando testid
+      const contributionTitle = screen.getByTestId('contribution-linked-title')
+      expect(contributionTitle).toBeInTheDocument()
+      expect(contributionTitle).toHaveTextContent('Contribuição Teste')
+      
+      // Verificar descrição da contribuição usando testid
+      const contributionDescription = screen.getByTestId('contribution-linked-description')
+      expect(contributionDescription).toBeInTheDocument()
+      expect(contributionDescription).toHaveTextContent('Descrição da contribuição')
+      
+      // Verificar label e nome do contribuinte
       expect(screen.getByText('Contribuinte')).toBeInTheDocument()
-      expect(screen.getByText('Maria Santos')).toBeInTheDocument()
+      const contributorName = screen.getByTestId('contributor-name')
+      expect(contributorName).toBeInTheDocument()
+      expect(contributorName).toHaveTextContent('Maria Santos')
     })
   })
 

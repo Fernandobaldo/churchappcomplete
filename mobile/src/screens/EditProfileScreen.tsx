@@ -15,6 +15,7 @@ export default function EditProfileScreen() {
 
     const [profile, setProfile] = useState<any>(null)
     const [loading, setLoading] = useState(true)
+    const [positions, setPositions] = useState<any[]>([])
     const [form, setForm] = useState({
         name: '',
         email: '',
@@ -22,15 +23,26 @@ export default function EditProfileScreen() {
         birthDate: '',
         address: '',
         avatarUrl: '',
+        positionId: '',
     })
 
-    const fields = [
+    const getFields = () => [
         { key: 'name', label: 'Nome completo', type: 'string', placeholder: 'Seu nome completo' },
         { key: 'email', label: 'E-mail', type: 'email', placeholder: 'exemplo@email.com' },
         { key: 'phone', label: 'Telefone', type: 'string', placeholder: '(00) 00000-0000' },
         { key: 'birthDate', label: 'Data de nascimento', type: 'date', placeholder: 'DD/MM/AAAA' },
         { key: 'address', label: 'Endereço', type: 'string', placeholder: 'Rua, número, bairro, cidade' },
         { key: 'avatarUrl', label: 'Foto de Perfil', type: 'image' },
+        { 
+            key: 'positionId', 
+            label: 'Cargo na Igreja', 
+            type: 'select', 
+            placeholder: 'Selecione um cargo', 
+            options: [
+                { label: 'Nenhum cargo', value: '' },
+                ...positions.map(p => ({ label: p.name, value: p.id }))
+            ] 
+        },
     ]
 
 
@@ -49,7 +61,7 @@ export default function EditProfileScreen() {
                         : '',
                     address: data.address || '',
                     avatarUrl: data.avatarUrl || '',
-
+                    positionId: data.positionId || '',
                 })
             } catch (err) {
                 console.error('Erro ao carregar perfil:', err)
@@ -58,15 +70,27 @@ export default function EditProfileScreen() {
                 setLoading(false)
             }
         }
+        
+        async function fetchPositions() {
+            try {
+                const res = await api.get('/positions')
+                setPositions(res.data)
+            } catch (err) {
+                console.error('Erro ao carregar cargos:', err)
+            }
+        }
+        
         fetchProfile()
+        fetchPositions()
     }, [])
 
     const handleSave = async () => {
         try {
-
-            await api.put(`/members/${profile.id}`,{
+            const dataToSend = {
                 ...form,
-            })
+                positionId: form.positionId || null,
+            }
+            await api.put(`/members/${profile.id}`, dataToSend)
             Toast.show({
                 type: 'success',
                 text1: 'Perfil editado!',
@@ -103,7 +127,7 @@ export default function EditProfileScreen() {
             <MemberForm
                 form={form}
                 setForm={setForm}
-                fields={fields}
+                fields={getFields()}
                 onSubmit={handleSave}
                 submitLabel="Salvar alterações"
             />

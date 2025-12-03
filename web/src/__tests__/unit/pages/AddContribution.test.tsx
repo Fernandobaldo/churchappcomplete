@@ -49,7 +49,7 @@ describe('AddContribution Page', () => {
       </MemoryRouter>
     )
 
-    expect(screen.getByText('Nova Contribuição')).toBeInTheDocument()
+    expect(screen.getByText('Nova Campanha de Contribuição')).toBeInTheDocument()
     expect(screen.getByTestId('title-input')).toBeInTheDocument()
     expect(screen.getByTestId('submit-button')).toBeInTheDocument()
   })
@@ -62,7 +62,7 @@ describe('AddContribution Page', () => {
       </MemoryRouter>
     )
 
-    const submitButton = screen.getByText('Adicionar Contribuição')
+    const submitButton = screen.getByText('Criar Campanha')
     await user.click(submitButton)
 
     await waitFor(() => {
@@ -70,15 +70,16 @@ describe('AddContribution Page', () => {
     })
   })
 
-  it('deve criar contribuição com sucesso', async () => {
+  it('deve criar campanha com sucesso', async () => {
     const toast = await import('react-hot-toast')
     const mockResponse = {
       data: {
         id: 'contrib-1',
-        title: 'Dízimo',
-        value: 100.0,
-        type: 'DIZIMO',
-        date: '2024-01-15',
+        title: 'Campanha de Construção',
+        goal: 50000.0,
+        endDate: '2024-12-31',
+        isActive: true,
+        PaymentMethods: [],
       },
     }
 
@@ -99,47 +100,20 @@ describe('AddContribution Page', () => {
     // Preencher título usando data-testid
     const titleInput = screen.getByTestId('title-input')
     await user.clear(titleInput)
-    await user.type(titleInput, 'Dízimo')
+    await user.type(titleInput, 'Campanha de Construção')
     
-    // Preencher valor usando data-testid - garantir que é um número válido
-    const valueInput = screen.getByTestId('value-input') as HTMLInputElement
-    await user.clear(valueInput)
-    // Usar fireEvent para garantir que o valor é definido corretamente
-    fireEvent.change(valueInput, { target: { value: '100' } })
-    
-    // Verificar que o valor foi preenchido
-    await waitFor(() => {
-      expect(valueInput.value).toBe('100')
-    })
+    // Preencher meta de arrecadação (opcional)
+    const goalInput = screen.getByTestId('goal-input') as HTMLInputElement
+    if (goalInput) {
+      await user.clear(goalInput)
+      fireEvent.change(goalInput, { target: { value: '50000' } })
+      
+      await waitFor(() => {
+        expect(goalInput.value).toBe('50000')
+      })
+    }
 
-    // A data já tem valor padrão (hoje), então não precisamos preenchê-la
-    // Mas vamos garantir que o input existe e tem valor
-    const dateInput = screen.getByTestId('date-input') as HTMLInputElement
-    expect(dateInput).toBeTruthy()
-    expect(dateInput.value).toBeTruthy() // Deve ter um valor padrão
-
-    // Selecionar tipo DIZIMO usando data-testid
-    const typeSelect = screen.getByTestId('type-select') as HTMLSelectElement
-    expect(typeSelect).toBeTruthy()
-    await user.selectOptions(typeSelect, 'DIZIMO')
-    
-    // Verificar que o tipo foi selecionado
-    await waitFor(() => {
-      expect(typeSelect.value).toBe('DIZIMO')
-    })
-
-    // Aguardar um pouco para garantir que o formulário está pronto
-    await waitFor(() => {
-      expect(titleInput).toHaveValue('Dízimo')
-      expect(valueInput.value).toBe('100')
-      expect(typeSelect).toHaveValue('DIZIMO')
-    }, { timeout: 3000 })
-
-    // Verificar que não há erros de validação antes de submeter
-    expect(screen.queryByText(/título é obrigatório/i)).not.toBeInTheDocument()
-    expect(screen.queryByText(/valor é obrigatório/i)).not.toBeInTheDocument()
-    expect(screen.queryByText(/data é obrigatória/i)).not.toBeInTheDocument()
-    expect(screen.queryByText(/tipo é obrigatório/i)).not.toBeInTheDocument()
+    // Data de término é opcional, não precisa preencher
 
     // Submeter formulário usando data-testid
     const submitButton = screen.getByTestId('submit-button')
@@ -151,7 +125,6 @@ describe('AddContribution Page', () => {
     expect(form).toBeTruthy()
     
     // Submeter o formulário diretamente usando fireEvent.submit
-    // Isso garante que o evento de submit é disparado mesmo se o botão não funcionar
     fireEvent.submit(form!)
 
     // Aguardar o submit ser processado e a API ser chamada
@@ -165,13 +138,11 @@ describe('AddContribution Page', () => {
     // Verifica os argumentos
     const callArgs = vi.mocked(api.post).mock.calls[0]
     expect(callArgs[0]).toBe('/contributions')
-    expect(callArgs[1]).toHaveProperty('title', 'Dízimo')
-    expect(callArgs[1]).toHaveProperty('value')
-    expect(callArgs[1]).toHaveProperty('type')
-    expect(callArgs[1]).toHaveProperty('date')
+    expect(callArgs[1]).toHaveProperty('title', 'Campanha de Construção')
+    expect(callArgs[1]).toHaveProperty('isActive', true)
 
     await waitFor(() => {
-      expect(toast.default.success).toHaveBeenCalledWith('Contribuição adicionada com sucesso!')
+      expect(toast.default.success).toHaveBeenCalledWith('Campanha de contribuição criada com sucesso!')
     })
 
     expect(mockNavigate).toHaveBeenCalledWith('/app/contributions')
@@ -199,29 +170,13 @@ describe('AddContribution Page', () => {
 
     // Aguardar o formulário renderizar
     await waitFor(() => {
-      expect(screen.getByText('Nova Contribuição')).toBeInTheDocument()
+      expect(screen.getByText('Nova Campanha de Contribuição')).toBeInTheDocument()
     })
 
     // Preencher título
     const titleInput = screen.getByTestId('title-input')
     await user.clear(titleInput)
-    await user.type(titleInput, 'Dízimo')
-    
-    // Preencher valor usando fireEvent para garantir que o valor é definido corretamente
-    const valueInput = screen.getByTestId('value-input') as HTMLInputElement
-    await user.clear(valueInput)
-    fireEvent.change(valueInput, { target: { value: '100' } })
-    
-    // Verificar que o valor foi preenchido
-    await waitFor(() => {
-      expect(valueInput.value).toBe('100')
-    })
-    
-    // A data já tem valor padrão, não precisa preencher
-    const dateInput = screen.getByTestId('date-input')
-    expect(dateInput).toBeTruthy()
-
-    // Tipo já está como OFERTA por padrão, não precisa mudar
+    await user.type(titleInput, 'Campanha de Teste')
 
     // Submeter o formulário diretamente usando fireEvent.submit
     const form = titleInput.closest('form')

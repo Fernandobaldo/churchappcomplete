@@ -25,6 +25,18 @@ vi.mock('react-hot-toast', () => ({
   },
 }))
 
+// Mock do useAuthStore
+vi.mock('@/stores/authStore', () => ({
+  useAuthStore: vi.fn(() => ({
+    user: {
+      id: 'user-1',
+      name: 'Test User',
+      email: 'test@example.com',
+      role: 'ADMINGERAL',
+    },
+  })),
+}))
+
 // Mock do useSearchParams
 let mockSearchParams: URLSearchParams
 let mockSetSearchParams: ReturnType<typeof vi.fn>
@@ -50,6 +62,9 @@ describe('Permissions Page - Unit Tests', () => {
     vi.clearAllMocks()
     mockSearchParams = new URLSearchParams()
     mockSetSearchParams = vi.fn()
+    // Limpa o estado do componente entre testes
+    vi.mocked(api.get).mockReset()
+    vi.mocked(api.post).mockReset()
   })
 
   const mockMembers = [
@@ -236,19 +251,12 @@ describe('Permissions Page - Unit Tests', () => {
   })
 
   describe('Atualização de permissões', () => {
-    beforeEach(async () => {
-      vi.mocked(api.get).mockResolvedValueOnce({ data: mockMembers })
+    beforeEach(() => {
+      vi.clearAllMocks()
     })
 
     it('deve adicionar permissão quando toggle é ativado', async () => {
       const user = userEvent.setup()
-
-      vi.mocked(api.get).mockResolvedValueOnce({
-        data: {
-          ...mockMembers[0],
-          permissions: [],
-        },
-      })
 
       // POST retorna permissões atualizadas
       vi.mocked(api.post).mockResolvedValueOnce({
@@ -261,16 +269,16 @@ describe('Permissions Page - Unit Tests', () => {
         },
       })
 
+      // Configura todos os mocks necessários
       vi.mocked(api.get)
-        .mockResolvedValueOnce({ data: mockMembers })
-        .mockResolvedValueOnce({
+        .mockResolvedValueOnce({ data: mockMembers }) // GET /members inicial
+        .mockResolvedValueOnce({ // GET /members/member-1 ao selecionar
           data: {
             ...mockMembers[0],
             permissions: [],
           },
         })
-        // GET /members após atualização
-        .mockResolvedValueOnce({
+        .mockResolvedValueOnce({ // GET /members após atualização
           data: [
             {
               ...mockMembers[0],
@@ -295,42 +303,33 @@ describe('Permissions Page - Unit Tests', () => {
         expect(api.get).toHaveBeenCalledWith('/members/member-1')
       })
 
-      // Aguarda o toggle aparecer
+      // Aguarda o toggle aparecer (são checkboxes, não switches)
       await waitFor(() => {
-        const toggles = screen.queryAllByRole('switch')
+        const toggles = screen.queryAllByRole('checkbox')
         expect(toggles.length).toBeGreaterThan(0)
-      })
+      }, { timeout: 5000 })
 
-      const toggle = screen.getAllByRole('switch')[0]
+      const toggle = screen.getAllByRole('checkbox')[0]
       await user.click(toggle)
 
       await waitFor(() => {
         expect(api.post).toHaveBeenCalledWith('/permissions/member-1', {
           permissions: ['devotional_manage'],
         })
-      })
+      }, { timeout: 3000 })
 
       // Verifica que GET /members é chamado após atualização
       await waitFor(() => {
         expect(api.get).toHaveBeenCalledWith('/members')
-      })
+      }, { timeout: 5000 })
 
       await waitFor(() => {
         expect(toast.success).toHaveBeenCalledWith('Permissão adicionada com sucesso!')
-      })
+      }, { timeout: 5000 })
     })
 
     it('deve remover permissão quando toggle é desativado', async () => {
       const user = userEvent.setup()
-
-      vi.mocked(api.get).mockResolvedValueOnce({
-        data: {
-          ...mockMembers[0],
-          permissions: [
-            { id: 'perm-1', type: 'devotional_manage' },
-          ],
-        },
-      })
 
       // POST retorna permissões atualizadas (vazias)
       vi.mocked(api.post).mockResolvedValueOnce({
@@ -342,8 +341,8 @@ describe('Permissions Page - Unit Tests', () => {
       })
 
       vi.mocked(api.get)
-        .mockResolvedValueOnce({ data: mockMembers })
-        .mockResolvedValueOnce({
+        .mockResolvedValueOnce({ data: mockMembers }) // GET /members inicial
+        .mockResolvedValueOnce({ // GET /members/member-1 ao selecionar
           data: {
             ...mockMembers[0],
             permissions: [
@@ -351,8 +350,7 @@ describe('Permissions Page - Unit Tests', () => {
             ],
           },
         })
-        // GET /members após atualização
-        .mockResolvedValueOnce({
+        .mockResolvedValueOnce({ // GET /members após atualização
           data: [
             {
               ...mockMembers[0],
@@ -376,38 +374,40 @@ describe('Permissions Page - Unit Tests', () => {
       })
 
       await waitFor(() => {
-        const toggles = screen.queryAllByRole('switch')
+        const toggles = screen.queryAllByRole('checkbox')
         expect(toggles.length).toBeGreaterThan(0)
-      })
+      }, { timeout: 5000 })
 
-      const toggle = screen.getAllByRole('switch')[0]
+      const toggle = screen.getAllByRole('checkbox')[0]
       await user.click(toggle)
 
       await waitFor(() => {
         expect(api.post).toHaveBeenCalledWith('/permissions/member-1', {
           permissions: [],
         })
-      })
+      }, { timeout: 3000 })
 
       // Verifica que GET /members é chamado após atualização
       await waitFor(() => {
         expect(api.get).toHaveBeenCalledWith('/members')
-      })
+      }, { timeout: 5000 })
 
       await waitFor(() => {
         expect(toast.success).toHaveBeenCalledWith('Permissão removida com sucesso!')
-      })
+      }, { timeout: 5000 })
     })
 
     it('deve reverter toggle em caso de erro na API', async () => {
       const user = userEvent.setup()
 
-      vi.mocked(api.get).mockResolvedValueOnce({
-        data: {
-          ...mockMembers[0],
-          permissions: [],
-        },
-      })
+      vi.mocked(api.get)
+        .mockResolvedValueOnce({ data: mockMembers }) // GET /members inicial
+        .mockResolvedValueOnce({ // GET /members/member-1 ao selecionar
+          data: {
+            ...mockMembers[0],
+            permissions: [],
+          },
+        })
 
       vi.mocked(api.post).mockRejectedValueOnce({
         response: {
@@ -415,15 +415,6 @@ describe('Permissions Page - Unit Tests', () => {
           data: { message: 'Erro interno' },
         },
       })
-
-      vi.mocked(api.get)
-        .mockResolvedValueOnce({ data: mockMembers })
-        .mockResolvedValueOnce({
-          data: {
-            ...mockMembers[0],
-            permissions: [],
-          },
-        })
 
       renderComponent()
 
@@ -439,11 +430,11 @@ describe('Permissions Page - Unit Tests', () => {
       })
 
       await waitFor(() => {
-        const toggles = screen.queryAllByRole('switch')
+        const toggles = screen.queryAllByRole('checkbox')
         expect(toggles.length).toBeGreaterThan(0)
-      })
+      }, { timeout: 3000 })
 
-      const toggle = screen.getAllByRole('switch')[0]
+      const toggle = screen.getAllByRole('checkbox')[0]
       await user.click(toggle)
 
       await waitFor(() => {
@@ -454,13 +445,6 @@ describe('Permissions Page - Unit Tests', () => {
     it('deve atualizar lista de membros após atualizar permissões', async () => {
       const user = userEvent.setup()
 
-      vi.mocked(api.get).mockResolvedValueOnce({
-        data: {
-          ...mockMembers[0],
-          permissions: [],
-        },
-      })
-
       // POST retorna permissões atualizadas
       vi.mocked(api.post).mockResolvedValueOnce({
         data: {
@@ -473,15 +457,14 @@ describe('Permissions Page - Unit Tests', () => {
       })
 
       vi.mocked(api.get)
-        .mockResolvedValueOnce({ data: mockMembers })
-        .mockResolvedValueOnce({
+        .mockResolvedValueOnce({ data: mockMembers }) // GET /members inicial
+        .mockResolvedValueOnce({ // GET /members/member-1 ao selecionar
           data: {
             ...mockMembers[0],
             permissions: [],
           },
         })
-        // GET /members após atualização
-        .mockResolvedValueOnce({
+        .mockResolvedValueOnce({ // GET /members após atualização
           data: [
             {
               ...mockMembers[0],
@@ -507,11 +490,11 @@ describe('Permissions Page - Unit Tests', () => {
       })
 
       await waitFor(() => {
-        const toggles = screen.queryAllByRole('switch')
+        const toggles = screen.queryAllByRole('checkbox')
         expect(toggles.length).toBeGreaterThan(0)
-      })
+      }, { timeout: 5000 })
 
-      const toggle = screen.getAllByRole('switch')[0]
+      const toggle = screen.getAllByRole('checkbox')[0]
       await user.click(toggle)
 
       // Verifica que POST foi chamado
@@ -519,27 +502,20 @@ describe('Permissions Page - Unit Tests', () => {
         expect(api.post).toHaveBeenCalledWith('/permissions/member-1', {
           permissions: ['devotional_manage'],
         })
-      })
+      }, { timeout: 3000 })
 
       // Verifica que GET /members é chamado após atualização
       await waitFor(() => {
         expect(api.get).toHaveBeenCalledWith('/members')
-      })
+      }, { timeout: 5000 })
 
       await waitFor(() => {
         expect(toast.success).toHaveBeenCalledWith('Permissão adicionada com sucesso!')
-      })
+      }, { timeout: 5000 })
     })
 
     it('deve usar permissões da resposta POST em vez de fazer GET adicional quando disponível', async () => {
       const user = userEvent.setup()
-
-      vi.mocked(api.get).mockResolvedValueOnce({
-        data: {
-          ...mockMembers[0],
-          permissions: [],
-        },
-      })
 
       // POST retorna permissões atualizadas
       vi.mocked(api.post).mockResolvedValueOnce({
@@ -553,15 +529,14 @@ describe('Permissions Page - Unit Tests', () => {
       })
 
       vi.mocked(api.get)
-        .mockResolvedValueOnce({ data: mockMembers })
-        .mockResolvedValueOnce({
+        .mockResolvedValueOnce({ data: mockMembers }) // GET /members inicial
+        .mockResolvedValueOnce({ // GET /members/member-1 ao selecionar
           data: {
             ...mockMembers[0],
             permissions: [],
           },
         })
-        // GET /members após atualização
-        .mockResolvedValueOnce({
+        .mockResolvedValueOnce({ // GET /members após atualização
           data: [
             {
               ...mockMembers[0],
@@ -587,11 +562,11 @@ describe('Permissions Page - Unit Tests', () => {
       })
 
       await waitFor(() => {
-        const toggles = screen.queryAllByRole('switch')
+        const toggles = screen.queryAllByRole('checkbox')
         expect(toggles.length).toBeGreaterThan(0)
-      })
+      }, { timeout: 5000 })
 
-      const toggle = screen.getAllByRole('switch')[0]
+      const toggle = screen.getAllByRole('checkbox')[0]
       await user.click(toggle)
 
       // Verifica que POST foi chamado e retornou permissões
@@ -599,12 +574,12 @@ describe('Permissions Page - Unit Tests', () => {
         expect(api.post).toHaveBeenCalledWith('/permissions/member-1', {
           permissions: ['devotional_manage'],
         })
-      })
+      }, { timeout: 3000 })
 
       // Verifica que GET /members é chamado após atualização
       await waitFor(() => {
         expect(api.get).toHaveBeenCalledWith('/members')
-      })
+      }, { timeout: 5000 })
     })
   })
 
@@ -621,8 +596,8 @@ describe('Permissions Page - Unit Tests', () => {
       }
 
       vi.mocked(api.get)
-        .mockResolvedValueOnce({ data: [adminMember] })
-        .mockResolvedValueOnce({ data: adminMember })
+        .mockResolvedValueOnce({ data: [adminMember] }) // GET /members inicial
+        .mockResolvedValueOnce({ data: adminMember }) // GET /members/admin-1 ao selecionar
 
       renderComponent()
 
@@ -637,90 +612,82 @@ describe('Permissions Page - Unit Tests', () => {
         expect(api.get).toHaveBeenCalledWith('/members/admin-1')
       })
 
-      // Tenta clicar em um toggle
+      // Aguarda os toggles aparecerem (são checkboxes, não switches)
       await waitFor(() => {
-        const toggles = screen.queryAllByRole('switch')
-        if (toggles.length > 0) {
-          user.click(toggles[0])
-        }
-      })
+        const toggles = screen.queryAllByRole('checkbox')
+        expect(toggles.length).toBeGreaterThan(0)
+      }, { timeout: 5000 })
 
+      // Aguarda os toggles aparecerem
+      const toggles = screen.getAllByRole('checkbox')
+      expect(toggles.length).toBeGreaterThan(0)
+      
+      // Verifica que todos os toggles estão desabilitados para ADMINGERAL
+      toggles.forEach(toggle => {
+        expect(toggle).toBeDisabled()
+      })
+      
+      // Como os toggles estão desabilitados, o onChange não será disparado
+      // Mas vamos verificar que a mensagem informativa está sendo exibida
       await waitFor(() => {
-        expect(toast.error).toHaveBeenCalledWith(
-          expect.stringContaining('Administrador Geral possui todas as permissões')
-        )
-      })
+        expect(screen.getByText(/Administrador Geral possui todas as permissões automaticamente/i)).toBeInTheDocument()
+      }, { timeout: 3000 })
 
+      // Verifica que nenhuma chamada POST foi feita
       expect(api.post).not.toHaveBeenCalled()
     })
   })
 
   describe('Tratamento robusto de permissões', () => {
     it('deve processar permissões corretamente quando vem como array de objetos', async () => {
-      vi.mocked(api.get).mockResolvedValueOnce({
-        data: [
-          {
-            id: 'member-1',
-            name: 'Membro Teste',
-            email: 'membro@example.com',
-            role: 'MEMBER',
-            permissions: [
-              { id: 'perm-1', type: 'devotional_manage' },
-              { id: 'perm-2', type: 'members_view' },
-            ],
-          },
+      const member = {
+        id: 'member-1',
+        name: 'Membro Teste',
+        email: 'membro@example.com',
+        role: 'MEMBER',
+        permissions: [
+          { id: 'perm-1', type: 'devotional_manage' },
+          { id: 'perm-2', type: 'members_view' },
         ],
+      }
+
+      vi.mocked(api.get).mockResolvedValue({
+        data: [member],
       })
 
       renderComponent()
 
       await waitFor(() => {
         expect(screen.getByText('Membro Teste')).toBeInTheDocument()
-      })
+      }, { timeout: 3000 })
     })
 
     it('deve processar permissões corretamente quando vem como array de strings', async () => {
-      vi.mocked(api.get).mockResolvedValueOnce({
-        data: [
-          {
-            id: 'member-1',
-            name: 'Membro Teste',
-            email: 'membro@example.com',
-            role: 'MEMBER',
-            permissions: ['devotional_manage', 'members_view'],
-          },
-        ],
+      const member = {
+        id: 'member-1',
+        name: 'Membro Teste',
+        email: 'membro@example.com',
+        role: 'MEMBER',
+        permissions: ['devotional_manage', 'members_view'],
+      }
+
+      vi.mocked(api.get).mockResolvedValue({
+        data: [member],
       })
 
       renderComponent()
 
       await waitFor(() => {
         expect(screen.getByText('Membro Teste')).toBeInTheDocument()
-      })
+      }, { timeout: 3000 })
     })
 
     it('deve fazer fallback para GET quando POST não retorna permissões', async () => {
       const user = userEvent.setup()
 
-      vi.mocked(api.get).mockResolvedValueOnce({
-        data: {
-          ...mockMembers[0],
-          permissions: [],
-        },
-      })
-
-      // POST não retorna permissões (simula resposta antiga)
-      vi.mocked(api.post).mockResolvedValueOnce({
-        data: {
-          success: true,
-          added: 1,
-          // permissions não está presente
-        },
-      })
-
       vi.mocked(api.get)
-        .mockResolvedValueOnce({ data: mockMembers })
-        .mockResolvedValueOnce({
+        .mockResolvedValueOnce({ data: mockMembers }) // GET /members inicial
+        .mockResolvedValueOnce({ // GET /members/member-1 ao selecionar
           data: {
             ...mockMembers[0],
             permissions: [],
@@ -748,6 +715,15 @@ describe('Permissions Page - Unit Tests', () => {
           ],
         })
 
+      // POST não retorna permissões (simula resposta antiga)
+      vi.mocked(api.post).mockResolvedValueOnce({
+        data: {
+          success: true,
+          added: 1,
+          // permissions não está presente
+        },
+      })
+
       renderComponent()
 
       await waitFor(() => {
@@ -761,12 +737,13 @@ describe('Permissions Page - Unit Tests', () => {
         expect(api.get).toHaveBeenCalledWith('/members/member-1')
       })
 
+      // Aguarda o componente carregar os detalhes do membro
       await waitFor(() => {
-        const toggles = screen.queryAllByRole('switch')
+        const toggles = screen.queryAllByRole('checkbox')
         expect(toggles.length).toBeGreaterThan(0)
-      })
+      }, { timeout: 5000 })
 
-      const toggle = screen.getAllByRole('switch')[0]
+      const toggle = screen.getAllByRole('checkbox')[0]
       await user.click(toggle)
 
       await waitFor(() => {
@@ -777,8 +754,11 @@ describe('Permissions Page - Unit Tests', () => {
 
       // Verifica que GET adicional é feito quando POST não retorna permissões
       await waitFor(() => {
-        expect(api.get).toHaveBeenCalledWith('/members/member-1')
-      }, { timeout: 3000 })
+        // Verifica que GET /members/member-1 foi chamado novamente (fallback)
+        const calls = vi.mocked(api.get).mock.calls
+        const memberCalls = calls.filter(call => call[0] === '/members/member-1')
+        expect(memberCalls.length).toBeGreaterThan(1)
+      }, { timeout: 5000 })
 
       await waitFor(() => {
         expect(toast.success).toHaveBeenCalledWith('Permissão adicionada com sucesso!')

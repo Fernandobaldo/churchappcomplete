@@ -277,22 +277,28 @@ describe('E2E: Fluxo Completo - Registro até Contribuição (Frontend)', () => 
       expect(eventResult.branchId).toBe(branchId)
       console.log('[E2E Frontend] ✅ Evento criado:', eventResult.id)
 
-      // PASSO 4: Criar contribuição (usa o token atualizado com dados do member)
-      console.log('[E2E Frontend] 💰 Passo 4: Criando contribuição...')
+      // PASSO 4: Criar campanha de contribuição (usa o token atualizado com dados do member)
+      console.log('[E2E Frontend] 💰 Passo 4: Criando campanha de contribuição...')
       const contributionResult = await createContribution(memberToken, {
-        title: `Contribuição E2E Frontend ${timestamp}`,
-        description: 'Contribuição criada via teste E2E Frontend',
-        value: 150.50,
-        date: new Date().toISOString(),
-        type: 'DIZIMO',
+        title: `Campanha E2E Frontend ${timestamp}`,
+        description: 'Campanha criada via teste E2E Frontend',
+        goal: 15000.50,
+        endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        isActive: true,
+        paymentMethods: [
+          {
+            type: 'PIX',
+            data: { chave: '12345678900' },
+          },
+        ],
       })
 
       expect(contributionResult.id).toBeDefined()
-      expect(contributionResult.title).toBe(`Contribuição E2E Frontend ${timestamp}`)
-      expect(contributionResult.value).toBe(150.50)
-      expect(contributionResult.type).toBe('DIZIMO')
+      expect(contributionResult.title).toBe(`Campanha E2E Frontend ${timestamp}`)
+      expect(contributionResult.goal).toBe(15000.50)
+      expect(contributionResult.isActive).toBe(true)
       expect(contributionResult.branchId).toBe(branchId)
-      console.log('[E2E Frontend] ✅ Contribuição criada:', contributionResult.id)
+      console.log('[E2E Frontend] ✅ Campanha criada:', contributionResult.id)
 
       console.log('[E2E Frontend] ✅ Todos os dados criados com sucesso!')
     }, 30000) // Timeout de 30 segundos para este teste
@@ -399,26 +405,26 @@ describe('E2E: Fluxo Completo - Registro até Contribuição (Frontend)', () => 
 
       expect(events).toHaveLength(3)
 
-      // Criar 3 contribuições
-      console.log('[E2E Frontend] 💰 Criando múltiplas contribuições...')
+      // Criar 3 campanhas de contribuição
+      console.log('[E2E Frontend] 💰 Criando múltiplas campanhas...')
       const contributions = []
-      const types: Array<'DIZIMO' | 'OFERTA' | 'OUTRO'> = [
-        'DIZIMO',
-        'OFERTA',
-        'OUTRO',
-      ]
 
       for (let i = 0; i < 3; i++) {
         const contribution = await createContribution(auth.token, {
-          title: `Contribuição ${i + 1} - E2E Frontend ${timestamp}`,
-          value: (i + 1) * 100,
-          date: new Date().toISOString(),
-          type: types[i],
+          title: `Campanha ${i + 1} - E2E Frontend ${timestamp}`,
+          goal: (i + 1) * 1000,
+          isActive: true,
+          paymentMethods: [
+            {
+              type: 'PIX',
+              data: { chave: `1234567890${i}` },
+            },
+          ],
         })
 
         contributions.push(contribution)
         expect(contribution.id).toBeDefined()
-        expect(contribution.type).toBe(types[i])
+        expect(contribution.goal).toBe((i + 1) * 1000)
       }
 
       expect(contributions).toHaveLength(3)
@@ -470,16 +476,14 @@ describe('E2E: Fluxo Completo - Registro até Contribuição (Frontend)', () => 
         }
       )
 
-      // Tentar criar contribuição sem valor (deve falhar)
+      // Tentar criar campanha sem título (deve falhar)
       try {
         await createContribution(auth.token, {
-          title: 'Contribuição sem valor',
-          value: 0, // valor zero ou inválido
-          date: new Date().toISOString(),
-          type: 'DIZIMO',
+          title: '', // título vazio
+          goal: -10, // goal negativo (inválido)
         })
         // Se não lançou erro, o teste falha
-        expect.fail('Deveria ter lançado erro ao criar contribuição sem valor')
+        expect.fail('Deveria ter lançado erro ao criar campanha sem título ou com goal inválido')
       } catch (error: any) {
         // Esperado: deve lançar erro
         if (error.response?.status) {
@@ -488,7 +492,7 @@ describe('E2E: Fluxo Completo - Registro até Contribuição (Frontend)', () => 
           // Se não tem response, pelo menos deve ter lançado um erro
           expect(error).toBeDefined()
         }
-        console.log('[E2E Frontend] ✅ Validação de contribuição funcionou corretamente')
+        console.log('[E2E Frontend] ✅ Validação de campanha funcionou corretamente')
       }
     }, 30000)
   })

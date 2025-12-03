@@ -243,23 +243,23 @@ describe('Permissions Routes - Integração', () => {
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ permissions: ['devotional_manage', 'members_view'] })
 
-      // Depois substitui por outras permissões
+      // Depois substitui por outras permissões (usando permissão não restrita, pois o membro é MEMBER)
       const response = await request(app.server)
         .post(`/permissions/${memberId}`)
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({ permissions: ['contributions_manage'] })
+        .send({ permissions: ['events_manage'] })
 
       logTestResponse(response, 200)
       expect(response.status).toBe(200)
       expect(response.body.permissions.length).toBe(1)
-      expect(response.body.permissions[0].type).toBe('contributions_manage')
+      expect(response.body.permissions[0].type).toBe('events_manage')
       
       // Verifica no banco que apenas a nova permissão existe
       const memberPermissions = await prisma.permission.findMany({
         where: { memberId },
       })
       expect(memberPermissions.length).toBe(1)
-      expect(memberPermissions[0].type).toBe('contributions_manage')
+      expect(memberPermissions[0].type).toBe('events_manage')
     })
 
     it('deve permitir remover todas as permissões enviando array vazio', async () => {
@@ -381,11 +381,22 @@ describe('Permissions Routes - Integração', () => {
     })
 
     it('deve retornar permissões atualizadas após POST /permissions/:id', async () => {
-      // Atualiza permissões
-      await request(app.server)
+      // Atualiza permissões (usando apenas permissões não restritas, pois memberId tem role MEMBER)
+      const updateResponse = await request(app.server)
         .post(`/permissions/${memberId}`)
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({ permissions: ['events_manage', 'finances_manage'] })
+        .send({ permissions: ['events_manage', 'members_view'] })
+
+      logTestResponse(updateResponse, 200)
+      expect(updateResponse.status).toBe(200)
+      expect(updateResponse.body).toHaveProperty('success', true)
+      expect(updateResponse.body.permissions).toBeDefined()
+      expect(updateResponse.body.permissions.length).toBe(2)
+      
+      // Verifica que o POST retornou as permissões corretas
+      const updatePermissionTypes = updateResponse.body.permissions.map((p: any) => p.type)
+      expect(updatePermissionTypes).toContain('events_manage')
+      expect(updatePermissionTypes).toContain('members_view')
 
       // Busca o membro novamente
       const response = await request(app.server)
@@ -398,7 +409,7 @@ describe('Permissions Routes - Integração', () => {
       
       const permissionTypes = response.body.permissions.map((p: any) => p.type)
       expect(permissionTypes).toContain('events_manage')
-      expect(permissionTypes).toContain('finances_manage')
+      expect(permissionTypes).toContain('members_view')
       expect(permissionTypes).not.toContain('devotional_manage')
     })
 

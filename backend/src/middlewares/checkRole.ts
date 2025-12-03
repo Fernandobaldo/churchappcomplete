@@ -9,7 +9,10 @@ export function checkRole(required: string[]) {
     const hasRole = user?.role && required.includes(user.role)
 
     if (!hasRole) {
-      return reply.code(403).send({ message: 'Acesso negado' })
+      console.log(`[ROLE CHECK] Acesso negado. Role necessária: ${required.join(' ou ')}, Role do usuário: ${user?.role || 'não definida'}, Email: ${user?.email || 'desconhecido'}`)
+      return reply.code(403).send({ 
+        message: `Acesso negado: Role insuficiente. Necessário: ${required.join(' ou ')}, Atual: ${user?.role || 'não definida'}` 
+      })
     }
   }
 }

@@ -104,11 +104,15 @@ export async function registerController(request, reply) {
                 console.error('❌ [REGISTER INVITE] Erro no registro via link:', error.message);
                 // Tratamento específico para erros de email já cadastrado PRIMEIRO (deve retornar 400)
                 // Isso deve ser verificado ANTES de qualquer outra verificação para garantir que retorne 400
-                if (error.message?.includes('já cadastrado') ||
-                    error.message?.includes('Email já cadastrado') ||
-                    error.message?.includes('já está em uso') ||
-                    error.message?.toLowerCase().includes('email já')) {
-                    return reply.status(400).send({ error: error.message });
+                const errorMessage = error.message || String(error) || '';
+                const errorMessageLower = errorMessage.toLowerCase();
+                if (errorMessage.includes('já cadastrado') ||
+                    errorMessage.includes('Email já cadastrado') ||
+                    errorMessage.includes('já está em uso') ||
+                    errorMessageLower.includes('email já') ||
+                    errorMessageLower.includes('já cadastrado como usuário') ||
+                    errorMessageLower.includes('já cadastrado como membro')) {
+                    return reply.status(400).send({ error: errorMessage });
                 }
                 if (error.message === 'LIMIT_REACHED') {
                     // Log de auditoria para tentativa de registro com limite atingido

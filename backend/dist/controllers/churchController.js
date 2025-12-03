@@ -12,6 +12,16 @@ export class ChurchController {
             const bodySchema = z.object({
                 name: z.string(),
                 logoUrl: z.string().url().optional(),
+                address: z.string().optional(),
+                phone: z.string().optional(),
+                email: z.string().email().optional(),
+                website: z.string().url().optional(),
+                socialMedia: z.object({
+                    facebook: z.string().url().optional(),
+                    instagram: z.string().url().optional(),
+                    youtube: z.string().url().optional(),
+                    twitter: z.string().url().optional(),
+                }).optional(),
                 withBranch: z.boolean().optional(),
                 branchName: z.string().optional(),
                 pastorName: z.string().optional(),
@@ -139,8 +149,18 @@ export class ChurchController {
             const { id } = z.object({ id: z.string().cuid() }).parse(request.params);
             const data = z
                 .object({
-                name: z.string(),
+                name: z.string().optional(),
                 logoUrl: z.string().url().optional(),
+                address: z.string().optional(),
+                phone: z.string().optional(),
+                email: z.string().email().optional(),
+                website: z.string().url().optional(),
+                socialMedia: z.object({
+                    facebook: z.string().url().optional(),
+                    instagram: z.string().url().optional(),
+                    youtube: z.string().url().optional(),
+                    twitter: z.string().url().optional(),
+                }).optional(),
                 withBranch: z.boolean().optional(),
                 branchName: z.string().optional(),
                 pastorName: z.string().optional(),

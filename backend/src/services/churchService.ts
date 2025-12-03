@@ -7,6 +7,12 @@ import { ALL_PERMISSION_TYPES } from '../constants/permissions'
 interface CreateChurchData {
   name: string
   logoUrl?: string
+  avatarUrl?: string
+  address?: string
+  phone?: string
+  email?: string
+  website?: string
+  socialMedia?: any
   branchName?: string
   pastorName?: string
   withBranch?: boolean
@@ -26,6 +32,12 @@ export class ChurchService {
         data: {
           name: data.name,
           logoUrl: data.logoUrl,
+          avatarUrl: data.avatarUrl,
+          address: data.address,
+          phone: data.phone,
+          email: data.email,
+          website: data.website,
+          socialMedia: data.socialMedia,
           isActive: true,
         },
       })
@@ -137,6 +149,12 @@ export class ChurchService {
       data: {
         name: data.name,
         logoUrl: data.logoUrl,
+        avatarUrl: data.avatarUrl,
+        address: data.address,
+        phone: data.phone,
+        email: data.email,
+        website: data.website,
+        socialMedia: data.socialMedia,
       },
     })
   }

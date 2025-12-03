@@ -1,12 +1,15 @@
 import fastify from 'fastify';
 import fastifyJwt from '@fastify/jwt';
 import fastifyCors from '@fastify/cors';
+import fastifyStatic from '@fastify/static';
 import { registerRoutes } from './routes/registerRoutes';
 import fastifySwagger from '@fastify/swagger';
 import fastifySwaggerUi from '@fastify/swagger-ui';
 import dotenv from 'dotenv';
 import { env } from './env.js';
 import { authenticate } from './middlewares/authenticate.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
 // Se dotenv-cli carregou .env.test, detecta pelo DATABASE_URL
 // Carrega .env primeiro
 dotenv.config();
@@ -34,10 +37,17 @@ if (isTestDb && process.env.DATABASE_URL) {
 else if (process.env.DATABASE_URL && !isTestDb) {
     console.log('[SERVER] ℹ️ Usando banco de desenvolvimento/produção');
 }
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const app = fastify({ logger: true });
 app.register(fastifyCors, { origin: true });
 app.register(fastifyJwt, {
     secret: env.JWT_SECRET,
+});
+// Servir arquivos estáticos da pasta uploads
+app.register(fastifyStatic, {
+    root: path.join(__dirname, '../uploads'),
+    prefix: '/uploads/',
 });
 // Usa o middleware authenticate que popula request.user corretamente
 app.decorate('authenticate', authenticate);

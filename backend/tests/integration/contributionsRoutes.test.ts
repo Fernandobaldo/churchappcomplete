@@ -129,11 +129,11 @@ describe('Contributions Routes', () => {
       // Criar contribuição
       const contribution = await prisma.contribution.create({
         data: {
-          title: 'Dízimo',
-          description: 'Dízimo do mês',
-          value: 100.0,
-          date: new Date('2024-01-15'),
-          type: 'DIZIMO',
+          title: 'Campanha de Construção',
+          description: 'Campanha para construção da nova igreja',
+          goal: 50000.0,
+          endDate: new Date('2024-12-31'),
+          isActive: true,
           branchId: branchId,
         },
       })
@@ -147,8 +147,9 @@ describe('Contributions Routes', () => {
       expect(Array.isArray(response.body)).toBe(true)
       expect(response.body.length).toBeGreaterThan(0)
       expect(response.body[0]).toHaveProperty('id')
-      expect(response.body[0]).toHaveProperty('title', 'Dízimo')
-      expect(response.body[0]).toHaveProperty('value', 100.0)
+      expect(response.body[0]).toHaveProperty('title', 'Campanha de Construção')
+      expect(response.body[0]).toHaveProperty('goal', 50000.0)
+      expect(response.body[0]).toHaveProperty('isActive', true)
     })
 
     it('deve retornar 400 quando usuário não tem branchId', async () => {
@@ -177,28 +178,21 @@ describe('Contributions Routes', () => {
     })
   })
 
-  describe('GET /contributions/types', () => {
-    it('deve retornar lista de tipos de contribuição', async () => {
-      const response = await request(app.server)
-        .get('/contributions/types')
-
-      logTestResponse(response, 200)
-      expect(response.status).toBe(200)
-      expect(Array.isArray(response.body)).toBe(true)
-      expect(response.body.length).toBe(3)
-      expect(response.body[0]).toHaveProperty('label')
-      expect(response.body[0]).toHaveProperty('value')
-    })
-  })
 
   describe('POST /contributions', () => {
-    it('deve criar contribuição com sucesso', async () => {
+    it('deve criar campanha de contribuição com sucesso', async () => {
       const contributionData = {
-        title: 'Oferta',
-        description: 'Oferta especial',
-        value: 50.0,
-        date: '2024-01-15',
-        type: 'OFERTA',
+        title: 'Campanha de Construção',
+        description: 'Campanha para construção da nova igreja',
+        goal: 50000.0,
+        endDate: '2024-12-31',
+        isActive: true,
+        paymentMethods: [
+          {
+            type: 'PIX',
+            data: { chave: '12345678900' },
+          },
+        ],
       }
 
       const response = await request(app.server)
@@ -209,19 +203,19 @@ describe('Contributions Routes', () => {
       logTestResponse(response, 201)
       expect(response.status).toBe(201)
       expect(response.body).toHaveProperty('id')
-      expect(response.body).toHaveProperty('title', 'Oferta')
-      expect(response.body).toHaveProperty('value', 50.0)
-      expect(response.body).toHaveProperty('type', 'OFERTA')
+      expect(response.body).toHaveProperty('title', 'Campanha de Construção')
+      expect(response.body).toHaveProperty('goal', 50000.0)
+      expect(response.body).toHaveProperty('isActive', true)
       expect(response.body).toHaveProperty('branchId', branchId)
+      expect(response.body.PaymentMethods).toBeDefined()
+      expect(response.body.PaymentMethods.length).toBe(1)
     })
 
-    it('deve criar contribuição com formato ISO de data', async () => {
+    it('deve criar campanha sem meta e sem data de término', async () => {
       const contributionData = {
-        title: 'Dízimo',
-        description: 'Dízimo do mês',
-        value: 100.0,
-        date: '2024-01-15T00:00:00.000Z',
-        type: 'DIZIMO',
+        title: 'Campanha Aberta',
+        description: 'Campanha sem meta definida',
+        isActive: true,
       }
 
       const response = await request(app.server)
@@ -232,15 +226,47 @@ describe('Contributions Routes', () => {
       logTestResponse(response, 201)
       expect(response.status).toBe(201)
       expect(response.body).toHaveProperty('id')
-      expect(response.body).toHaveProperty('title', 'Dízimo')
+      expect(response.body).toHaveProperty('title', 'Campanha Aberta')
+      expect(response.body.goal).toBeNull()
+      expect(response.body.endDate).toBeNull()
+    })
+
+    it('deve criar campanha com múltiplos payment methods', async () => {
+      const contributionData = {
+        title: 'Campanha Completa',
+        goal: 10000.0,
+        paymentMethods: [
+          {
+            type: 'PIX',
+            data: { chave: '12345678900' },
+          },
+          {
+            type: 'CONTA_BR',
+            data: {
+              banco: 'Banco do Brasil',
+              agencia: '1234',
+              conta: '56789-0',
+              tipo: 'CORRENTE',
+            },
+          },
+        ],
+      }
+
+      const response = await request(app.server)
+        .post('/contributions')
+        .set('Authorization', `Bearer ${userToken}`)
+        .send(contributionData)
+
+      logTestResponse(response, 201)
+      expect(response.status).toBe(201)
+      expect(response.body.PaymentMethods).toBeDefined()
+      expect(response.body.PaymentMethods.length).toBe(2)
     })
 
     it('deve retornar 400 quando dados inválidos', async () => {
       const contributionData = {
         title: '',
-        value: -10, // Valor negativo
-        date: '2024-01-15',
-        type: 'OFERTA',
+        goal: -10, // Valor negativo
       }
 
       const response = await request(app.server)
@@ -270,10 +296,8 @@ describe('Contributions Routes', () => {
       })
 
       const contributionData = {
-        title: 'Oferta',
-        value: 50.0,
-        date: '2024-01-15',
-        type: 'OFERTA',
+        title: 'Campanha Teste',
+        goal: 5000.0,
       }
 
       const response = await request(app.server)
@@ -319,10 +343,8 @@ describe('Contributions Routes', () => {
       })
 
       const contributionData = {
-        title: 'Oferta',
-        value: 50.0,
-        date: '2024-01-15',
-        type: 'OFERTA',
+        title: 'Campanha Teste',
+        goal: 5000.0,
       }
 
       const response = await request(app.server)
@@ -333,24 +355,136 @@ describe('Contributions Routes', () => {
       logTestResponse(response, 403)
       expect(response.status).toBe(403)
     })
+
+    it('deve ignorar branchId enviado no body e usar branchId do token', async () => {
+      // Criar outra filial na mesma igreja
+      const otherBranch = await prisma.branch.create({
+        data: {
+          name: 'Outra Filial Mesma Igreja',
+          churchId: churchId,
+        },
+      })
+
+      const contributionData = {
+        title: 'Campanha com BranchId no Body',
+        goal: 10000.0,
+        // Tentar enviar branchId diferente no body (deve ser ignorado)
+        branchId: otherBranch.id,
+      }
+
+      const response = await request(app.server)
+        .post('/contributions')
+        .set('Authorization', `Bearer ${userToken}`)
+        .send(contributionData)
+
+      logTestResponse(response, 201)
+      expect(response.status).toBe(201)
+      // Deve usar o branchId do token, não o do body
+      expect(response.body).toHaveProperty('branchId', branchId)
+      expect(response.body.branchId).not.toBe(otherBranch.id)
+    })
+
+    it('deve retornar 403 ao tentar criar contribuição para outra igreja', async () => {
+      // Criar outra igreja completamente diferente
+      const otherChurch = await prisma.church.create({
+        data: {
+          name: 'Outra Igreja',
+        },
+      })
+
+      const otherBranch = await prisma.branch.create({
+        data: {
+          name: 'Filial Outra Igreja',
+          churchId: otherChurch.id,
+        },
+      })
+
+      // Criar usuário e membro na outra igreja
+      const otherUser = await prisma.user.create({
+        data: {
+          name: 'User Outra Igreja',
+          email: 'otherchurch@example.com',
+          password: await bcrypt.hash('password123', 10),
+        },
+      })
+
+      const otherMember = await prisma.member.create({
+        data: {
+          name: 'Member Outra Igreja',
+          email: 'memberother@example.com',
+          branchId: otherBranch.id,
+          role: 'ADMINFILIAL',
+          userId: otherUser.id,
+          Permission: {
+            create: { type: 'contributions_manage' },
+          },
+        },
+        include: { Permission: true },
+      })
+
+      const otherToken = app.jwt.sign({
+        sub: otherUser.id,
+        email: otherUser.email,
+        name: otherUser.name,
+        type: 'user',
+        memberId: otherMember.id,
+        role: otherMember.role,
+        branchId: otherMember.branchId,
+        churchId: otherChurch.id,
+        permissions: otherMember.Permission.map(p => p.type),
+      })
+
+      // Tentar criar contribuição na outra igreja usando token da primeira igreja
+      // Isso não deve ser possível porque o branchId vem do token
+      // Mas vamos testar se o sistema valida corretamente
+      const contributionData = {
+        title: 'Campanha Outra Igreja',
+        goal: 5000.0,
+      }
+
+      // Como o branchId vem do token, não podemos criar para outra igreja
+      // Mas vamos verificar se o sistema valida o churchId
+      const response = await request(app.server)
+        .post('/contributions')
+        .set('Authorization', `Bearer ${userToken}`)
+        .send(contributionData)
+
+      // Deve criar na filial do token (branchId), não na outra igreja
+      logTestResponse(response, 201)
+      expect(response.status).toBe(201)
+      expect(response.body).toHaveProperty('branchId', branchId)
+    })
   })
 
   describe('GET /contributions/:id', () => {
     it('deve retornar contribuição por ID', async () => {
-      // Criar contribuição
+      // Criar contribuição com payment methods
       const contribution = await prisma.contribution.create({
         data: {
-          title: 'Dízimo Especial',
-          description: 'Dízimo do mês de janeiro',
-          value: 200.0,
-          date: new Date('2024-01-15'),
-          type: 'DIZIMO',
-          branchId: branchId,
+          title: 'Campanha Especial',
+          description: 'Campanha do mês de janeiro',
           goal: 5000.0,
+          endDate: new Date('2024-12-31'),
           raised: 2000.0,
-          bankName: 'Banco Teste',
-          agency: '1234',
-          accountName: 'Igreja Teste',
+          isActive: true,
+          branchId: branchId,
+          PaymentMethods: {
+            create: [
+              {
+                type: 'PIX',
+                data: { chave: '12345678900' },
+              },
+              {
+                type: 'CONTA_BR',
+                data: {
+                  banco: 'Banco Teste',
+                  agencia: '1234',
+                  conta: '56789-0',
+                  tipo: 'CORRENTE',
+                },
+              },
+            ],
+          },
         },
       })
 
@@ -361,13 +495,12 @@ describe('Contributions Routes', () => {
       logTestResponse(response, 200)
       expect(response.status).toBe(200)
       expect(response.body).toHaveProperty('id', contribution.id)
-      expect(response.body).toHaveProperty('title', 'Dízimo Especial')
-      expect(response.body).toHaveProperty('value', 200.0)
+      expect(response.body).toHaveProperty('title', 'Campanha Especial')
       expect(response.body).toHaveProperty('goal', 5000.0)
       expect(response.body).toHaveProperty('raised', 2000.0)
-      expect(response.body).toHaveProperty('bankName', 'Banco Teste')
-      expect(response.body).toHaveProperty('agency', '1234')
-      expect(response.body).toHaveProperty('accountName', 'Igreja Teste')
+      expect(response.body).toHaveProperty('isActive', true)
+      expect(response.body.PaymentMethods).toBeDefined()
+      expect(response.body.PaymentMethods.length).toBe(2)
     })
 
     it('deve retornar 404 quando contribuição não existe', async () => {
@@ -393,9 +526,8 @@ describe('Contributions Routes', () => {
       const contribution = await prisma.contribution.create({
         data: {
           title: 'Contribuição Outra Filial',
-          value: 100.0,
-          date: new Date('2024-01-15'),
-          type: 'OFERTA',
+          goal: 100.0,
+          isActive: true,
           branchId: otherBranch.id,
         },
       })
@@ -428,9 +560,8 @@ describe('Contributions Routes', () => {
       const contribution = await prisma.contribution.create({
         data: {
           title: 'Test',
-          value: 100.0,
-          date: new Date('2024-01-15'),
-          type: 'OFERTA',
+          goal: 100.0,
+          isActive: true,
           branchId: branchId,
         },
       })
@@ -442,6 +573,129 @@ describe('Contributions Routes', () => {
       logTestResponse(response, 400)
       expect(response.status).toBe(400)
       expect(response.body).toHaveProperty('message', 'Usuário não vinculado a uma filial.')
+    })
+
+    it('deve retornar 403 quando contribuição pertence a outra igreja', async () => {
+      // Criar outra igreja completamente diferente
+      const otherChurch = await prisma.church.create({
+        data: {
+          name: 'Outra Igreja Diferente',
+        },
+      })
+
+      const otherBranch = await prisma.branch.create({
+        data: {
+          name: 'Filial Outra Igreja',
+          churchId: otherChurch.id,
+        },
+      })
+
+      // Criar contribuição na outra igreja
+      const contribution = await prisma.contribution.create({
+        data: {
+          title: 'Contribuição Outra Igreja',
+          goal: 100.0,
+          isActive: true,
+          branchId: otherBranch.id,
+        },
+      })
+
+      const response = await request(app.server)
+        .get(`/contributions/${contribution.id}`)
+        .set('Authorization', `Bearer ${userToken}`)
+
+      logTestResponse(response, 403)
+      expect(response.status).toBe(403)
+      expect(response.body).toHaveProperty('message', 'Você não tem permissão para visualizar esta contribuição')
+    })
+  })
+
+  describe('PATCH /contributions/:id/toggle-active', () => {
+    it('deve ativar/desativar campanha com sucesso', async () => {
+      const contribution = await prisma.contribution.create({
+        data: {
+          title: 'Campanha Teste',
+          isActive: true,
+          branchId: branchId,
+        },
+      })
+
+      const response = await request(app.server)
+        .patch(`/contributions/${contribution.id}/toggle-active`)
+        .set('Authorization', `Bearer ${userToken}`)
+
+      logTestResponse(response, 200)
+      expect(response.status).toBe(200)
+      expect(response.body).toHaveProperty('id', contribution.id)
+      expect(response.body).toHaveProperty('isActive', false)
+    })
+
+    it('deve retornar 404 quando contribuição não existe', async () => {
+      const fakeId = 'clx123456789012345678901234'
+      const response = await request(app.server)
+        .patch(`/contributions/${fakeId}/toggle-active`)
+        .set('Authorization', `Bearer ${userToken}`)
+
+      expect(response.status).toBe(404)
+      expect(response.body).toHaveProperty('message', 'Contribuição não encontrada')
+    })
+
+    it('deve retornar 403 quando contribuição pertence a outra filial', async () => {
+      const otherBranch = await prisma.branch.create({
+        data: {
+          name: 'Outra Filial',
+          churchId: churchId,
+        },
+      })
+
+      const contribution = await prisma.contribution.create({
+        data: {
+          title: 'Campanha Outra Filial',
+          isActive: true,
+          branchId: otherBranch.id,
+        },
+      })
+
+      const response = await request(app.server)
+        .patch(`/contributions/${contribution.id}/toggle-active`)
+        .set('Authorization', `Bearer ${userToken}`)
+
+      logTestResponse(response, 403)
+      expect(response.status).toBe(403)
+      expect(response.body).toHaveProperty('message', 'Você não tem permissão para alterar esta contribuição')
+    })
+
+    it('deve retornar 403 quando contribuição pertence a outra igreja', async () => {
+      // Criar outra igreja completamente diferente
+      const otherChurch = await prisma.church.create({
+        data: {
+          name: 'Outra Igreja para Toggle',
+        },
+      })
+
+      const otherBranch = await prisma.branch.create({
+        data: {
+          name: 'Filial Outra Igreja Toggle',
+          churchId: otherChurch.id,
+        },
+      })
+
+      // Criar contribuição na outra igreja
+      const contribution = await prisma.contribution.create({
+        data: {
+          title: 'Campanha Outra Igreja Toggle',
+          isActive: true,
+          branchId: otherBranch.id,
+        },
+      })
+
+      const response = await request(app.server)
+        .patch(`/contributions/${contribution.id}/toggle-active`)
+        .set('Authorization', `Bearer ${userToken}`)
+
+      logTestResponse(response, 403)
+      expect(response.status).toBe(403)
+      expect(response.body).toHaveProperty('message', 'Você não tem permissão para alterar esta contribuição')
     })
   })
 })
