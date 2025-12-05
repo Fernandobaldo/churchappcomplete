@@ -35,6 +35,8 @@ jobs:
       
       - name: Setup database
         working-directory: ./backend
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_TEST }}
         run: |
           npx prisma db push --force-reset --accept-data-loss
           npm run seed:test
