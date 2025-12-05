@@ -9,6 +9,7 @@ on:
 jobs:
   backend-test:
     runs-on: ubuntu-latest
+    environment: Test
     
     steps:
       - uses: actions/checkout@v3
@@ -25,18 +26,23 @@ jobs:
         run: npm ci
       
       - name: Validate secrets
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_TEST }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET_TEST }}
         run: |
-          if [ -z "${{ secrets.DATABASE_URL_TEST }}" ]; then
-            echo "❌ Error: DATABASE_URL_TEST secret is not configured in GitHub"
-            echo "Please configure it in: Settings → Secrets and variables → Actions"
+          echo "🔍 Checking secrets..."
+          if [ -z "$DATABASE_URL" ]; then
+            echo "❌ Error: DATABASE_URL_TEST secret is not configured or empty"
+            echo "Please configure it in: Settings → Secrets and variables → Actions → Environments → Test"
             exit 1
           fi
-          if [ -z "${{ secrets.JWT_SECRET_TEST }}" ]; then
-            echo "❌ Error: JWT_SECRET_TEST secret is not configured in GitHub"
-            echo "Please configure it in: Settings → Secrets and variables → Actions"
+          if [ -z "$JWT_SECRET" ]; then
+            echo "❌ Error: JWT_SECRET_TEST secret is not configured or empty"
+            echo "Please configure it in: Settings → Secrets and variables → Actions → Environments → Test"
             exit 1
           fi
-          echo "✅ Secrets are configured"
+          echo "✅ DATABASE_URL_TEST is configured"
+          echo "✅ JWT_SECRET_TEST is configured"
       
       - name: Create .env.test file
         working-directory: ./backend
