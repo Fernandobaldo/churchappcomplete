@@ -8,6 +8,7 @@ process.env.VITEST = 'true'
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
 import { prisma } from '../../src/lib/prisma'
+import { SubscriptionStatus } from '@prisma/client'
 import { registerUserService } from '../../src/services/auth/registerService'
 import { resetTestDatabase } from '../utils/resetTestDatabase'
 import bcrypt from 'bcryptjs'
@@ -44,7 +45,7 @@ describe('RegisterService - Novo Modelo User + Member', () => {
         Subscription: {
           create: {
             planId: plan.id,
-            status: 'active',
+            status: SubscriptionStatus.active,
           },
         },
       },

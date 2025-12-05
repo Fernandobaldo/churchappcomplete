@@ -38,7 +38,8 @@
     "test:admin:plans": "npx dotenv-cli -e .env.test -- vitest run tests/integration/admin/adminPlansRoutes.test.ts tests/integration/admin/adminSubscriptionsRoutes.test.ts",
     "test:admin:members": "npx dotenv-cli -e .env.test -- vitest run tests/integration/admin/adminMembersRoutes.test.ts",
     "test:admin:config": "npx dotenv-cli -e .env.test -- vitest run tests/integration/admin/adminConfigRoutes.test.ts tests/unit/admin/adminPermissions.test.ts",
-    "test:admin:audit": "npx dotenv-cli -e .env.test -- vitest run tests/integration/admin/adminAuditRoutes.test.ts tests/unit/admin/adminAuditService.test.ts"
+    "test:admin:audit": "npx dotenv-cli -e .env.test -- vitest run tests/integration/admin/adminAuditRoutes.test.ts tests/unit/admin/adminAuditService.test.ts",
+    "fix:subscription-status": "tsx scripts/fix-subscription-status-enum.js"
   },
   "type": "module",
   "keywords": [],

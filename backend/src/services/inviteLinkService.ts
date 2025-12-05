@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma'
+import { SubscriptionStatus } from '@prisma/client'
 import { checkPlanMembersLimit } from '../utils/planLimits'
 import { validateMemberCreationPermission, getMemberFromUserId } from '../utils/authorization'
 import { sendMemberLimitReachedNotification } from './emailService'
@@ -191,7 +192,7 @@ export async function validateInviteLink(token: string): Promise<{
       },
       include: {
         Subscription: {
-          where: { status: 'active' },
+          where: { status: SubscriptionStatus.active },
           include: { Plan: true },
         },
       },

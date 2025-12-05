@@ -1,6 +1,6 @@
 import { prisma } from '../lib/prisma'
+import { SubscriptionStatus, AuditAction } from '@prisma/client'
 import { PaymentGatewayService } from './payment/PaymentGatewayService'
-import { AuditAction } from '@prisma/client'
 import { logAudit } from '../utils/auditHelper'
 import { FastifyRequest } from 'fastify'
 
@@ -23,7 +23,7 @@ export class AdminPlanService {
     const plans = await prisma.plan.findMany({
       include: {
         Subscription: {
-          where: { status: 'active' },
+          where: { status: SubscriptionStatus.active },
         },
       },
       orderBy: { price: 'asc' },

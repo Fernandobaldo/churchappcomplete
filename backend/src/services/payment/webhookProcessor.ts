@@ -1,7 +1,7 @@
 import { prisma } from '../../lib/prisma'
 import { PaymentGatewayService } from './PaymentGatewayService'
-import { WebhookEvent, PaymentStatus, SubscriptionStatus } from './types'
-import { AuditAction } from '@prisma/client'
+import { WebhookEvent, PaymentStatus } from './types'
+import { AuditAction, SubscriptionStatus } from '@prisma/client'
 
 /**
  * Processador de webhooks com idempotência
@@ -203,14 +203,14 @@ export class WebhookProcessor {
       await prisma.subscription.update({
         where: { id: subscription.id },
         data: {
-          status: 'active',
+          status: SubscriptionStatus.active,
         },
       })
     } else if (status === 'rejected' || status === 'cancelled') {
       await prisma.subscription.update({
         where: { id: subscription.id },
         data: {
-          status: 'past_due',
+          status: SubscriptionStatus.past_due,
         },
       })
 
@@ -308,7 +308,7 @@ export class WebhookProcessor {
     await prisma.subscription.update({
       where: { id: subscription.id },
       data: {
-        status: 'active',
+        status: SubscriptionStatus.active,
       },
     })
   }

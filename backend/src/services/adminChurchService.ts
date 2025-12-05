@@ -1,5 +1,5 @@
 import { prisma } from '../lib/prisma'
-import { AdminRole } from '@prisma/client'
+import { AdminRole, SubscriptionStatus } from '@prisma/client'
 import { AdminUserService } from './adminUserService'
 
 interface ChurchFilters {
@@ -76,7 +76,7 @@ export class AdminChurchService {
           ? await prisma.subscription.findFirst({
               where: {
                 userId: owner.User.id,
-                status: 'active',
+                status: SubscriptionStatus.active,
               },
               include: {
                 Plan: true,
@@ -153,7 +153,7 @@ export class AdminChurchService {
             User: {
               include: {
                 Subscription: {
-                  where: { status: 'active' },
+                  where: { status: SubscriptionStatus.active },
                   include: {
                     Plan: true,
                   },
@@ -353,7 +353,7 @@ export class AdminChurchService {
     const currentSubscription = await prisma.subscription.findFirst({
       where: {
         userId: owner.User.id,
-        status: 'active',
+        status: SubscriptionStatus.active,
       },
       include: {
         Plan: true,
@@ -373,7 +373,7 @@ export class AdminChurchService {
         data: {
           userId: owner.User.id,
           planId,
-          status: 'active',
+          status: SubscriptionStatus.active,
         },
       })
     }

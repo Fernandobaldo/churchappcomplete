@@ -16,7 +16,7 @@ import {
   loginAdmin,
   cleanupAdminUsers,
 } from '../../utils/adminTestHelpers'
-import { AdminRole } from '@prisma/client'
+import { AdminRole, SubscriptionStatus } from '@prisma/client'
 import { prisma } from '../../../src/lib/prisma'
 import { logTestResponse } from '../../utils/testResponseHelper'
 import bcrypt from 'bcryptjs'
@@ -95,7 +95,7 @@ describe('Admin Subscriptions Routes - Integration Tests', () => {
       data: {
         userId: testUser.id,
         planId: testPlan.id,
-        status: 'active',
+        status: SubscriptionStatus.active,
       },
     })
   })
@@ -211,7 +211,7 @@ describe('Admin Subscriptions Routes - Integration Tests', () => {
       const cancelledSubscription = await prisma.subscription.findUnique({
         where: { id: testSubscription.id },
       })
-      expect(cancelledSubscription?.status).toBe('cancelled')
+      expect(cancelledSubscription?.status).toBe(SubscriptionStatus.canceled)
     })
   })
 

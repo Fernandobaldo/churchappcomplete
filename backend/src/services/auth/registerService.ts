@@ -1,6 +1,6 @@
 import { prisma } from '../../lib/prisma'
 import bcrypt from 'bcryptjs'
-import { Role } from '@prisma/client'
+import { Role, SubscriptionStatus } from '@prisma/client'
 import { parse, isValid } from 'date-fns'
 import { ALL_PERMISSION_TYPES } from '../../constants/permissions'
 import { checkPlanMembersLimit } from '../../utils/planLimits'
@@ -191,7 +191,7 @@ export async function registerUserService(data: RegisterUserInput) {
       data: {
         userId: user.id,
         planId: freePlan.id,
-        status: 'active',
+        status: SubscriptionStatus.active,
       },
     })
 

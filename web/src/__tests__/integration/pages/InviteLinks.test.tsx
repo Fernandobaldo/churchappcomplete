@@ -3,11 +3,72 @@ import { render, screen, waitFor, cleanup } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import userEvent from '@testing-library/user-event'
 import InviteLinks from '@/pages/Members/InviteLinks'
-import api from '@/api/api'
 import { useAuthStore } from '@/stores/authStore'
 import { mockUser } from '@/test/mocks/mockData'
 
-vi.mock('@/api/api')
+// Mock dos planos esperados - usando vi.hoisted para garantir que seja executado antes do vi.mock
+const { mockApi, mockPlans } = vi.hoisted(() => {
+  const mockPlans = [
+    {
+      id: '1',
+      name: 'Free',
+      price: 0,
+      maxMembers: 10,
+      maxBranches: 1,
+      features: ['Até 10 membros', '1 filial'],
+      isActive: true,
+    },
+    {
+      id: '2',
+      name: 'Básico',
+      price: 29.9,
+      maxMembers: 50,
+      maxBranches: 3,
+      features: ['Até 50 membros', '3 filiais'],
+      isActive: true,
+    },
+    {
+      id: '3',
+      name: 'Premium',
+      price: 79.9,
+      maxMembers: 200,
+      maxBranches: 10,
+      features: ['Até 200 membros', '10 filiais'],
+      isActive: true,
+    },
+    {
+      id: '4',
+      name: 'Enterprise',
+      price: 199.9,
+      maxMembers: null,
+      maxBranches: null,
+      features: ['Membros ilimitados', 'Filiais ilimitadas'],
+      isActive: true,
+    },
+  ]
+
+  const mockApi = {
+    get: vi.fn(),
+    post: vi.fn(),
+    interceptors: {
+      request: { use: vi.fn() },
+      response: { use: vi.fn() },
+    },
+  }
+
+  return { mockApi, mockPlans }
+})
+
+vi.mock('@/api/api', () => ({
+  default: mockApi,
+  plansApi: {
+    getAll: vi.fn(() => Promise.resolve(mockPlans)),
+  },
+  subscriptionApi: {
+    checkout: vi.fn(() => Promise.resolve({ subscription: { checkoutUrl: null } })),
+  },
+}))
+
 vi.mock('react-hot-toast', () => ({
   default: {
     success: vi.fn(),
@@ -43,7 +104,7 @@ describe('InviteLinks - Integração', () => {
     const user = userEvent.setup()
 
     // Mock da resposta de erro com PLAN_LIMIT_REACHED
-    vi.mocked(api.post).mockRejectedValueOnce({
+    mockApi.post.mockRejectedValueOnce({
       response: {
         data: {
           code: 'PLAN_LIMIT_REACHED',
@@ -54,7 +115,7 @@ describe('InviteLinks - Integração', () => {
     })
 
     // Mock da busca do plano atual
-    vi.mocked(api.get).mockResolvedValueOnce({
+    mockApi.get.mockResolvedValueOnce({
       data: {
         plan: {
           name: 'Free',
@@ -64,7 +125,7 @@ describe('InviteLinks - Integração', () => {
     } as any)
 
     // Mock da listagem de links
-    vi.mocked(api.get).mockResolvedValueOnce({
+    mockApi.get.mockResolvedValueOnce({
       data: [],
     } as any)
 
@@ -94,17 +155,22 @@ describe('InviteLinks - Integração', () => {
 
     // Verificar que o modal de upgrade está visível
     expect(screen.getByText(/Seu plano atual atingiu o limite de membros/)).toBeInTheDocument()
+    
+    // Aguardar o carregamento dos planos no modal
+    await waitFor(() => {
+      expect(screen.getByText('Básico')).toBeInTheDocument()
+    })
+    
     // Usar getAllByText e verificar que pelo menos um existe, já que "Free" aparece múltiplas vezes
     const freeElements = screen.getAllByText('Free')
     expect(freeElements.length).toBeGreaterThan(0)
-    expect(screen.getByText('Básico')).toBeInTheDocument()
   })
 
   it('deve fechar modal de upgrade ao clicar em fechar', async () => {
     const user = userEvent.setup()
 
     // Mock da resposta de erro
-    vi.mocked(api.post).mockRejectedValueOnce({
+    mockApi.post.mockRejectedValueOnce({
       response: {
         data: {
           code: 'PLAN_LIMIT_REACHED',
@@ -114,7 +180,7 @@ describe('InviteLinks - Integração', () => {
     })
 
     // Mock da busca do plano atual
-    vi.mocked(api.get).mockResolvedValueOnce({
+    mockApi.get.mockResolvedValueOnce({
       data: {
         plan: {
           name: 'Free',
@@ -124,7 +190,7 @@ describe('InviteLinks - Integração', () => {
     } as any)
 
     // Mock da listagem de links
-    vi.mocked(api.get).mockResolvedValueOnce({
+    mockApi.get.mockResolvedValueOnce({
       data: [],
     } as any)
 
@@ -178,7 +244,7 @@ describe('InviteLinks - Integração', () => {
     const user = userEvent.setup()
 
     // Mock da resposta de erro
-    vi.mocked(api.post).mockRejectedValueOnce({
+    mockApi.post.mockRejectedValueOnce({
       response: {
         data: {
           code: 'PLAN_LIMIT_REACHED',
@@ -189,7 +255,7 @@ describe('InviteLinks - Integração', () => {
     })
 
     // Mock da busca do plano atual
-    vi.mocked(api.get).mockResolvedValueOnce({
+    mockApi.get.mockResolvedValueOnce({
       data: {
         plan: {
           name: 'Free',
@@ -199,7 +265,7 @@ describe('InviteLinks - Integração', () => {
     } as any)
 
     // Mock da listagem de links
-    vi.mocked(api.get).mockResolvedValueOnce({
+    mockApi.get.mockResolvedValueOnce({
       data: [],
     } as any)
 

@@ -7,6 +7,7 @@ process.env.NODE_ENV = 'test'
 process.env.VITEST = 'true'
 
 import { prisma } from '../../src/lib/prisma'
+import { SubscriptionStatus } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 
 export async function seedTestDatabase() {
@@ -81,7 +82,7 @@ export async function seedTestDatabase() {
     data: {
       userId: user.id,
       planId: plan.id,
-      status: 'active',
+      status: SubscriptionStatus.active,
     },
   })
     } catch (error: any) {

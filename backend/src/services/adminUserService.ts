@@ -1,5 +1,5 @@
 import { prisma } from '../lib/prisma'
-import { AdminRole } from '@prisma/client'
+import { AdminRole, SubscriptionStatus } from '@prisma/client'
 import jwt from 'jsonwebtoken'
 import { env } from '../env'
 import { randomBytes } from 'crypto'
@@ -45,7 +45,7 @@ export class AdminUserService {
       where.Subscription = {
         some: {
           planId: filters.planId,
-          status: 'active',
+          status: SubscriptionStatus.active,
         },
       }
     }
@@ -66,7 +66,7 @@ export class AdminUserService {
         orderBy: { createdAt: 'desc' },
         include: {
           Subscription: {
-            where: { status: 'active' },
+            where: { status: SubscriptionStatus.active },
             include: {
               Plan: true,
             },
@@ -174,7 +174,7 @@ export class AdminUserService {
         }]
       : []
 
-    const activeSubscription = user.Subscription.find((sub) => sub.status === 'active')
+    const activeSubscription = user.Subscription.find((sub) => sub.status === SubscriptionStatus.active)
 
     return {
       id: user.id,

@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma'
+import { SubscriptionStatus } from '@prisma/client'
 
 interface SubscriptionFilters {
   status?: string
@@ -167,7 +168,7 @@ export class AdminSubscriptionService {
 
   async updateSubscriptionStatus(
     subscriptionId: string,
-    status: string,
+    status: SubscriptionStatus,
     adminUserId: string
   ) {
     const subscription = await prisma.subscription.update({
@@ -192,11 +193,11 @@ export class AdminSubscriptionService {
   }
 
   async cancelSubscription(subscriptionId: string, adminUserId: string) {
-    return this.updateSubscriptionStatus(subscriptionId, 'cancelled', adminUserId)
+    return this.updateSubscriptionStatus(subscriptionId, SubscriptionStatus.canceled, adminUserId)
   }
 
   async reactivateSubscription(subscriptionId: string, adminUserId: string) {
-    return this.updateSubscriptionStatus(subscriptionId, 'active', adminUserId)
+    return this.updateSubscriptionStatus(subscriptionId, SubscriptionStatus.active, adminUserId)
   }
 
   async getSubscriptionHistory(subscriptionId: string) {

@@ -1,4 +1,5 @@
 import { prisma } from '../../lib/prisma'
+import { SubscriptionStatus } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import { FastifyInstance } from 'fastify'
 
@@ -7,7 +8,7 @@ export async function loginUserService(app: FastifyInstance, email: string, pass
     where: { email },
     include: {
       subscriptions: {
-        where: { status: 'active' },
+        where: { status: SubscriptionStatus.active },
         include: { plan: true },
       },
       member: {

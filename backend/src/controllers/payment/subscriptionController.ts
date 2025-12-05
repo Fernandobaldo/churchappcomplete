@@ -1,7 +1,7 @@
 import { FastifyRequest, FastifyReply } from 'fastify'
 import { prisma } from '../../lib/prisma'
 import { PaymentGatewayService } from '../../services/payment/PaymentGatewayService'
-import { AuditAction } from '@prisma/client'
+import { AuditAction, SubscriptionStatus } from '@prisma/client'
 
 /**
  * Buscar assinatura do usuário
@@ -159,7 +159,7 @@ export async function resumeSubscriptionHandler(request: FastifyRequest, reply: 
     const updatedSubscription = await prisma.subscription.update({
       where: { id: subscription.id },
       data: {
-        status: 'active',
+        status: SubscriptionStatus.active,
         cancelAtPeriodEnd: false,
         canceledAt: null,
       },

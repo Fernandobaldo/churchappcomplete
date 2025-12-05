@@ -5,6 +5,64 @@ import PlanUpgradeModal from '@/components/PlanUpgradeModal'
 
 const mockOnClose = vi.fn()
 
+// Mock dos planos esperados pelos testes
+const mockPlans = [
+  {
+    id: '1',
+    name: 'Free',
+    price: 0,
+    maxMembers: 10,
+    maxBranches: 1,
+    features: ['Até 10 membros', '1 filial'],
+    isActive: true,
+  },
+  {
+    id: '2',
+    name: 'Básico',
+    price: 29.9,
+    maxMembers: 50,
+    maxBranches: 3,
+    features: ['Até 50 membros', '3 filiais'],
+    isActive: true,
+  },
+  {
+    id: '3',
+    name: 'Premium',
+    price: 79.9,
+    maxMembers: 200,
+    maxBranches: 10,
+    features: ['Até 200 membros', '10 filiais'],
+    isActive: true,
+  },
+  {
+    id: '4',
+    name: 'Enterprise',
+    price: 199.9,
+    maxMembers: null,
+    maxBranches: null,
+    features: ['Membros ilimitados', 'Filiais ilimitadas'],
+    isActive: true,
+  },
+]
+
+// Mock da API
+vi.mock('@/api/api', () => ({
+  default: {
+    get: vi.fn(),
+    post: vi.fn(),
+    interceptors: {
+      request: { use: vi.fn() },
+      response: { use: vi.fn() },
+    },
+  },
+  plansApi: {
+    getAll: vi.fn(() => Promise.resolve(mockPlans)),
+  },
+  subscriptionApi: {
+    checkout: vi.fn(() => Promise.resolve({ subscription: { checkoutUrl: null } })),
+  },
+}))
+
 describe('PlanUpgradeModal', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -45,23 +103,29 @@ describe('PlanUpgradeModal', () => {
     expect(screen.getByText(/Limite: 10 membros/)).toBeInTheDocument()
   })
 
-  it('deve exibir todos os planos disponíveis', () => {
+  it('deve exibir todos os planos disponíveis', async () => {
     render(<PlanUpgradeModal isOpen={true} onClose={mockOnClose} />)
 
-    expect(screen.getByText('Free')).toBeInTheDocument()
+    // Aguardar o carregamento dos planos
+    await waitFor(() => {
+      expect(screen.getByText('Free')).toBeInTheDocument()
+    })
+
     expect(screen.getByText('Básico')).toBeInTheDocument()
     expect(screen.getByText('Premium')).toBeInTheDocument()
     expect(screen.getByText('Enterprise')).toBeInTheDocument()
   })
 
-  it('deve destacar plano popular com badge', () => {
+  it('deve destacar plano popular com badge', async () => {
     render(<PlanUpgradeModal isOpen={true} onClose={mockOnClose} />)
 
-    const popularBadge = screen.getByText('POPULAR')
-    expect(popularBadge).toBeInTheDocument()
+    // Aguardar o carregamento dos planos
+    await waitFor(() => {
+      expect(screen.getByText('POPULAR')).toBeInTheDocument()
+    })
   })
 
-  it('deve marcar plano atual como desabilitado', () => {
+  it('deve marcar plano atual como desabilitado', async () => {
     const currentPlan = {
       name: 'Free',
       maxMembers: 10,
@@ -74,6 +138,11 @@ describe('PlanUpgradeModal', () => {
         currentPlan={currentPlan}
       />
     )
+
+    // Aguardar o carregamento dos planos
+    await waitFor(() => {
+      expect(screen.getByText('Free')).toBeInTheDocument()
+    })
 
     // Encontrar o heading do plano Free dentro do card
     const freePlanHeading = screen.getByRole('heading', { name: 'Free' })
@@ -110,19 +179,27 @@ describe('PlanUpgradeModal', () => {
     expect(mockOnClose).toHaveBeenCalledTimes(1)
   })
 
-  it('deve exibir preços dos planos corretamente', () => {
+  it('deve exibir preços dos planos corretamente', async () => {
     render(<PlanUpgradeModal isOpen={true} onClose={mockOnClose} />)
 
-    expect(screen.getByText('R$ 0.00')).toBeInTheDocument()
+    // Aguardar o carregamento dos planos
+    await waitFor(() => {
+      expect(screen.getByText('R$ 0.00')).toBeInTheDocument()
+    })
+
     expect(screen.getByText('R$ 29.90')).toBeInTheDocument()
     expect(screen.getByText('R$ 79.90')).toBeInTheDocument()
     expect(screen.getByText('R$ 199.90')).toBeInTheDocument()
   })
 
-  it('deve exibir features de cada plano', () => {
+  it('deve exibir features de cada plano', async () => {
     render(<PlanUpgradeModal isOpen={true} onClose={mockOnClose} />)
 
-    expect(screen.getByText('Até 10 membros')).toBeInTheDocument()
+    // Aguardar o carregamento dos planos
+    await waitFor(() => {
+      expect(screen.getByText('Até 10 membros')).toBeInTheDocument()
+    })
+
     expect(screen.getByText('Até 50 membros')).toBeInTheDocument()
     expect(screen.getByText('Até 200 membros')).toBeInTheDocument()
     expect(screen.getByText('Membros ilimitados')).toBeInTheDocument()
@@ -142,6 +219,11 @@ describe('PlanUpgradeModal', () => {
         currentPlan={currentPlan}
       />
     )
+
+    // Aguardar o carregamento dos planos
+    await waitFor(() => {
+      expect(screen.getByText('Básico')).toBeInTheDocument()
+    })
 
     // Encontrar o heading do plano Básico
     const basicPlanHeading = screen.getByRole('heading', { name: 'Básico' })

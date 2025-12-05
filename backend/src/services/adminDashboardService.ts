@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma'
+import { SubscriptionStatus } from '@prisma/client'
 import { subDays } from 'date-fns'
 
 /**
@@ -65,7 +66,7 @@ export class AdminDashboardService {
     // Busca todas as assinaturas ativas e agrupa por plano
     const subscriptions = await prisma.subscription.findMany({
       where: {
-        status: 'active',
+        status: SubscriptionStatus.active,
       },
       include: {
         Plan: true,

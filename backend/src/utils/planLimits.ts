@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma'
+import { SubscriptionStatus } from '@prisma/client'
 
 /**
  * Verifica se o plano permite criar mais membros
@@ -12,7 +13,7 @@ export async function checkPlanMembersLimit(userId: string): Promise<void> {
     where: { id: userId },
     include: {
       Subscription: {
-        where: { status: 'active' },
+        where: { status: SubscriptionStatus.active },
         include: { Plan: true },
       },
       Member: {
@@ -43,7 +44,7 @@ export async function checkPlanMembersLimit(userId: string): Promise<void> {
         User: {
           include: {
             Subscription: {
-              where: { status: 'active' },
+              where: { status: SubscriptionStatus.active },
               include: { Plan: true },
             },
           },
@@ -90,7 +91,7 @@ export async function checkPlanBranchesLimit(userId: string): Promise<void> {
     where: { id: userId },
     include: {
       Subscription: {
-        where: { status: 'active' },
+        where: { status: SubscriptionStatus.active },
         include: { Plan: true },
       },
       Member: {
@@ -121,7 +122,7 @@ export async function checkPlanBranchesLimit(userId: string): Promise<void> {
         User: {
           include: {
             Subscription: {
-              where: { status: 'active' },
+              where: { status: SubscriptionStatus.active },
               include: { Plan: true },
             },
           },
