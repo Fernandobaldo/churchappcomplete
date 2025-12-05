@@ -70,23 +70,12 @@ export async function checkPlanMembersLimit(userId: string): Promise<void> {
   })
 
   const totalMembers = branches.reduce((sum, b) => sum + b._count.Member, 0)
-  
-  console.log('🔍 [PLAN LIMITS] Verificando limite:', {
-    churchId,
-    planMaxMembers: plan.maxMembers,
-    totalMembers,
-    branchesCount: branches.length,
-    branches: branches.map(b => ({ id: b.id, name: b.name, members: b._count.Member }))
-  })
 
   // 4. Verificar limite
   if (totalMembers >= plan.maxMembers) {
     const errorMsg = `Limite do plano atingido: máximo de ${plan.maxMembers} membros excedido. Você tem ${totalMembers} membros.`
-    console.error('❌ [PLAN LIMITS]', errorMsg)
     throw new Error(errorMsg)
   }
-  
-  console.log('✅ [PLAN LIMITS] Limite OK:', totalMembers, '<', plan.maxMembers)
 }
 
 /**

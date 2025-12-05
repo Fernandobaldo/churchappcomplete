@@ -5,18 +5,11 @@ import { useAuthStore } from '../stores/authStore'
 const getBaseURL = (): string => {
   // Prioridade: variável de ambiente VITE_API_URL > fallback localhost
   if (import.meta.env.VITE_API_URL) {
-    if (import.meta.env.DEV) {
-      console.log('🌐 Usando API URL da variável de ambiente:', import.meta.env.VITE_API_URL)
-    }
     return import.meta.env.VITE_API_URL
   }
 
   // Fallback para desenvolvimento
-  const baseURL = 'http://localhost:3333'
-  if (import.meta.env.DEV) {
-    console.log('🌐 API Base URL (fallback):', baseURL)
-  }
-  return baseURL
+  return 'http://localhost:3333'
 }
 
 const api = axios.create({
@@ -46,14 +39,6 @@ api.interceptors.request.use(
     const token = useAuthStore.getState().token
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
-    }
-
-    // Log da requisição em desenvolvimento
-    if (import.meta.env.DEV) {
-      console.log('📤 Requisição:', config.method?.toUpperCase(), config.url, {
-        baseURL: config.baseURL,
-        timeout: config.timeout,
-      })
     }
 
     return config

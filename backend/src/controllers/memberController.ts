@@ -114,27 +114,12 @@ export async function getMemberById(request: FastifyRequest, reply: FastifyReply
       return reply.code(404).send({ message: 'Membro não encontrado' })
     }
 
-    console.log(`[PERMISSIONS DEBUG] getMemberById retornando dados para ${id}:`, {
-      hasPermissions: !!memberData.permissions,
-      permissionsCount: memberData.permissions?.length || 0,
-      permissions: memberData.permissions,
-      memberDataKeys: Object.keys(memberData),
-      memberDataFull: JSON.stringify(memberData, null, 2)
-    })
-
     // Garante que as permissões sempre sejam incluídas na resposta
     const responseData = {
       ...memberData,
       permissions: memberData.permissions || [], // Garante que permissions sempre exista
       birthDate: formatDate(memberData.birthDate),
     }
-
-    console.log(`[PERMISSIONS DEBUG] Dados que serão enviados na resposta:`, {
-      hasPermissions: !!responseData.permissions,
-      permissionsCount: responseData.permissions?.length || 0,
-      permissions: responseData.permissions,
-      responseKeys: Object.keys(responseData)
-    })
 
     return reply.send(responseData)
   } catch (error: any) {
@@ -161,16 +146,6 @@ export async function getMyProfile(request: FastifyRequest, reply: FastifyReply)
     return reply.code(404).send({ message: 'Membro não encontrado' })
   }
 
-  console.log('[CONTROLLER DEBUG] ========== DADOS DO findMemberById ==========')
-  console.log('[CONTROLLER DEBUG] member.positionId:', member.positionId)
-  console.log('[CONTROLLER DEBUG] member.positionId (type):', typeof member.positionId)
-  console.log('[CONTROLLER DEBUG] member.position:', JSON.stringify(member.position, null, 2))
-  console.log('[CONTROLLER DEBUG] member.position (type):', typeof member.position)
-  console.log('[CONTROLLER DEBUG] hasPositionId:', 'positionId' in member)
-  console.log('[CONTROLLER DEBUG] hasPosition:', 'position' in member)
-  console.log('[CONTROLLER DEBUG] member keys:', Object.keys(member))
-  console.log('[CONTROLLER DEBUG] ============================================')
-
   // Garante que todos os campos estejam presentes, especialmente positionId e position
   // Para o próprio perfil, sempre retorna todas as informações, incluindo permissões
   const response: any = {
@@ -189,31 +164,9 @@ export async function getMyProfile(request: FastifyRequest, reply: FastifyReply)
     branch: member.branch ?? null,
   }
   
-  console.log('[RESPONSE DEBUG] ========== OBJETO DE RESPOSTA FINAL ==========')
-  console.log('[RESPONSE DEBUG] response.positionId:', response.positionId)
-  console.log('[RESPONSE DEBUG] response.positionId (type):', typeof response.positionId)
-  console.log('[RESPONSE DEBUG] response.position:', JSON.stringify(response.position, null, 2))
-  console.log('[RESPONSE DEBUG] response keys:', Object.keys(response))
-  console.log('[RESPONSE DEBUG] JSON completo da resposta:', JSON.stringify(response, null, 2))
-  console.log('[RESPONSE DEBUG] ==============================================')
-
-  console.log('[FINAL DEBUG] ========== ANTES DE ENVIAR AO CLIENTE ==========')
-  console.log('[FINAL DEBUG] response.positionId:', response.positionId)
-  console.log('[FINAL DEBUG] response.position:', response.position)
-  console.log('[FINAL DEBUG] Verificando se positionId existe:', 'positionId' in response)
-  console.log('[FINAL DEBUG] Verificando se position existe:', 'position' in response)
-  console.log('[FINAL DEBUG] ===============================================')
-  
   // Garantir que a resposta seja serializada corretamente
   // Fastify pode remover campos undefined, então garantimos que tudo seja null ou valor válido
   const finalResponse = JSON.parse(JSON.stringify(response))
-  
-  console.log('[SENT DEBUG] ========== RESPOSTA FINAL SERIALIZADA ==========')
-  console.log('[SENT DEBUG] finalResponse.positionId:', finalResponse.positionId)
-  console.log('[SENT DEBUG] finalResponse.position:', finalResponse.position)
-  console.log('[SENT DEBUG] finalResponse keys:', Object.keys(finalResponse))
-  console.log('[SENT DEBUG] JSON da resposta final:', JSON.stringify(finalResponse, null, 2))
-  console.log('[SENT DEBUG] ===============================================')
   
   // Enviar resposta
   return reply.send(finalResponse)
@@ -329,20 +282,6 @@ export async function updateMemberById(request: FastifyRequest, reply: FastifyRe
     
     // Remove Position do objeto (já foi mapeado para position)
     delete (response as any).Position
-    
-    console.log('[UPDATE MEMBER DEBUG] Resposta formatada:', {
-      phone: response.phone,
-      address: response.address,
-      birthDate: response.birthDate,
-      phoneType: typeof response.phone,
-      addressType: typeof response.address,
-    })
-    
-    console.log('[UPDATE MEMBER DEBUG] Resposta após atualização:', {
-      id: response.id,
-      positionId: response.positionId,
-      position: response.position,
-    })
     
     // Garantir que a resposta seja serializada corretamente
     // Fastify pode remover campos undefined, então garantimos que tudo seja null ou valor válido

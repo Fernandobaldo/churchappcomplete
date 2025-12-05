@@ -44,5 +44,4 @@ export async function authRoutes(app: FastifyInstance) {
         },
     }, getMyProfile);
     
-    console.log('🔑 LoginRoute foi executado!');
 }

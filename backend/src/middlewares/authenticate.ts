@@ -50,11 +50,6 @@ export async function authenticate(request: FastifyRequest, reply: FastifyReply)
       churchId: payload.churchId || null,
     }
   } catch (error: any) {
-    // Debug em ambiente de teste
-    if (process.env.NODE_ENV === 'test' || process.env.VITEST) {
-      console.log(`[AUTH MIDDLEWARE] Erro ao verificar token:`, error.message)
-      console.log(`[AUTH MIDDLEWARE] JWT_SECRET usado:`, JWT_SECRET?.substring(0, 10) + '...')
-    }
     reply.status(401).send({ message: 'Token inválido' })
     return
   }

@@ -8,14 +8,12 @@ import { useAuthStore } from '../stores/authStore'
 const getBaseURL = (): string => {
   // 1. Verificar variável de ambiente EXPO_PUBLIC (mais alta prioridade)
   if (process.env.EXPO_PUBLIC_API_URL) {
-    console.log('📱 Usando API URL da variável de ambiente:', process.env.EXPO_PUBLIC_API_URL)
     return process.env.EXPO_PUBLIC_API_URL
   }
 
   // 2. Verificar configuração do app.config.js
   const configApiUrl = Constants.expoConfig?.extra?.apiUrl
   if (configApiUrl) {
-    console.log('📱 Usando API URL do app.config.js:', configApiUrl)
     return configApiUrl
   }
 
@@ -40,16 +38,11 @@ const getBaseURL = (): string => {
     devIP = '192.168.1.7'
   }
   
-  const baseURL = `http://${devIP}:3333`
-  console.log('📱 API Base URL:', baseURL, '(Platform:', Platform.OS + ', Dev:', __DEV__ + ')')
-  return baseURL
+  return `http://${devIP}:3333`
 }
 
-// Obter URL base e logar para debug (apenas em desenvolvimento)
+// Obter URL base
 const baseURL = getBaseURL()
-if (__DEV__) {
-  console.log('🔗 API Base URL configurada:', baseURL)
-}
 
 const api = axios.create({
   baseURL: baseURL,
@@ -78,14 +71,6 @@ api.interceptors.request.use(
     const token = useAuthStore.getState().token
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
-    }
-    
-    // Log da requisição em desenvolvimento
-    if (__DEV__) {
-      console.log('📤 Requisição:', config.method?.toUpperCase(), config.url, {
-        baseURL: config.baseURL,
-        timeout: config.timeout,
-      })
     }
     
     return config

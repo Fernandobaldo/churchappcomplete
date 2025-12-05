@@ -112,7 +112,6 @@ export class ServiceScheduleController {
             undefined, // endDate - usa autoCreateDaysAhead
             schedule.autoCreateDaysAhead
           )
-          console.log(`✅ ${eventsResult.created} eventos criados automaticamente para o horário '${schedule.title}'`)
         } catch (error: any) {
           // Log do erro mas não falha a criação do horário
           console.error('⚠️ Erro ao criar eventos automaticamente:', error.message)
@@ -339,7 +338,6 @@ export class ServiceScheduleController {
             undefined, // endDate - usa autoCreateDaysAhead
             updatedSchedule.autoCreateDaysAhead
           )
-          console.log(`✅ ${eventsResult.created} eventos criados automaticamente para o horário '${updatedSchedule.title}'`)
         } catch (error: any) {
           // Log do erro mas não falha a atualização do horário
           console.error('⚠️ Erro ao criar eventos automaticamente:', error.message)

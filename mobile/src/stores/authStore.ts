@@ -50,7 +50,6 @@ export const useAuthStore = create<AuthStore>()(
             setUserFromToken: (token) => {
                 try {
                     const decoded = jwtDecode<DecodedToken>(token)
-                    console.log('Token decodificado:', decoded)
 
                     // Garante que permissions seja sempre um array
                     const permissions = decoded.permissions || []

@@ -10,19 +10,13 @@ if (process.env.NODE_ENV === 'test' || process.env.VITEST) {
   dotenv.config()
 }
 
-// Log para debug em ambiente de teste
+// Limpa a DATABASE_URL se tiver aspas (para testes)
 if (process.env.NODE_ENV === 'test' || process.env.VITEST) {
   const dbUrl = process.env.DATABASE_URL
   if (dbUrl) {
-    const isTest = dbUrl.includes('churchapp_test')
     const cleanUrl = dbUrl.replace(/^["']|["']$/g, '') // Remove aspas
-    console.log(`[PRISMA INIT] Criando Prisma Client...`)
-    console.log(`[PRISMA INIT] Usando banco: ${isTest ? 'TESTE ✅' : 'PRODUÇÃO/DEV ⚠️'}`)
-    console.log(`[PRISMA INIT] DATABASE_URL: ${cleanUrl.substring(0, 50)}...`)
     // Atualiza a DATABASE_URL sem aspas
     process.env.DATABASE_URL = cleanUrl
-  } else {
-    console.log(`[PRISMA INIT] ⚠️ DATABASE_URL não encontrada!`)
   }
 }
 

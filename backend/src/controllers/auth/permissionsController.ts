@@ -50,10 +50,6 @@ export async function assignPermissionsController(request: FastifyRequest, reply
       throw error
     }
 
-  console.log(`[PERMISSIONS DEBUG] POST /permissions/${id}`)
-  console.log(`[PERMISSIONS DEBUG] Permissões recebidas:`, permissions)
-  console.log(`[PERMISSIONS DEBUG] Quantidade de permissões:`, permissions.length)
-
   // Validação: Verificar se membro com role MEMBER está tentando receber permissões restritas
   const member = await prisma.member.findUnique({
     where: { id },
@@ -78,18 +74,10 @@ export async function assignPermissionsController(request: FastifyRequest, reply
 
   // Usa transação para garantir atomicidade
   const result = await prisma.$transaction(async (tx) => {
-    // Primeiro, busca permissões existentes antes de remover
-    const existingPermissions = await tx.permission.findMany({
-      where: { memberId: id },
-      select: { id: true, type: true },
-    })
-    console.log(`[PERMISSIONS DEBUG] Permissões existentes antes de remover:`, existingPermissions)
-
     // Primeiro, remove todas as permissões existentes do membro
-    const deleteResult = await tx.permission.deleteMany({
+    await tx.permission.deleteMany({
       where: { memberId: id },
     })
-    console.log(`[PERMISSIONS DEBUG] Permissões removidas:`, deleteResult.count)
 
     // Depois, adiciona as novas permissões (se houver)
     let added = 0
@@ -102,7 +90,6 @@ export async function assignPermissionsController(request: FastifyRequest, reply
         skipDuplicates: true,
       })
       added = createResult.count
-      console.log(`[PERMISSIONS DEBUG] Permissões criadas:`, added)
     }
 
     // Busca as permissões atualizadas para garantir que foram salvas corretamente
@@ -111,27 +98,17 @@ export async function assignPermissionsController(request: FastifyRequest, reply
       select: { id: true, type: true },
     })
 
-    console.log(`[PERMISSIONS DEBUG] Permissões encontradas após salvar (dentro da transação):`, updatedPermissions)
-    console.log(`[PERMISSIONS DEBUG] Quantidade de permissões encontradas:`, updatedPermissions.length)
-
     return { added, permissions: updatedPermissions }
   })
 
   // Log de auditoria
   await AuditLogger.memberPermissionsChanged(request, id, permissions)
 
-  console.log(`[PERMISSIONS DEBUG] Resposta final do POST:`, {
+  return reply.send({
     success: true,
     added: result.added,
-    permissionsCount: result.permissions.length,
-    permissions: result.permissions
+    permissions: result.permissions, // Retorna as permissões atualizadas
   })
-
-    return reply.send({
-      success: true,
-      added: result.added,
-      permissions: result.permissions, // Retorna as permissões atualizadas
-    })
   } catch (error: any) {
     if (error instanceof z.ZodError) {
       return reply.code(400).send({ 

@@ -13,52 +13,59 @@ BEGIN
   END IF;
 END $$;
 
--- Adicionar campos ao Plan
+-- Adicionar campos ao Plan (apenas se a tabela existir)
 DO $$ 
 BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.columns 
+  -- Verifica se a tabela Plan existe antes de tentar modificá-la
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables 
     WHERE table_schema = 'public' 
-    AND table_name = 'Plan' 
-    AND column_name = 'gatewayProvider'
+    AND table_name = 'Plan'
   ) THEN
-    ALTER TABLE "Plan" ADD COLUMN "gatewayProvider" TEXT;
-  END IF;
-  
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.columns 
-    WHERE table_schema = 'public' 
-    AND table_name = 'Plan' 
-    AND column_name = 'gatewayProductId'
-  ) THEN
-    ALTER TABLE "Plan" ADD COLUMN "gatewayProductId" TEXT;
-  END IF;
-  
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.columns 
-    WHERE table_schema = 'public' 
-    AND table_name = 'Plan' 
-    AND column_name = 'gatewayPriceId'
-  ) THEN
-    ALTER TABLE "Plan" ADD COLUMN "gatewayPriceId" TEXT;
-  END IF;
-  
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.columns 
-    WHERE table_schema = 'public' 
-    AND table_name = 'Plan' 
-    AND column_name = 'billingInterval'
-  ) THEN
-    ALTER TABLE "Plan" ADD COLUMN "billingInterval" TEXT DEFAULT 'month';
-  END IF;
-  
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.columns 
-    WHERE table_schema = 'public' 
-    AND table_name = 'Plan' 
-    AND column_name = 'syncStatus'
-  ) THEN
-    ALTER TABLE "Plan" ADD COLUMN "syncStatus" TEXT DEFAULT 'pending';
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns 
+      WHERE table_schema = 'public' 
+      AND table_name = 'Plan' 
+      AND column_name = 'gatewayProvider'
+    ) THEN
+      ALTER TABLE "Plan" ADD COLUMN "gatewayProvider" TEXT;
+    END IF;
+    
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns 
+      WHERE table_schema = 'public' 
+      AND table_name = 'Plan' 
+      AND column_name = 'gatewayProductId'
+    ) THEN
+      ALTER TABLE "Plan" ADD COLUMN "gatewayProductId" TEXT;
+    END IF;
+    
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns 
+      WHERE table_schema = 'public' 
+      AND table_name = 'Plan' 
+      AND column_name = 'gatewayPriceId'
+    ) THEN
+      ALTER TABLE "Plan" ADD COLUMN "gatewayPriceId" TEXT;
+    END IF;
+    
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns 
+      WHERE table_schema = 'public' 
+      AND table_name = 'Plan' 
+      AND column_name = 'billingInterval'
+    ) THEN
+      ALTER TABLE "Plan" ADD COLUMN "billingInterval" TEXT DEFAULT 'month';
+    END IF;
+    
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns 
+      WHERE table_schema = 'public' 
+      AND table_name = 'Plan' 
+      AND column_name = 'syncStatus'
+    ) THEN
+      ALTER TABLE "Plan" ADD COLUMN "syncStatus" TEXT DEFAULT 'pending';
+    END IF;
   END IF;
 END $$;
 
@@ -204,7 +211,17 @@ CREATE TABLE IF NOT EXISTS "WebhookEvent" (
 CREATE INDEX IF NOT EXISTS "PaymentHistory_subscriptionId_idx" ON "PaymentHistory"("subscriptionId");
 CREATE INDEX IF NOT EXISTS "PaymentHistory_gatewayPaymentId_idx" ON "PaymentHistory"("gatewayPaymentId");
 CREATE INDEX IF NOT EXISTS "PaymentHistory_status_idx" ON "PaymentHistory"("status");
-CREATE INDEX IF NOT EXISTS "Plan_gatewayProvider_gatewayProductId_idx" ON "Plan"("gatewayProvider", "gatewayProductId");
+-- Criar índice na tabela Plan apenas se ela existir
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables 
+    WHERE table_schema = 'public' 
+    AND table_name = 'Plan'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS "Plan_gatewayProvider_gatewayProductId_idx" ON "Plan"("gatewayProvider", "gatewayProductId");
+  END IF;
+END $$;
 CREATE INDEX IF NOT EXISTS "Subscription_gatewaySubscriptionId_idx" ON "Subscription"("gatewaySubscriptionId");
 CREATE INDEX IF NOT EXISTS "Subscription_gatewayCustomerId_idx" ON "Subscription"("gatewayCustomerId");
 CREATE INDEX IF NOT EXISTS "Subscription_status_idx" ON "Subscription"("status");

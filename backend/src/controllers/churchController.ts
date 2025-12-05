@@ -81,12 +81,7 @@ export class ChurchController {
         }
         
         newToken = request.server.jwt.sign(tokenPayload, { expiresIn: '7d' })
-        console.log(`[CHURCH] ✅ Token gerado para member ${member.id} com role ${member.role} e ${member.Permission.length} permissões`)
-      } else {
-        console.warn(`[CHURCH] ⚠️ Member não encontrado após criação para user ${dbUser.id}`)
       }
-    } else {
-      console.warn('[CHURCH] ⚠️ Member não foi criado (withBranch pode ser false)')
     }
     
     // Log de auditoria

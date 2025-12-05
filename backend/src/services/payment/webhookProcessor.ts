@@ -27,7 +27,6 @@ export class WebhookProcessor {
     })
 
     if (existingEvent && existingEvent.processed) {
-      console.log(`Evento ${gatewayEventId} já foi processado, ignorando...`)
       return
     }
 
@@ -127,7 +126,8 @@ export class WebhookProcessor {
         break
 
       default:
-        console.log(`Tipo de evento não tratado: ${eventType}`)
+        // Tipo de evento não tratado
+        break
     }
   }
 
@@ -141,7 +141,6 @@ export class WebhookProcessor {
     const amount = payload.data?.transaction_amount || payload.transaction_amount || 0
 
     if (!subscriptionId) {
-      console.log('Pagamento sem external_reference (subscriptionId), ignorando...')
       return
     }
 
@@ -153,7 +152,6 @@ export class WebhookProcessor {
     })
 
     if (!subscription) {
-      console.log(`Assinatura não encontrada para subscriptionId: ${subscriptionId}`)
       return
     }
 
@@ -254,7 +252,6 @@ export class WebhookProcessor {
     })
 
     if (!subscription) {
-      console.log(`Assinatura não encontrada para preapprovalId: ${preapprovalId}`)
       return
     }
 

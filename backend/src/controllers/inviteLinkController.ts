@@ -41,7 +41,6 @@ export async function createInviteLinkController(
         maxUses: bodyData.maxUses ?? null,
         expiresAt: bodyData.expiresAt ? new Date(bodyData.expiresAt) : null,
       })
-      console.log('✅ [INVITE LINK CONTROLLER] Link criado:', { id: inviteLink.id, token: inviteLink.token })
     } catch (error: any) {
       console.error('❌ [INVITE LINK CONTROLLER] Erro ao criar link:', error.message, error.code)
       if (error.code === 'PLAN_LIMIT_REACHED' || error.message === 'PLAN_LIMIT_REACHED') {
@@ -93,7 +92,6 @@ export async function createInviteLinkController(
       }
     ).catch(err => console.error('Erro ao criar log de auditoria:', err))
     
-    console.log('✅ [INVITE LINK CONTROLLER] Retornando link:', JSON.stringify(responseData, null, 2))
     return reply.status(201).send(responseData)
   } catch (error: any) {
     // Verificar se é erro de limite de plano (já tratado no try acima)
@@ -352,7 +350,6 @@ export async function getInviteLinkInfoController(
       isActive: inviteLink.isActive,
     }
 
-    console.log('✅ [GET INVITE LINK INFO] Retornando dados:', JSON.stringify(responseData, null, 2))
     return reply.status(200).send(responseData)
   } catch (error: any) {
     if (error.name === 'ZodError') {

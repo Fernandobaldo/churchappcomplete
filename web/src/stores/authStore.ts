@@ -47,11 +47,6 @@ export const useAuthStore = create<AuthStore>()(
         try {
           const decoded = jwtDecode<DecodedToken>(token)
 
-          // Log para debug
-          if (!decoded.branchId) {
-            console.warn('⚠️ ATENÇÃO: branchId não está presente no token!', decoded)
-          }
-
           // Garante que permissions seja sempre um array
           const permissions = decoded.permissions || []
           const permissionsArray = Array.isArray(permissions)

@@ -134,7 +134,6 @@ export async function sendWelcomeEmail(
 
   try {
     await transporter.sendMail(mailOptions)
-    console.log(`✅ Email de boas-vindas enviado para ${email}`)
   } catch (error) {
     console.error(`❌ Erro ao enviar email para ${email}:`, error)
     // Não lança erro para não quebrar o fluxo de registro
@@ -238,7 +237,6 @@ export async function sendMemberLimitReachedNotification(
 
   try {
     await transporter.sendMail(mailOptions)
-    console.log(`✅ Notificação de limite enviada para admins`)
   } catch (error) {
     console.error(`❌ Erro ao enviar notificação de limite:`, error)
   }
@@ -328,7 +326,6 @@ export async function sendMemberRegistrationAttemptNotification(
 
   try {
     await transporter.sendMail(mailOptions)
-    console.log(`✅ Notificação de tentativa de registro enviada para admins`)
   } catch (error) {
     console.error(`❌ Erro ao enviar notificação de tentativa de registro:`, error)
   }
