@@ -10,21 +10,6 @@ jobs:
   backend-test:
     runs-on: ubuntu-latest
     
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: churchapp_test
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-
     steps:
       - uses: actions/checkout@v3
       
@@ -39,19 +24,23 @@ jobs:
         working-directory: ./backend
         run: npm ci
       
-      - name: Setup database
+      - name: Create .env.test file
         working-directory: ./backend
         env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/churchapp_test
+          DATABASE_URL: ${{ secrets.DATABASE_URL_TEST }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET_TEST }}
+        run: |
+          echo "DATABASE_URL=$DATABASE_URL" > .env.test
+          echo "JWT_SECRET=$JWT_SECRET" >> .env.test
+      
+      - name: Setup database
+        working-directory: ./backend
         run: |
           npx prisma db push --force-reset --accept-data-loss
           npm run seed:test
       
       - name: Run tests
         working-directory: ./backend
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/churchapp_test
-          JWT_SECRET: test-secret
         run: npm test
 
   web-test:
