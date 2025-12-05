@@ -24,6 +24,20 @@ jobs:
         working-directory: ./backend
         run: npm ci
       
+      - name: Validate secrets
+        run: |
+          if [ -z "${{ secrets.DATABASE_URL_TEST }}" ]; then
+            echo "❌ Error: DATABASE_URL_TEST secret is not configured in GitHub"
+            echo "Please configure it in: Settings → Secrets and variables → Actions"
+            exit 1
+          fi
+          if [ -z "${{ secrets.JWT_SECRET_TEST }}" ]; then
+            echo "❌ Error: JWT_SECRET_TEST secret is not configured in GitHub"
+            echo "Please configure it in: Settings → Secrets and variables → Actions"
+            exit 1
+          fi
+          echo "✅ Secrets are configured"
+      
       - name: Create .env.test file
         working-directory: ./backend
         env:
@@ -32,6 +46,7 @@ jobs:
         run: |
           echo "DATABASE_URL=$DATABASE_URL" > .env.test
           echo "JWT_SECRET=$JWT_SECRET" >> .env.test
+          echo "✅ .env.test file created"
       
       - name: Setup database
         working-directory: ./backend
