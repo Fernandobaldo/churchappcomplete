@@ -46,7 +46,34 @@ const __dirname = path.dirname(__filename);
 
 const app = fastify({ logger: true });
 
-app.register(fastifyCors, { origin: true });
+// Configurar CORS baseado no ambiente
+const corsOptions = env.isProduction
+  ? {
+      origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+        // Em produção, aceitar apenas origens específicas
+        const allowedOrigins = process.env.CORS_ORIGINS?.split(',') || []
+        // Se não houver origem (ex: requisições do Postman), permitir apenas em desenvolvimento
+        if (!origin) {
+          callback(null, !env.isProduction)
+          return
+        }
+        // Verificar se a origem está na lista permitida
+        if (allowedOrigins.length === 0) {
+          console.warn('⚠️ CORS_ORIGINS não configurado em produção - permitindo todas as origens (NÃO RECOMENDADO)')
+          callback(null, true)
+          return
+        }
+        const isAllowed = allowedOrigins.some(allowed => origin.startsWith(allowed))
+        callback(null, isAllowed)
+      },
+      credentials: true
+    }
+  : {
+      // Em desenvolvimento/teste, permitir todas as origens
+      origin: true
+    }
+
+app.register(fastifyCors, corsOptions);
 
 app.register(fastifyJwt, {
     secret: env.JWT_SECRET,

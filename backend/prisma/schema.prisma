@@ -19,12 +19,15 @@ model AuditLog {
   metadata    Json?
   ipAddress   String?
   userAgent   String?
+  adminUserId String?
+  AdminUser   AdminUser?  @relation(fields: [adminUserId], references: [id])
   createdAt   DateTime    @default(now())
 
   @@index([action])
   @@index([createdAt])
   @@index([entityType, entityId])
   @@index([userId])
+  @@index([adminUserId])
 }
 
 model Branch {
@@ -32,6 +35,8 @@ model Branch {
   name             String
   churchId         String
   isMainBranch     Boolean            @default(false)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
   Church           Church             @relation(fields: [churchId], references: [id], onDelete: Cascade)
   Contribution     Contribution[]
   Devotional       Devotional[]
@@ -54,6 +59,8 @@ model Church {
   email       String?
   website     String?
   socialMedia Json?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
   Branch      Branch[]
   Positions   ChurchPosition[]
 }
@@ -131,6 +138,8 @@ model Member {
   userId         String?           @unique
   inviteLinkId   String?
   positionId     String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
   Devotional     Devotional[]
   DevotionalLike DevotionalLike[]
   Branch         Branch            @relation(fields: [branchId], references: [id])
@@ -161,27 +170,46 @@ model Permission {
 }
 
 model Plan {
-  id           String         @id @default(cuid())
-  name         String         @unique
-  price        Float
-  features     String[]
-  maxBranches  Int?
-  maxMembers   Int?
-  Subscription Subscription[]
+  id               String         @id @default(cuid())
+  name             String         @unique
+  price            Float
+  features         String[]
+  maxBranches      Int?
+  maxMembers       Int?
+  isActive         Boolean        @default(true)
+  gatewayProvider  String?
+  gatewayProductId String?
+  gatewayPriceId   String?
+  billingInterval  String         @default("month")
+  syncStatus       String         @default("pending")
+  Subscription     Subscription[]
 }
 
 model Subscription {
-  id        String    @id @default(cuid())
-  userId    String
-  planId    String
-  status    String    @default("active")
-  startedAt DateTime  @default(now())
-  endsAt    DateTime?
-  Plan      Plan      @relation(fields: [planId], references: [id])
-  User      User      @relation(fields: [userId], references: [id])
+  id                   String            @id @default(cuid())
+  userId               String
+  planId               String
+  status               SubscriptionStatus @default(pending)
+  startedAt            DateTime          @default(now())
+  endsAt               DateTime?
+  gatewayProvider      String?
+  gatewaySubscriptionId String?
+  gatewayCustomerId    String?
+  paymentMethodId      String?
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean           @default(false)
+  canceledAt           DateTime?
+  trialEnd             DateTime?
+  Plan                 Plan              @relation(fields: [planId], references: [id])
+  User                 User              @relation(fields: [userId], references: [id])
+  PaymentHistory       PaymentHistory[]
 
   @@index([planId])
   @@index([userId])
+  @@index([gatewaySubscriptionId])
+  @@index([gatewayCustomerId])
+  @@index([status])
 }
 
 model Transaction {
@@ -225,11 +253,25 @@ model ServiceSchedule {
   @@index([dayOfWeek])
 }
 
+model AdminUser {
+  id           String      @id @default(cuid())
+  name         String
+  email        String      @unique
+  passwordHash String
+  adminRole    AdminRole   @default(SUPPORT)
+  isActive     Boolean     @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  AuditLog     AuditLog[]
+}
+
 model User {
   id           String         @id @default(cuid())
   name         String
   email        String         @unique
   password     String
+  isBlocked    Boolean        @default(false)
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
   Member       Member?
@@ -281,6 +323,39 @@ model ContributionPaymentMethod {
   @@index([contributionId])
 }
 
+model PaymentHistory {
+  id                String       @id @default(cuid())
+  subscriptionId    String
+  amount            Decimal      @db.Decimal(10, 2)
+  currency          String       @default("BRL")
+  status            String
+  gatewayPaymentId  String?
+  gatewayProvider   String?
+  paidAt            DateTime?
+  createdAt         DateTime     @default(now())
+  Subscription      Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([subscriptionId])
+  @@index([gatewayPaymentId])
+  @@index([status])
+}
+
+model WebhookEvent {
+  id              String   @id @default(cuid())
+  gatewayProvider String
+  gatewayEventId  String
+  eventType       String
+  processed       Boolean  @default(false)
+  processedAt     DateTime?
+  payload         Json?
+  createdAt       DateTime @default(now())
+
+  @@unique([gatewayProvider, gatewayEventId])
+  @@index([gatewayProvider])
+  @@index([gatewayEventId])
+  @@index([processed])
+}
+
 enum AuditAction {
   MEMBER_CREATED
   MEMBER_UPDATED
@@ -306,6 +381,29 @@ enum AuditAction {
   MEMBER_REGISTRATION_ATTEMPT
   INVITE_LINK_CREATED
   INVITE_LINK_DEACTIVATED
+  ADMIN_LOGIN
+  ADMIN_LOGOUT
+  USER_BLOCKED
+  USER_UNBLOCKED
+  CHURCH_SUSPENDED
+  CHURCH_REACTIVATED
+  PLAN_CHANGED
+  SUBSCRIPTION_CHANGED
+  IMPERSONATE_USER
+  IMPERSONATE_CHURCH_OWNER
+  PASSWORD_RESET_SENT
+  ADMIN_CONFIG_UPDATED
+  PLAN_SYNCED_TO_GATEWAY
+  PLAN_SYNC_ERROR
+  SUBSCRIPTION_CREATED
+  SUBSCRIPTION_UPDATED
+  SUBSCRIPTION_CANCELED
+  SUBSCRIPTION_RESUMED
+  PAYMENT_RECEIVED
+  PAYMENT_FAILED
+  WEBHOOK_RECEIVED
+  WEBHOOK_PROCESSED
+  WEBHOOK_ERROR
 }
 
 enum PaymentMethodType {
@@ -338,4 +436,19 @@ enum ExitType {
   AGUA
   INTERNET
   OUTROS
+}
+
+enum AdminRole {
+  SUPERADMIN
+  SUPPORT
+  FINANCE
+}
+
+enum SubscriptionStatus {
+  pending
+  active
+  past_due
+  canceled
+  unpaid
+  trialing
 }

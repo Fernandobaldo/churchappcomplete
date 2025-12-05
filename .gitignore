@@ -1,0 +1,77 @@
+# Dependências
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Arquivos de ambiente
+.env
+.env.local
+.env.*.local
+.env.production
+.env.test
+*.env
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Sistema operacional
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# Expo
+.expo/
+.expo-shared/
+web-build/
+.expo/
+
+# Uploads e arquivos temporários
+uploads/
+temp/
+tmp/
+*.tmp
+
+# Testes
+coverage/
+.nyc_output/
+*.lcov
+
+# Prisma
+*.db
+*.db-journal
+
+# Docker
+.dockerignore
+
+# Misc
+*.pem
+*.key
+*.cert
+*.crt
+

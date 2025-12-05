@@ -59,3 +59,6 @@ Esses erros são **separados** do problema do esbuild e podem ser corrigidos gra
 2. **Corrigir os erros do código de produção** gradualmente conforme necessário
 3. **Os testes continuam funcionando** normalmente através do Vitest
 
+
+
+

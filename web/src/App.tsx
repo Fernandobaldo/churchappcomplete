@@ -38,6 +38,8 @@ import ChurchSettings from './pages/ChurchSettings'
 import RegisterInvite from './pages/RegisterInvite'
 import MemberLimitReached from './pages/MemberLimitReached'
 import InviteLinks from './pages/Members/InviteLinks'
+import Subscription from './pages/Subscription'
+import SubscriptionSuccess from './pages/Subscription/Success'
 import Layout from './components/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
 import PermissionProtectedRoute from './components/PermissionProtectedRoute'
@@ -139,7 +141,11 @@ function App() {
           <Route path="church-settings" element={<PermissionProtectedRoute permission="church_manage"><ChurchSettings /></PermissionProtectedRoute>} />
           <Route path="permissions" element={<PermissionProtectedRoute role={['ADMINGERAL', 'ADMINFILIAL', 'COORDINATOR']}><Permissions /></PermissionProtectedRoute>} />
           <Route path="profile" element={<Profile />} />
+          <Route path="subscription" element={<Subscription />} />
         </Route>
+
+        {/* Rotas públicas de subscription */}
+        <Route path="/subscription/success" element={<SubscriptionSuccess />} />
 
         {/* Redireciona /dashboard antigo para /app/dashboard */}
         <Route path="/dashboard" element={<Navigate to="/app/dashboard" replace />} />

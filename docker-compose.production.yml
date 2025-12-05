@@ -1,0 +1,79 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: churchapp-postgres-prod
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-churchapp}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - churchapp-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: churchapp-backend-prod
+    restart: always
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      PAYMENT_GATEWAY: ${PAYMENT_GATEWAY:-mercadopago}
+      MERCADOPAGO_ACCESS_TOKEN: ${MERCADOPAGO_ACCESS_TOKEN}
+      MERCADOPAGO_PUBLIC_KEY: ${MERCADOPAGO_PUBLIC_KEY}
+      MERCADOPAGO_WEBHOOK_SECRET: ${MERCADOPAGO_WEBHOOK_SECRET}
+      MERCADOPAGO_ENVIRONMENT: ${MERCADOPAGO_ENVIRONMENT:-production}
+      MERCADOPAGO_BACK_URL: ${MERCADOPAGO_BACK_URL}
+      MERCADOPAGO_WEBHOOK_URL: ${MERCADOPAGO_WEBHOOK_URL}
+      PORT: 3333
+    ports:
+      - "3333:3333"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - churchapp-network
+    volumes:
+      - ./backend/uploads:/app/uploads
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3333/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=${VITE_API_URL}
+    container_name: churchapp-web-prod
+    restart: always
+    environment:
+      VITE_API_URL: ${VITE_API_URL}
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - churchapp-network
+
+volumes:
+  postgres_data:
+
+networks:
+  churchapp-network:
+    driver: bridge
+

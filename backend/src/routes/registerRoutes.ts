@@ -12,6 +12,7 @@ import { registerRoute } from './auth/register'
 import { planRoutes } from './planRoutes';
 import { subscriptionRoutes } from './subscriptionRoutes';
 import { adminRoutes } from './adminRoutes';
+import { adminAuthRoutes } from './adminAuthRoutes';
 import { publicRegisterRoute } from './public/register'
 import { loginRoute } from './auth/login'
 import { authenticate } from '../middlewares/authenticate'
@@ -22,6 +23,8 @@ import { serviceScheduleRoutes } from './serviceScheduleRoutes.js'
 import { inviteLinkRoutes } from './inviteLinkRoutes.js'
 import { uploadRoutes } from './uploadRoutes.js'
 import { positionRoutes } from './positionRoutes.js'
+import { paymentRoutes } from './paymentRoutes.js'
+import { healthRoutes } from './health.js'
 
 
     export async function registerRoutes(app: FastifyInstance) {
@@ -37,6 +40,7 @@ import { positionRoutes } from './positionRoutes.js'
         app.register(planRoutes, { prefix: '/plans' });
         app.register(subscriptionRoutes, { prefix: '/subscriptions' });
         app.register(adminRoutes);
+        app.register(adminAuthRoutes);
         app.register(publicRegisterRoute, { prefix: '/public' })
         app.register(noticesRoutes, { prefix: '/notices' });
         app.register(financesRoutes, { prefix: '/finances' });
@@ -46,6 +50,9 @@ import { positionRoutes } from './positionRoutes.js'
         app.register(inviteLinkRoutes)
         app.register(uploadRoutes)
         app.register(positionRoutes)
+        app.register(paymentRoutes, { prefix: '/api' })
+        // Health check - sem prefixo para acesso direto em /health
+        app.register(healthRoutes)
 
 
 

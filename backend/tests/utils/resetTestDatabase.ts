@@ -30,6 +30,7 @@ export async function resetTestDatabase() {
     await prisma.subscription.deleteMany().catch(() => {})
     await prisma.user.deleteMany().catch(() => {})
     await prisma.plan.deleteMany().catch(() => {})
+    await prisma.adminUser.deleteMany().catch(() => {})
   } catch (error: any) {
     // Se for erro de tabela não existir, ignora
     if (error.code === 'P2021' || error.code === 'P2001') {
