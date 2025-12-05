@@ -44,7 +44,7 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/churchapp_test
         run: |
-          npx prisma migrate deploy
+          npx prisma db push --force-reset --accept-data-loss
           npm run seed:test
       
       - name: Run tests
