@@ -124,17 +124,102 @@ jobs:
         with:
           node-version: '18'
       
+      - name: Install backend dependencies
+        working-directory: ./backend
+        run: |
+          echo "📦 Instalando dependências do backend..."
+          npm ci
+          echo "✅ Dependências instaladas"
+      
+      - name: TypeCheck backend
+        working-directory: ./backend
+        run: |
+          echo "🔍 Verificando erros de TypeScript no backend..."
+          npx tsc --noEmit
+          echo "✅ TypeScript sem erros!"
+      
       - name: Build backend
         working-directory: ./backend
         run: |
+          echo "🔨 Iniciando build do backend..."
+          
+          echo "🔍 Gerando Prisma Client..."
+          npx prisma generate
+          echo "✅ Prisma Client gerado"
+          
+          echo "⚙️ Compilando TypeScript..."
+          npm run build 2>&1 | tee build.log || {
+            echo "❌ ERRO: Build falhou!"
+            echo "📄 Últimas linhas do log de build:"
+            tail -50 build.log
+            exit 1
+          }
+          
+          echo "✅ Verificando se build foi gerado..."
+          if [ ! -d "dist" ] || [ -z "$(ls -A dist 2>/dev/null)" ]; then
+            echo "❌ ERRO: Diretório dist não foi criado ou está vazio!"
+            echo "📄 Últimas linhas do log de build:"
+            tail -50 build.log
+            exit 1
+          fi
+          
+          echo "📊 Build gerado com sucesso!"
+          echo "📁 Arquivos em dist/ (primeiros 10):"
+          ls -lh dist/ | head -10
+          echo "💾 Tamanho total do build:"
+          du -sh dist/
+      
+      - name: Install web dependencies
+        working-directory: ./web
+        run: |
+          echo "📦 Instalando dependências do web..."
           npm ci
-          npm run build
+          echo "✅ Dependências instaladas"
+      
+      - name: TypeCheck web
+        working-directory: ./web
+        run: |
+          echo "🔍 Verificando erros de TypeScript no web..."
+          npx tsc --noEmit
+          echo "✅ TypeScript sem erros!"
       
       - name: Build web
         working-directory: ./web
         env:
           VITE_API_URL: http://localhost:3333
         run: |
-          npm ci
-          npm run build
+          echo "🔨 Iniciando build do web..."
+          
+          echo "⚙️ Compilando TypeScript e gerando build..."
+          npm run build 2>&1 | tee build.log || {
+            echo "❌ ERRO: Build falhou!"
+            echo "📄 Últimas linhas do log de build:"
+            tail -50 build.log
+            exit 1
+          }
+          
+          echo "✅ Verificando se build foi gerado..."
+          if [ ! -d "dist" ] || [ -z "$(ls -A dist 2>/dev/null)" ]; then
+            echo "❌ ERRO: Diretório dist não foi criado ou está vazio!"
+            echo "📄 Últimas linhas do log de build:"
+            tail -50 build.log
+            exit 1
+          fi
+          
+          echo "📊 Build gerado com sucesso!"
+          echo "📁 Arquivos em dist/ (primeiros 10):"
+          ls -lh dist/ | head -10
+          echo "💾 Tamanho total do build:"
+          du -sh dist/
+      
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: build-artifacts
+          path: |
+            backend/dist/
+            web/dist/
+          retention-days: 7
+          if-no-files-found: warn
 
