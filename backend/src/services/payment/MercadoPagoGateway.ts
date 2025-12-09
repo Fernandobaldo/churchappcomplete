@@ -431,7 +431,7 @@ export class MercadoPagoGateway implements PaymentGatewayInterface {
       authorized: 'active',
       paused: 'past_due',
       cancelled: 'canceled',
-      cancelled: 'unpaid',
+      unpaid: 'unpaid',
     }
 
     return statusMap[status.toLowerCase()] || 'pending'
