@@ -322,11 +322,6 @@ export async function validateRoleChangePermission(
     throw new Error('Apenas o sistema pode criar um Administrador Geral')
   }
 
-  // ADMINFILIAL não pode criar outro ADMINGERAL
-  if (editor.role === Role.ADMINFILIAL && newRole === Role.ADMINGERAL) {
-    throw new Error('Você não pode criar um Administrador Geral')
-  }
-
   // 5. Validar se o editor pode editar o membro alvo (mesma igreja/filial)
   await validateMemberEditPermission(editorMemberId, targetMemberId)
 }

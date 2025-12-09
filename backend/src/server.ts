@@ -49,7 +49,7 @@ const app = fastify({ logger: true });
 // Configurar CORS baseado no ambiente
 const corsOptions = env.isProduction
   ? {
-      origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+      origin: (origin: string | undefined, callback: (err: Error | null, allow: boolean | string) => void) => {
         // Em produção, aceitar apenas origens específicas
         const allowedOrigins = process.env.CORS_ORIGINS?.split(',') || []
         // Se não houver origem (ex: requisições do Postman), permitir apenas em desenvolvimento
@@ -221,7 +221,6 @@ Authorization: Bearer <seu-token>
 
 app.register(fastifySwaggerUi, {
     routePrefix: '/docs',
-    exposeRoute: true,
 });
 
 await registerRoutes(app);

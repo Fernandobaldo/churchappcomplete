@@ -7,12 +7,12 @@ export async function loginUserService(app: FastifyInstance, email: string, pass
   const user = await prisma.user.findUnique({
     where: { email },
     include: {
-      subscriptions: {
+      Subscription: {
         where: { status: SubscriptionStatus.active },
-        include: { plan: true },
+        include: { Plan: true },
       },
-      member: {
-        include: { permissions: true }
+      Member: {
+        include: { Permission: true }
       }
     }
   })
@@ -24,10 +24,10 @@ export async function loginUserService(app: FastifyInstance, email: string, pass
   const tokenPayload = {
     userId: user.id,
     email: user.email,
-    memberId: user.member?.id ?? null,
-    role: user.member?.role ?? null,
-    branchId: user.member?.branchId ?? null,
-    permissions: user.member?.permissions.map(p => p.type) ?? [],
+    memberId: user.Member?.id ?? null,
+    role: user.Member?.role ?? null,
+    branchId: user.Member?.branchId ?? null,
+    permissions: user.Member?.Permission.map((p: any) => p.type) ?? [],
   }
 
   const token = app.jwt.sign(tokenPayload, { sub: user.id, expiresIn: '7d' })
@@ -37,14 +37,14 @@ export async function loginUserService(app: FastifyInstance, email: string, pass
     user: {
       id: user.id,
       email: user.email,
-      plan: user.subscriptions[0]?.plan.name ?? 'free',
+      plan: user.Subscription[0]?.Plan.name ?? 'free',
     },
-    member: user.member ? {
-      id: user.member.id,
-      name: user.member.name,
-      role: user.member.role,
-      branchId: user.member.branchId,
-      permissions: user.member.permissions.map(p => p.type)
+    member: user.Member ? {
+      id: user.Member.id,
+      name: user.Member.name,
+      role: user.Member.role,
+      branchId: user.Member.branchId,
+      permissions: user.Member.Permission.map((p: any) => p.type)
     } : null
   }
 }

@@ -3,6 +3,7 @@ import { SubscriptionStatus, AuditAction } from '@prisma/client'
 import { PaymentGatewayService } from './payment/PaymentGatewayService'
 import { logAudit } from '../utils/auditHelper'
 import { FastifyRequest } from 'fastify'
+import { env } from '../env'
 
 interface PlanData {
   name: string

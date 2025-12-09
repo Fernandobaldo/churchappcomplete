@@ -116,10 +116,8 @@ export class MercadoPagoGateway implements PaymentGatewayInterface {
     try {
       // Tentar buscar por email
       const searchResponse = await this.customer.search({
-        qs: {
-          email: input.email,
-        },
-      })
+        email: input.email,
+      } as any)
 
       if (searchResponse.results && searchResponse.results.length > 0) {
         const customer = searchResponse.results[0]
@@ -183,8 +181,8 @@ export class MercadoPagoGateway implements PaymentGatewayInterface {
 
       const customer = await this.customer.update({
         id: customerId,
-        body: updateData,
-      })
+        ...updateData,
+      } as any)
 
       return {
         id: customer.id?.toString() || '',
@@ -286,7 +284,7 @@ export class MercadoPagoGateway implements PaymentGatewayInterface {
         currentPeriodStart: now,
         currentPeriodEnd: periodEnd,
         cancelAtPeriodEnd: preApproval.status === 'cancelled',
-        metadata: preApproval.metadata as Record<string, any>,
+        metadata: (preApproval as any).metadata as Record<string, any>,
       }
     } catch (error: any) {
       throw new Error(`Erro ao buscar assinatura no MercadoPago: ${error.message}`)
@@ -354,10 +352,8 @@ export class MercadoPagoGateway implements PaymentGatewayInterface {
     try {
       // Buscar pagamentos relacionados à assinatura
       const searchResponse = await this.payment.search({
-        qs: {
-          external_reference: subscriptionId,
-        },
-      })
+        external_reference: subscriptionId,
+      } as any)
 
       if (!searchResponse.results) {
         return []

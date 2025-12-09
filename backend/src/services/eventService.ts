@@ -12,7 +12,7 @@ async getAll(branchId: string) {
     return await prisma.event.findUnique({
       where: { id },
       include: {
-        branch: {
+        Branch: {
           select: { name: true, churchId: true },
         },
       },

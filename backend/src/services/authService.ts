@@ -128,6 +128,10 @@ export class AuthService {
 
     const { type, user, member } = result
 
+    if (!user) {
+      throw new Error('Usuário não encontrado')
+    }
+
     // Monta payload do token
     const tokenPayload: any = {
       sub: user.id,

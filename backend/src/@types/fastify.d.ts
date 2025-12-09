@@ -1,17 +1,16 @@
-import fastify from 'fastify'
-import { authenticate } from './plugins/authenticate'
+import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
+import { authenticate } from '../middlewares/authenticate'
 
 declare module 'fastify' {
   interface FastifyRequest {
-    user: {
+    user?: {
       id: string
       email: string
       permissions: string[]
     }
   }
+
+  interface FastifyInstance {
+    authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>
+  }
 }
-
-const app = fastify()
-
-app.decorateRequest('user', null)
-app.decorate('authenticate', authenticate)

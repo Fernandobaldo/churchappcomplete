@@ -42,8 +42,8 @@ export class ChurchService {
         },
       })
 
-      let branch = null
-      let member = null
+      let branch: any = null
+      let member: any = null
 
       // Só cria branch e member se withBranch não for false
       if (data.withBranch !== false) {

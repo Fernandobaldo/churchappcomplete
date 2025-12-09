@@ -4,13 +4,13 @@ import { SubscriptionStatus } from '@prisma/client';
 export async function getMySubscription(userId: string) {
   return prisma.subscription.findFirst({
     where: { userId, status: SubscriptionStatus.active },
-    include: { plan: true }
+    include: { Plan: true }
   });
 }
 
 export async function listAllSubscriptions() {
   return prisma.subscription.findMany({
-    include: { user: true, plan: true }
+    include: { User: true, Plan: true }
   });
 }
 
