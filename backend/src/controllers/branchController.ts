@@ -104,8 +104,8 @@ export async function listBranchesHandler(request: FastifyRequest, reply: Fastif
   return reply.send(branches);
 }
 
-export async function deleteBranchHandler(request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) {
-  const { id } = request.params;
+export async function deleteBranchHandler(request: FastifyRequest, reply: FastifyReply) {
+  const { id } = request.params as { id: string };
 
   const branch = await getBranchById(id);
   if (!branch) {

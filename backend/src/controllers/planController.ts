@@ -8,7 +8,14 @@ export async function createPlanHandler(request: FastifyRequest, reply: FastifyR
     return reply.status(400).send({ error: parsed.error.flatten() });
   }
 
-  const plan = await createPlan(parsed.data);
+  // Converter null para undefined
+  const planData = {
+    ...parsed.data,
+    maxMembers: parsed.data.maxMembers ?? undefined,
+    maxBranches: parsed.data.maxBranches ?? undefined,
+  }
+
+  const plan = await createPlan(planData);
   return reply.status(201).send(plan);
 }
 

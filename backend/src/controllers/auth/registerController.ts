@@ -113,10 +113,10 @@ export async function registerController(request: FastifyRequest, reply: Fastify
           inviteLinkId: result.inviteLinkId,
           phone: result.phone || null,
           address: result.address || null,
-          birthDate: result.birthDate ? (result.birthDate instanceof Date ? result.birthDate.toISOString() : result.birthDate) : null,
-          avatarUrl: result.avatarUrl || null,
-          createdAt: result.createdAt ? (result.createdAt instanceof Date ? result.createdAt.toISOString() : result.createdAt) : new Date().toISOString(),
-          updatedAt: result.updatedAt ? (result.updatedAt instanceof Date ? result.updatedAt.toISOString() : result.updatedAt) : new Date().toISOString(),
+          birthDate: 'birthDate' in result && result.birthDate ? (result.birthDate instanceof Date ? result.birthDate.toISOString() : result.birthDate) : null,
+          avatarUrl: 'avatarUrl' in result ? (result.avatarUrl || null) : null,
+          createdAt: 'createdAt' in result && result.createdAt ? (result.createdAt instanceof Date ? result.createdAt.toISOString() : result.createdAt) : new Date().toISOString(),
+          updatedAt: 'updatedAt' in result && result.updatedAt ? (result.updatedAt instanceof Date ? result.updatedAt.toISOString() : result.updatedAt) : new Date().toISOString(),
         }
         
         return reply.status(201).send({
@@ -268,13 +268,17 @@ export async function registerController(request: FastifyRequest, reply: Fastify
     // Para registro via invite, retorna { member: ..., token: ... }
     // Para registro público, retorna { user: ..., token: ... }
     // Para registro interno, retorna os campos diretamente
+    if (!result || !('id' in result)) {
+      return reply.status(500).send({ error: 'Erro ao criar registro' })
+    }
+    
     return reply.status(201).send({
       id: result.id,
       name: result.name,
       email: result.email,
-      role: result.role,
-      branchId: result.branchId,
-      permissions: result.Permission?.map(p => ({ type: p.type })) || [],
+      role: 'role' in result ? result.role : undefined,
+      branchId: 'branchId' in result ? result.branchId : undefined,
+      permissions: 'Permission' in result ? (result.Permission?.map((p: any) => ({ type: p.type })) || []) : [],
     })
   } catch (error: any) {
     // Erros de validação do Zod retornam 400

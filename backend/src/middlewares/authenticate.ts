@@ -54,19 +54,3 @@ export async function authenticate(request: FastifyRequest, reply: FastifyReply)
     return
   }
 }
-
-declare module 'fastify' {
-  interface FastifyRequest {
-    user?: {
-      id: string
-      userId: string
-      email: string
-      type: 'user' | 'member'
-      permissions: string[]
-      role: string | null
-      branchId: string | null
-      memberId: string | null
-      churchId: string | null
-    }
-  }
-}

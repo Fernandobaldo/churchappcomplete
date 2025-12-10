@@ -44,7 +44,12 @@ export class ChurchController {
       return reply.code(401).send({ message: 'Usuário não encontrado.' })
     }
 
-    const result = await this.service.createChurchWithMainBranch(data, dbUser)
+    // Converter null para undefined para avatarUrl
+    const churchData = {
+      ...data,
+      avatarUrl: data.avatarUrl ?? undefined
+    }
+    const result = await this.service.createChurchWithMainBranch(churchData, dbUser)
     
     // Busca o User com Member associado para gerar o token atualizado
     let newToken = null
@@ -212,7 +217,17 @@ export class ChurchController {
         }
       }
 
-      const church = await this.service.updateChurch(id, data)
+      // Converter null para undefined e garantir que name existe
+      const updateData: any = {
+        ...data,
+      }
+      if (data.name !== undefined) {
+        updateData.name = data.name
+      }
+      if (data.avatarUrl !== undefined) {
+        updateData.avatarUrl = data.avatarUrl ?? undefined
+      }
+      const church = await this.service.updateChurch(id, updateData)
       return reply.send(church)
     } catch (error: any) {
       // Trata erro do Prisma quando a igreja não existe

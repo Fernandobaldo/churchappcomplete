@@ -56,6 +56,10 @@ export class ContributionController {
         endDateValue = `${data.endDate}T00:00:00.000Z`
       }
 
+      if (!user || !user.branchId) {
+        return reply.code(400).send({ message: 'Usuário não vinculado a uma filial.' })
+      }
+
       const created = await this.service.create({
         ...data,
         endDate: endDateValue,

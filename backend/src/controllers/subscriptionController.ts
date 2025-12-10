@@ -7,6 +7,9 @@ changePlan
 } from '../services/subscriptionService';
 
 export async function getMySubscriptionHandler(request: FastifyRequest, reply: FastifyReply) {
+  if (!request.user) {
+    return reply.status(401).send({ error: 'Usuário não autenticado' })
+  }
   const userId = request.user.id;
   const sub = await getMySubscription(userId);
   return reply.send(sub);
@@ -21,6 +24,10 @@ export async function changePlanHandler(request: FastifyRequest, reply: FastifyR
   const parsed = changePlanSchema.safeParse(request.body);
   if (!parsed.success) {
     return reply.status(400).send({ error: parsed.error.flatten() });
+  }
+
+  if (!request.user) {
+    return reply.status(401).send({ error: 'Usuário não autenticado' })
   }
 
   const { planId } = parsed.data;

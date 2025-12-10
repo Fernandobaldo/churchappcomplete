@@ -202,8 +202,8 @@ export class ServiceScheduleService {
     const updateData: {
       title: string
       time: string
-      description?: string | null
-      location?: string | null
+      description?: string
+      location?: string
     } = {
       title: newSchedule.title,
       time: newSchedule.time,
@@ -211,11 +211,11 @@ export class ServiceScheduleService {
 
     // Atualiza description apenas se foi fornecido no novo schedule
     if (newSchedule.description !== undefined) {
-      updateData.description = newSchedule.description
+      updateData.description = newSchedule.description || undefined
     }
-    // Atualiza location se foi fornecido no novo schedule (incluindo null)
+    // Atualiza location se foi fornecido no novo schedule
     if (newSchedule.location !== undefined) {
-      updateData.location = newSchedule.location
+      updateData.location = newSchedule.location || undefined
     }
 
     // Atualiza todos os eventos relacionados
@@ -346,7 +346,7 @@ export class ServiceScheduleService {
             startDate: eventDate,
             endDate: eventEndDate,
             time: schedule.time,
-            location: schedule.location || 'Não especificado',
+            location: schedule.location ?? 'Não especificado',
             description: schedule.description,
             branchId: schedule.branchId,
           })

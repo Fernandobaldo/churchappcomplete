@@ -36,6 +36,10 @@ export class DevotionalController {
       const data = createDevotionalBodySchema.parse(request.body)
       const user = request.user
 
+      if (!user) {
+        return reply.code(401).send({ message: 'Usuário não autenticado.' })
+      }
+
       if (!user.branchId) {
         return reply.code(400).send({ message: 'Usuário não vinculado a uma filial.' })
       }

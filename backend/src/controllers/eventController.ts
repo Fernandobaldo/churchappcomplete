@@ -1,6 +1,6 @@
 import { FastifyRequest, FastifyReply } from 'fastify'
 import { EventService } from '../services/eventService'
-import { createEventSchema } from '../schemas'
+import { eventBodySchema } from '../schemas/eventSchemas'
 import { parse, isValid } from 'date-fns'
 
 export class EventController {
@@ -8,6 +8,9 @@ private service = new EventService()
 
 async getAll(request: FastifyRequest, reply: FastifyReply) {
     const user = request.user
+    if (!user || !user.branchId) {
+      return reply.status(400).send({ message: 'Usuário não vinculado a uma filial.' })
+    }
     const events = await this.service.getAll(user.branchId)
     return reply.send(events)
   }
@@ -24,8 +27,12 @@ async getAll(request: FastifyRequest, reply: FastifyReply) {
   }
 
   async create(request: FastifyRequest, reply: FastifyReply) {
-    const body = createEventSchema.body.parse(request.body)
+    const body = eventBodySchema.parse(request.body)
     const user = request.user
+
+    if (!user || !user.branchId) {
+      return reply.status(400).send({ message: 'Usuário não vinculado a uma filial.' })
+    }
 
     const parsedStartDate = parse(body.startDate.trim(), 'dd-MM-yyyy', new Date())
     const parsedEndDate = parse(body.endDate.trim(), 'dd-MM-yyyy', new Date())
