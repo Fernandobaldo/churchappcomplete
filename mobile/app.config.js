@@ -31,10 +31,9 @@ module.exports = {
     // Variáveis de ambiente
     extra: {
       // URL da API - pode ser sobrescrita por variável de ambiente do sistema
-      // IMPORTANTE: Atualize este IP com o IP da sua máquina na rede local
-      // Para descobrir: ifconfig (macOS/Linux) ou ipconfig (Windows)
-      // IP atual detectado: 192.168.1.7
-      apiUrl: process.env.EXPO_PUBLIC_API_URL || "http://192.168.1.7:3333",
+      // Para desenvolvimento local, use: http://SEU_IP_LOCAL:3333
+      // Para produção/staging, use a URL do Render
+      apiUrl: process.env.EXPO_PUBLIC_API_URL || "https://churchapp-backend-dev.onrender.com",
     }
   }
 };
