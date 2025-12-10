@@ -347,7 +347,7 @@ export class ServiceScheduleService {
             endDate: eventEndDate,
             time: schedule.time,
             location: schedule.location ?? 'Não especificado',
-            description: schedule.description,
+            description: schedule.description || undefined,
             branchId: schedule.branchId,
           })
         }

@@ -9,6 +9,7 @@ export class ChurchService {
                 data: {
                     name: data.name,
                     logoUrl: data.logoUrl,
+                    avatarUrl: data.avatarUrl,
                     address: data.address,
                     phone: data.phone,
                     email: data.email,
@@ -114,6 +115,7 @@ export class ChurchService {
             data: {
                 name: data.name,
                 logoUrl: data.logoUrl,
+                avatarUrl: data.avatarUrl,
                 address: data.address,
                 phone: data.phone,
                 email: data.email,

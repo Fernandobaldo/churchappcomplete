@@ -246,9 +246,20 @@ export async function validateRoleChangePermission(editorMemberId, targetMemberI
     if (editor.role === Role.COORDINATOR || editor.role === Role.MEMBER) {
         throw new Error('Você não tem permissão para alterar roles');
     }
-    // 3. Validar hierarquia de roles
-    validateRoleHierarchy(editor.role, newRole);
-    // 4. Validar se o editor pode editar o membro alvo (mesma igreja/filial)
+    // 3. Buscar dados do membro alvo para validar mudança de role
+    const targetMember = await prisma.member.findUnique({
+        where: { id: targetMemberId },
+    });
+    if (!targetMember) {
+        throw new Error('Membro alvo não encontrado');
+    }
+    // 4. Validar hierarquia de roles (apenas para criação de ADMINGERAL)
+    // Para downgrades e outras mudanças, permitir se o editor tem permissão
+    if (newRole === Role.ADMINGERAL) {
+        // Apenas o sistema pode criar ADMINGERAL
+        throw new Error('Apenas o sistema pode criar um Administrador Geral');
+    }
+    // 5. Validar se o editor pode editar o membro alvo (mesma igreja/filial)
     await validateMemberEditPermission(editorMemberId, targetMemberId);
 }
 /**

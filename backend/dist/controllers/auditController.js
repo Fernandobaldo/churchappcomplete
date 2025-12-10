@@ -9,7 +9,7 @@ export async function getAuditLogsHandler(request, reply) {
             return reply.status(401).send({ error: 'Autenticação necessária' });
         }
         // Buscar dados do membro para obter churchId
-        const currentMember = await getMemberFromUserId(user.userId);
+        const currentMember = await getMemberFromUserId(user.userId || user.id);
         if (!currentMember) {
             return reply.status(404).send({ error: 'Membro não encontrado' });
         }
@@ -62,7 +62,7 @@ export async function getMemberAuditLogsHandler(request, reply) {
         }
         const { id } = z.object({ id: z.string() }).parse(request.params);
         // Buscar dados do membro atual
-        const currentMember = await getMemberFromUserId(user.userId);
+        const currentMember = await getMemberFromUserId(user.userId || user.id);
         if (!currentMember) {
             return reply.status(404).send({ error: 'Membro atual não encontrado' });
         }
@@ -91,7 +91,7 @@ export async function getBranchAuditLogsHandler(request, reply) {
         }
         const { id } = z.object({ id: z.string() }).parse(request.params);
         // Apenas ADMINGERAL pode ver logs de branches
-        const currentMember = await getMemberFromUserId(user.userId);
+        const currentMember = await getMemberFromUserId(user.userId || user.id);
         if (!currentMember || currentMember.role !== 'ADMINGERAL') {
             return reply.status(403).send({ error: 'Apenas Administradores Gerais podem visualizar logs de filiais' });
         }
@@ -109,14 +109,14 @@ export async function getBranchAuditLogsHandler(request, reply) {
 export async function getMyAuditLogsHandler(request, reply) {
     try {
         const user = request.user;
-        if (!user || !user.userId) {
+        if (!user || (!user.userId && !user.id)) {
             return reply.status(401).send({ error: 'Autenticação necessária' });
         }
         const querySchema = z.object({
             limit: z.coerce.number().int().positive().max(1000).optional().default(50),
         });
         const query = querySchema.parse(request.query);
-        const result = await getUserAuditLogs(user.userId, query.limit);
+        const result = await getUserAuditLogs(user.userId || user.id, query.limit);
         return reply.send(result);
     }
     catch (error) {

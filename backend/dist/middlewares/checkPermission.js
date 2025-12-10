@@ -21,7 +21,10 @@ export function checkPermission(requiredPermissions) {
                 });
                 if (member) {
                     memberPermissions = member.Permission.map(p => p.type);
-                    console.log(`[PERMISSIONS DEBUG] Permissões buscadas do banco para membro ${user.memberId}:`, memberPermissions);
+                }
+                else {
+                    // Se member não foi encontrado, usa permissões do token como fallback
+                    memberPermissions = user.permissions || [];
                 }
             }
             catch (error) {
@@ -39,8 +42,9 @@ export function checkPermission(requiredPermissions) {
         }
         const hasPermission = requiredPermissions.every(permission => memberPermissions.includes(permission));
         if (!hasPermission) {
-            console.log(`[PERMISSIONS DEBUG] Acesso negado para ${user?.email || 'usuário'}. Permissões necessárias: ${requiredPermissions.join(', ')}, Permissões do usuário: ${memberPermissions.join(', ')}`);
-            return reply.code(403).send({ message: 'Acesso negado: Permissão insuficiente.' });
+            return reply.code(403).send({
+                message: `Acesso negado: Permissão insuficiente. Necessário: ${requiredPermissions.join(', ')}, Permissões do usuário: ${memberPermissions.join(', ') || 'nenhuma'}`
+            });
         }
     };
 }

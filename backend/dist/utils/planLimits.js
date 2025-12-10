@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma';
+import { SubscriptionStatus } from '@prisma/client';
 /**
  * Verifica se o plano permite criar mais membros
  * @param userId ID do usuário (User)
@@ -11,7 +12,7 @@ export async function checkPlanMembersLimit(userId) {
         where: { id: userId },
         include: {
             Subscription: {
-                where: { status: 'active' },
+                where: { status: SubscriptionStatus.active },
                 include: { Plan: true },
             },
             Member: {
@@ -21,13 +22,35 @@ export async function checkPlanMembersLimit(userId) {
             },
         },
     });
-    if (!user?.Subscription[0]?.Plan) {
-        throw new Error('Plano não encontrado para o usuário');
-    }
-    const plan = user.Subscription[0].Plan;
-    const churchId = user.Member?.Branch.churchId;
-    if (!churchId) {
+    if (!user?.Member?.Branch?.churchId) {
         throw new Error('Igreja não encontrada para o usuário');
+    }
+    const churchId = user.Member.Branch.churchId;
+    let plan = user?.Subscription[0]?.Plan;
+    // 2. Se o usuário não tiver plano, buscar o plano do ADMINGERAL da igreja
+    if (!plan) {
+        const adminMember = await prisma.member.findFirst({
+            where: {
+                Branch: {
+                    churchId,
+                },
+                role: 'ADMINGERAL',
+            },
+            include: {
+                User: {
+                    include: {
+                        Subscription: {
+                            where: { status: SubscriptionStatus.active },
+                            include: { Plan: true },
+                        },
+                    },
+                },
+            },
+        });
+        if (!adminMember?.User?.Subscription[0]?.Plan) {
+            throw new Error('Plano não encontrado para o usuário ou para a igreja');
+        }
+        plan = adminMember.User.Subscription[0].Plan;
     }
     // 2. Se maxMembers for null, significa ilimitado
     if (plan.maxMembers === null) {
@@ -39,20 +62,11 @@ export async function checkPlanMembersLimit(userId) {
         include: { _count: { select: { Member: true } } },
     });
     const totalMembers = branches.reduce((sum, b) => sum + b._count.Member, 0);
-    console.log('🔍 [PLAN LIMITS] Verificando limite:', {
-        churchId,
-        planMaxMembers: plan.maxMembers,
-        totalMembers,
-        branchesCount: branches.length,
-        branches: branches.map(b => ({ id: b.id, name: b.name, members: b._count.Member }))
-    });
     // 4. Verificar limite
     if (totalMembers >= plan.maxMembers) {
         const errorMsg = `Limite do plano atingido: máximo de ${plan.maxMembers} membros excedido. Você tem ${totalMembers} membros.`;
-        console.error('❌ [PLAN LIMITS]', errorMsg);
         throw new Error(errorMsg);
     }
-    console.log('✅ [PLAN LIMITS] Limite OK:', totalMembers, '<', plan.maxMembers);
 }
 /**
  * Verifica se o plano permite criar mais branches
@@ -66,7 +80,7 @@ export async function checkPlanBranchesLimit(userId) {
         where: { id: userId },
         include: {
             Subscription: {
-                where: { status: 'active' },
+                where: { status: SubscriptionStatus.active },
                 include: { Plan: true },
             },
             Member: {
@@ -76,13 +90,35 @@ export async function checkPlanBranchesLimit(userId) {
             },
         },
     });
-    if (!user?.Subscription[0]?.Plan) {
-        throw new Error('Plano não encontrado para o usuário');
-    }
-    const plan = user.Subscription[0].Plan;
-    const churchId = user.Member?.Branch.churchId;
-    if (!churchId) {
+    if (!user?.Member?.Branch?.churchId) {
         throw new Error('Igreja não encontrada para o usuário');
+    }
+    const churchId = user.Member.Branch.churchId;
+    let plan = user?.Subscription[0]?.Plan;
+    // 2. Se o usuário não tiver plano, buscar o plano do ADMINGERAL da igreja
+    if (!plan) {
+        const adminMember = await prisma.member.findFirst({
+            where: {
+                Branch: {
+                    churchId,
+                },
+                role: 'ADMINGERAL',
+            },
+            include: {
+                User: {
+                    include: {
+                        Subscription: {
+                            where: { status: SubscriptionStatus.active },
+                            include: { Plan: true },
+                        },
+                    },
+                },
+            },
+        });
+        if (!adminMember?.User?.Subscription[0]?.Plan) {
+            throw new Error('Plano não encontrado para o usuário ou para a igreja');
+        }
+        plan = adminMember.User.Subscription[0].Plan;
     }
     // 2. Se maxBranches for null, significa ilimitado
     if (plan.maxBranches === null) {

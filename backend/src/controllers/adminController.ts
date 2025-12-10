@@ -49,11 +49,12 @@ export async function getDashboardStatsHandler(
 
 export async function getAllUsersHandler(req: FastifyRequest, reply: FastifyReply) {
   try {
-    const page = Number(req.query.page) || 1
-    const limit = Number(req.query.limit) || 50
-    const status = req.query.status as 'active' | 'blocked' | undefined
-    const planId = req.query.planId as string | undefined
-    const search = req.query.search as string | undefined
+    const query = req.query as any
+    const page = Number(query.page) || 1
+    const limit = Number(query.limit) || 50
+    const status = query.status as 'active' | 'blocked' | undefined
+    const planId = query.planId as string | undefined
+    const search = query.search as string | undefined
 
     const result = await userService.getAllUsers(
       { status, planId, search },
@@ -139,11 +140,12 @@ export async function getAllChurchesHandler(
   reply: FastifyReply
 ) {
   try {
-    const page = Number(req.query.page) || 1
-    const limit = Number(req.query.limit) || 50
-    const name = req.query.name as string | undefined
-    const planId = req.query.planId as string | undefined
-    const status = req.query.status as 'active' | 'suspended' | undefined
+    const query = req.query as any
+    const page = Number(query.page) || 1
+    const limit = Number(query.limit) || 50
+    const name = query.name as string | undefined
+    const planId = query.planId as string | undefined
+    const status = query.status as 'active' | 'suspended' | undefined
 
     const result = await churchService.getAllChurches(
       { name, planId, status },
@@ -190,8 +192,9 @@ export async function getChurchMembersHandler(
 ) {
   try {
     const { id } = req.params as { id: string }
-    const page = Number(req.query.page) || 1
-    const limit = Number(req.query.limit) || 50
+    const query = req.query as any
+    const page = Number(query.page) || 1
+    const limit = Number(query.limit) || 50
     const result = await churchService.getChurchMembers(id, { page, limit })
     return reply.send(result)
   } catch (error: any) {
@@ -274,9 +277,10 @@ export async function getAllMembersHandler(
   reply: FastifyReply
 ) {
   try {
-    const page = Number(req.query.page) || 1
-    const limit = Number(req.query.limit) || 50
-    const search = req.query.search as string | undefined
+    const query = req.query as any
+    const page = Number(query.page) || 1
+    const limit = Number(query.limit) || 50
+    const search = query.search as string | undefined
     const result = await memberService.getAllMembers({ search }, { page, limit })
     return reply.send(result)
   } catch (error: any) {
@@ -342,7 +346,7 @@ export async function createPlanHandler(req: FastifyRequest, reply: FastifyReply
     // Validar features
     const { AVAILABLE_PLAN_FEATURES } = await import('../constants/planFeatures')
     const validFeatureIds = AVAILABLE_PLAN_FEATURES.map((f) => f.id)
-    const invalidFeatures = data.features.filter((f) => !validFeatureIds.includes(f))
+    const invalidFeatures = data.features.filter((f) => !validFeatureIds.includes(f as any))
     if (invalidFeatures.length > 0) {
       return reply.status(400).send({
         error: `Features inválidas: ${invalidFeatures.join(', ')}`,
@@ -386,7 +390,7 @@ export async function updatePlanHandler(req: FastifyRequest, reply: FastifyReply
       if (data.features.length > 0) {
         const { AVAILABLE_PLAN_FEATURES } = await import('../constants/planFeatures')
         const validFeatureIds = AVAILABLE_PLAN_FEATURES.map((f) => f.id)
-        const invalidFeatures = data.features.filter((f) => !validFeatureIds.includes(f))
+        const invalidFeatures = data.features.filter((f) => !validFeatureIds.includes(f as any))
         if (invalidFeatures.length > 0) {
           return reply.status(400).send({
             error: `Features inválidas: ${invalidFeatures.join(', ')}`,
@@ -443,10 +447,11 @@ export async function getAllSubscriptionsHandler(
   reply: FastifyReply
 ) {
   try {
-    const page = Number(req.query.page) || 1
-    const limit = Number(req.query.limit) || 50
-    const status = req.query.status as string | undefined
-    const planId = req.query.planId as string | undefined
+    const query = req.query as any
+    const page = Number(query.page) || 1
+    const limit = Number(query.limit) || 50
+    const status = query.status as string | undefined
+    const planId = query.planId as string | undefined
     const result = await subscriptionService.getAllSubscriptions(
       { status, planId },
       { page, limit }
@@ -521,7 +526,7 @@ export async function updateSubscriptionStatusHandler(
     const adminUserId = getAdminUserId(req)
     const subscription = await subscriptionService.updateSubscriptionStatus(
       id,
-      status,
+      status as any,
       adminUserId
     )
     return reply.send(subscription)
@@ -571,15 +576,16 @@ export async function getAuditLogsHandler(
   reply: FastifyReply
 ) {
   try {
-    const page = Number(req.query.page) || 1
-    const limit = Number(req.query.limit) || 50
-    const adminUserId = req.query.adminUserId as string | undefined
-    const action = req.query.action as any
-    const startDate = req.query.startDate
-      ? new Date(req.query.startDate as string)
+    const query = req.query as any
+    const page = Number(query.page) || 1
+    const limit = Number(query.limit) || 50
+    const adminUserId = query.adminUserId as string | undefined
+    const action = query.action as any
+    const startDate = query.startDate
+      ? new Date(query.startDate as string)
       : undefined
-    const endDate = req.query.endDate
-      ? new Date(req.query.endDate as string)
+    const endDate = query.endDate
+      ? new Date(query.endDate as string)
       : undefined
 
     const result = await auditService.getAdminAuditLogs(

@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { AuditLogger } from '../../utils/auditHelper';
+import { Role } from '@prisma/client';
+import { RESTRICTED_PERMISSIONS } from '../../constants/permissions';
 // 🔍 Listar todas as permissões
 export async function getAllPermissionsController(request, reply) {
     const permissions = await prisma.permission.findMany({
@@ -42,22 +44,30 @@ export async function assignPermissionsController(request, reply) {
             }
             throw error;
         }
-        console.log(`[PERMISSIONS DEBUG] POST /permissions/${id}`);
-        console.log(`[PERMISSIONS DEBUG] Permissões recebidas:`, permissions);
-        console.log(`[PERMISSIONS DEBUG] Quantidade de permissões:`, permissions.length);
+        // Validação: Verificar se membro com role MEMBER está tentando receber permissões restritas
+        const member = await prisma.member.findUnique({
+            where: { id },
+            select: { id: true, role: true },
+        });
+        if (!member) {
+            return reply.code(404).send({
+                message: 'Membro não encontrado',
+            });
+        }
+        // Permissões que requerem pelo menos role COORDINATOR
+        const requestedRestricted = permissions.filter(perm => RESTRICTED_PERMISSIONS.includes(perm));
+        if (member.role === Role.MEMBER && requestedRestricted.length > 0) {
+            return reply.code(403).send({
+                message: 'Esta permissão requer pelo menos a role de Coordenador',
+                error: `Membros com role MEMBER não podem receber as permissões: ${requestedRestricted.join(', ')}`,
+            });
+        }
         // Usa transação para garantir atomicidade
         const result = await prisma.$transaction(async (tx) => {
-            // Primeiro, busca permissões existentes antes de remover
-            const existingPermissions = await tx.permission.findMany({
-                where: { memberId: id },
-                select: { id: true, type: true },
-            });
-            console.log(`[PERMISSIONS DEBUG] Permissões existentes antes de remover:`, existingPermissions);
             // Primeiro, remove todas as permissões existentes do membro
-            const deleteResult = await tx.permission.deleteMany({
+            await tx.permission.deleteMany({
                 where: { memberId: id },
             });
-            console.log(`[PERMISSIONS DEBUG] Permissões removidas:`, deleteResult.count);
             // Depois, adiciona as novas permissões (se houver)
             let added = 0;
             if (permissions.length > 0) {
@@ -69,25 +79,16 @@ export async function assignPermissionsController(request, reply) {
                     skipDuplicates: true,
                 });
                 added = createResult.count;
-                console.log(`[PERMISSIONS DEBUG] Permissões criadas:`, added);
             }
             // Busca as permissões atualizadas para garantir que foram salvas corretamente
             const updatedPermissions = await tx.permission.findMany({
                 where: { memberId: id },
                 select: { id: true, type: true },
             });
-            console.log(`[PERMISSIONS DEBUG] Permissões encontradas após salvar (dentro da transação):`, updatedPermissions);
-            console.log(`[PERMISSIONS DEBUG] Quantidade de permissões encontradas:`, updatedPermissions.length);
             return { added, permissions: updatedPermissions };
         });
         // Log de auditoria
         await AuditLogger.memberPermissionsChanged(request, id, permissions);
-        console.log(`[PERMISSIONS DEBUG] Resposta final do POST:`, {
-            success: true,
-            added: result.added,
-            permissionsCount: result.permissions.length,
-            permissions: result.permissions
-        });
         return reply.send({
             success: true,
             added: result.added,

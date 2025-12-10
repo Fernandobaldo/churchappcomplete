@@ -1,6 +1,6 @@
 import { prisma } from '../lib/prisma';
 import { Role } from '@prisma/client';
-import { ALL_PERMISSION_TYPES } from '../constants/permissions';
+import { ALL_PERMISSION_TYPES, RESTRICTED_PERMISSIONS } from '../constants/permissions';
 export function formatDate(date) {
     if (!date)
         return null;
@@ -21,6 +21,14 @@ export function formatDate(date) {
 export async function findAllMembers(branchId, churchId = null, userRole = null, memberId = null, hasManagePermission = false) {
     // Se for ADMINGERAL e tiver churchId, busca todos os membros da igreja
     if (userRole === 'ADMINGERAL' && churchId) {
+        // Buscar o avatar da igreja para usar como fallback
+        const church = await prisma.church.findUnique({
+            where: { id: churchId },
+            select: {
+                avatarUrl: true,
+            },
+        });
+        const churchAvatarUrl = church?.avatarUrl || null;
         const members = await prisma.member.findMany({
             where: {
                 Branch: {
@@ -56,17 +64,16 @@ export async function findAllMembers(branchId, churchId = null, userRole = null,
             },
         });
         const mappedMembers = members.map(member => {
-            const { Permission, Branch, Position, email, phone, address, ...rest } = member;
+            const { Permission, Branch, Position, email, phone, address, avatarUrl, ...rest } = member;
+            // Usa o avatar do membro se existir, senão usa o avatar da igreja
+            const finalAvatarUrl = avatarUrl || churchAvatarUrl;
             const result = {
                 ...rest,
+                avatarUrl: finalAvatarUrl, // Usa avatar do membro ou da igreja como fallback
                 permissions: Permission.map(p => ({ id: p.id, type: p.type })),
                 branch: Branch,
                 position: Position ? { id: Position.id, name: Position.name } : null,
             };
-            console.log(`[PERMISSIONS DEBUG] findAllMembers (ADMINGERAL) - Membro ${member.id} (${member.name}):`, {
-                permissionsCount: Permission.length,
-                permissions: Permission.map(p => p.type)
-            });
             // Inclui dados sensíveis apenas se tiver permissão members_manage
             if (hasManagePermission || userRole === 'ADMINGERAL' || userRole === 'ADMINFILIAL') {
                 result.email = email;
@@ -75,7 +82,6 @@ export async function findAllMembers(branchId, churchId = null, userRole = null,
             }
             return result;
         });
-        console.log(`[PERMISSIONS DEBUG] findAllMembers (ADMINGERAL) retornando ${mappedMembers.length} membros`);
         return mappedMembers;
     }
     // Para outros roles (incluindo MEMBER), busca membros da branch especificada
@@ -83,6 +89,18 @@ export async function findAllMembers(branchId, churchId = null, userRole = null,
     if (!branchId) {
         throw new Error('branchId é obrigatório para buscar membros');
     }
+    // Buscar o avatar da igreja para usar como fallback
+    const branch = await prisma.branch.findUnique({
+        where: { id: branchId },
+        select: {
+            Church: {
+                select: {
+                    avatarUrl: true,
+                },
+            },
+        },
+    });
+    const churchAvatarUrl = branch?.Church?.avatarUrl || null;
     const members = await prisma.member.findMany({
         where: { branchId },
         select: {
@@ -108,16 +126,15 @@ export async function findAllMembers(branchId, churchId = null, userRole = null,
         },
     });
     const mappedMembers = members.map(member => {
-        const { Permission, Position, email, phone, address, ...rest } = member;
+        const { Permission, Position, email, phone, address, avatarUrl, ...rest } = member;
+        // Usa o avatar do membro se existir, senão usa o avatar da igreja
+        const finalAvatarUrl = avatarUrl || churchAvatarUrl;
         const result = {
             ...rest,
+            avatarUrl: finalAvatarUrl, // Usa avatar do membro ou da igreja como fallback
             permissions: Permission.map(p => ({ id: p.id, type: p.type })),
             position: Position ? { id: Position.id, name: Position.name } : null,
         };
-        console.log(`[PERMISSIONS DEBUG] findAllMembers - Membro ${member.id} (${member.name}):`, {
-            permissionsCount: Permission.length,
-            permissions: Permission.map(p => p.type)
-        });
         // Inclui dados sensíveis apenas se tiver permissão members_manage
         if (hasManagePermission || userRole === 'ADMINGERAL' || userRole === 'ADMINFILIAL') {
             result.email = email;
@@ -126,11 +143,9 @@ export async function findAllMembers(branchId, churchId = null, userRole = null,
         }
         return result;
     });
-    console.log(`[PERMISSIONS DEBUG] findAllMembers retornando ${mappedMembers.length} membros`);
     return mappedMembers;
 }
 export async function findMemberById(id, hasManagePermission = false, canViewPermissions = false) {
-    console.log(`[PERMISSIONS DEBUG] findMemberById chamado para membro ${id}, hasManagePermission: ${hasManagePermission}, canViewPermissions: ${canViewPermissions}`);
     const member = await prisma.member.findUnique({
         where: { id },
         select: {
@@ -159,36 +174,22 @@ export async function findMemberById(id, hasManagePermission = false, canViewPer
         },
     });
     if (!member) {
-        console.log(`[PERMISSIONS DEBUG] Membro ${id} não encontrado`);
         return null;
     }
-    console.log(`[DB DEBUG] ========== DADOS DO BANCO DE DADOS ==========`);
-    console.log(`[DB DEBUG] Membro ID: ${member.id}`);
-    console.log(`[DB DEBUG] positionId (raw):`, member.positionId);
-    console.log(`[DB DEBUG] positionId (type):`, typeof member.positionId);
-    console.log(`[DB DEBUG] Position (raw):`, JSON.stringify(member.Position, null, 2));
-    console.log(`[DB DEBUG] Position (type):`, typeof member.Position);
-    console.log(`[DB DEBUG] Todos os campos do member:`, Object.keys(member));
-    console.log(`[DB DEBUG] ============================================`);
-    console.log(`[PERMISSIONS DEBUG] Permissões encontradas no banco para ${id}:`, member.Permission);
-    console.log(`[PERMISSIONS DEBUG] Quantidade de permissões:`, member.Permission.length);
+    // Buscar o avatar da igreja para usar como fallback
+    const churchAvatarUrl = member.Branch?.Church?.avatarUrl || null;
     // Desestruturação explícita para garantir que positionId não seja perdido
     const { Permission, Branch, Position, email, phone, address, positionId, ...rest } = member;
-    console.log(`[TRANSFORM DEBUG] ========== TRANSFORMAÇÃO DOS DADOS ==========`);
-    console.log(`[TRANSFORM DEBUG] positionId após desestruturação:`, positionId);
-    console.log(`[TRANSFORM DEBUG] positionId (type):`, typeof positionId);
-    console.log(`[TRANSFORM DEBUG] Position após desestruturação:`, Position);
-    console.log(`[TRANSFORM DEBUG] Position (type):`, typeof Position);
-    console.log(`[TRANSFORM DEBUG] Rest keys:`, Object.keys(rest));
-    console.log(`[TRANSFORM DEBUG] ============================================`);
     // Construir resultado explicitamente para garantir que todos os campos estejam presentes
     // IMPORTANTE: Usar null em vez de undefined para garantir que campos sejam serializados no JSON
+    // Usa o avatar do membro se existir, senão usa o avatar da igreja
+    const finalAvatarUrl = member.avatarUrl || churchAvatarUrl;
     const result = {
         id: member.id,
         name: member.name,
         branchId: member.branchId,
         birthDate: member.birthDate,
-        avatarUrl: member.avatarUrl ?? null,
+        avatarUrl: finalAvatarUrl, // Usa avatar do membro ou da igreja como fallback
         role: member.role,
         positionId: positionId !== undefined && positionId !== null ? String(positionId) : null, // Garante que positionId sempre esteja presente como string ou null
         permissions: canViewPermissions ? Permission.map(p => ({ id: p.id, type: p.type })) : [],
@@ -203,20 +204,6 @@ export async function findMemberById(id, hasManagePermission = false, canViewPer
     if (result.position === undefined) {
         result.position = null;
     }
-    console.log(`[RESULT DEBUG] ========== RESULTADO DO findMemberById ==========`);
-    console.log(`[RESULT DEBUG] result.positionId:`, result.positionId);
-    console.log(`[RESULT DEBUG] result.positionId (type):`, typeof result.positionId);
-    console.log(`[RESULT DEBUG] result.position:`, JSON.stringify(result.position, null, 2));
-    console.log(`[RESULT DEBUG] result keys:`, Object.keys(result));
-    console.log(`[RESULT DEBUG] JSON completo do result:`, JSON.stringify(result, null, 2));
-    console.log(`[RESULT DEBUG] =================================================`);
-    console.log(`[PERMISSIONS DEBUG] Resultado final do findMemberById para ${id}:`, {
-        permissionsCount: result.permissions.length,
-        permissions: result.permissions,
-        canViewPermissions,
-        positionId: result.positionId,
-        position: result.position,
-    });
     // Inclui dados sensíveis apenas se tiver permissão members_manage
     // Para o próprio perfil (getMyProfile), sempre inclui email, phone e address
     // Sempre inclui os campos, mesmo que sejam null, para garantir que o frontend receba todos os campos
@@ -231,15 +218,6 @@ export async function findMemberById(id, hasManagePermission = false, canViewPer
         result.phone = null;
         result.address = null;
     }
-    console.log(`[PROFILE DEBUG] findMemberById retornando para ${id}:`, {
-        hasManagePermission,
-        canViewPermissions,
-        email: result.email,
-        phone: result.phone,
-        address: result.address,
-        positionId: result.positionId,
-        position: result.position,
-    });
     return result;
 }
 export async function updateMember(id, data) {
@@ -271,65 +249,102 @@ export async function updateMember(id, data) {
  * @returns Membro atualizado com permissões
  */
 export async function updateMemberRole(memberId, newRole) {
-    // Buscar membro atual com permissões
-    const member = await prisma.member.findUnique({
-        where: { id: memberId },
-        include: {
-            Permission: true,
-        },
-    });
-    if (!member) {
-        throw new Error('Membro não encontrado');
-    }
-    // Atualizar role
-    await prisma.member.update({
-        where: { id: memberId },
-        data: { role: newRole },
-    });
-    // Determinar permissões padrão baseadas na nova role
-    let permissionsToAssign = [];
-    if (newRole === Role.ADMINGERAL || newRole === Role.ADMINFILIAL) {
-        // ADMINGERAL e ADMINFILIAL recebem todas as permissões
-        permissionsToAssign = [...ALL_PERMISSION_TYPES];
-    }
-    else {
-        // COORDINATOR e MEMBER mantêm apenas members_view
-        // Se já tiver permissões, mantém apenas members_view
-        permissionsToAssign = ['members_view'];
-    }
-    // Remover todas as permissões antigas
-    await prisma.permission.deleteMany({
-        where: { memberId },
-    });
-    // Criar novas permissões
-    if (permissionsToAssign.length > 0) {
-        await prisma.permission.createMany({
-            data: permissionsToAssign.map((type) => ({
-                memberId,
-                type,
-            })),
-            skipDuplicates: true,
+    // Usar transação para garantir atomicidade
+    try {
+        return await prisma.$transaction(async (tx) => {
+            // Buscar membro atual com permissões
+            const member = await tx.member.findUnique({
+                where: { id: memberId },
+                include: {
+                    Permission: true,
+                },
+            });
+            if (!member) {
+                throw new Error('Membro não encontrado');
+            }
+            const oldRole = member.role;
+            const currentPermissions = member.Permission.map(p => p.type);
+            // Determinar permissões a manter/atribuir baseadas na nova role
+            let permissionsToAssign = [];
+            if (newRole === Role.ADMINGERAL || newRole === Role.ADMINFILIAL) {
+                // ADMINGERAL e ADMINFILIAL recebem todas as permissões
+                permissionsToAssign = [...ALL_PERMISSION_TYPES];
+            }
+            else if (newRole === Role.COORDINATOR) {
+                // COORDINATOR: mantém todas as permissões ativas (pode ter todas, incluindo restritas)
+                // Upgrade: mantém todas as permissões que já estavam ativas
+                permissionsToAssign = [...currentPermissions];
+                // Garante que members_view sempre está presente
+                if (!permissionsToAssign.includes('members_view')) {
+                    permissionsToAssign.push('members_view');
+                }
+            }
+            else {
+                // MEMBER: mantém apenas permissões não restritas
+                // Downgrade: remove permissões que requerem COORDINATOR ou superior
+                permissionsToAssign = currentPermissions.filter(perm => !RESTRICTED_PERMISSIONS.includes(perm));
+                // Garante que members_view sempre está presente
+                if (!permissionsToAssign.includes('members_view')) {
+                    permissionsToAssign.push('members_view');
+                }
+            }
+            // Atualizar role e remover todas as permissões antigas em paralelo
+            await Promise.all([
+                tx.member.update({
+                    where: { id: memberId },
+                    data: { role: newRole },
+                }),
+                tx.permission.deleteMany({
+                    where: { memberId },
+                }),
+            ]);
+            // Criar novas permissões uma por uma para melhor tratamento de erros
+            if (permissionsToAssign.length > 0) {
+                // Criar permissões uma por uma para capturar erros específicos
+                for (const permissionType of permissionsToAssign) {
+                    try {
+                        await tx.permission.create({
+                            data: {
+                                memberId,
+                                type: permissionType,
+                            },
+                        });
+                    }
+                    catch (error) {
+                        // Se for erro de duplicata, ignora (não deveria acontecer já que deletamos todas antes)
+                        if (error.code !== 'P2002') {
+                            console.error(`[updateMemberRole] Erro ao criar permissão ${permissionType}:`, error);
+                            throw new Error(`Erro ao criar permissão ${permissionType}: ${error.message}`);
+                        }
+                    }
+                }
+            }
+            // Retornar membro atualizado com permissões
+            const updatedMember = await tx.member.findUnique({
+                where: { id: memberId },
+                select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    role: true,
+                    branchId: true,
+                    Permission: {
+                        select: { id: true, type: true },
+                    },
+                },
+            });
+            if (!updatedMember) {
+                throw new Error('Erro ao buscar membro atualizado');
+            }
+            const result = {
+                ...updatedMember,
+                permissions: updatedMember.Permission.map(p => ({ id: p.id, type: p.type })),
+            };
+            return result;
         });
     }
-    // Retornar membro atualizado com permissões
-    const updatedMember = await prisma.member.findUnique({
-        where: { id: memberId },
-        select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true,
-            branchId: true,
-            Permission: {
-                select: { id: true, type: true },
-            },
-        },
-    });
-    if (!updatedMember) {
-        throw new Error('Erro ao buscar membro atualizado');
+    catch (error) {
+        console.error(`[updateMemberRole] Erro na transação:`, error);
+        throw error;
     }
-    return {
-        ...updatedMember,
-        permissions: updatedMember.Permission.map(p => ({ id: p.id, type: p.type })),
-    };
 }

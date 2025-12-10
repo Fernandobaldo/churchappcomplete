@@ -5,7 +5,9 @@ export function checkRole(required) {
         // checkRole verifica apenas roles do token, não permissões do banco
         const hasRole = user?.role && required.includes(user.role);
         if (!hasRole) {
-            return reply.code(403).send({ message: 'Acesso negado' });
+            return reply.code(403).send({
+                message: `Acesso negado: Role insuficiente. Necessário: ${required.join(' ou ')}, Atual: ${user?.role || 'não definida'}`
+            });
         }
     };
 }

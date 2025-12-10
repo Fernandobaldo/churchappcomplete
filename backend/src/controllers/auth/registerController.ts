@@ -47,11 +47,18 @@ export async function registerController(request: FastifyRequest, reply: Fastify
         const result = await registerUserService(serviceData)
         
         // O serviço retorna um Member, que tem userId
-        if (!result || !result.userId) {
+        if (!result || !('userId' in result) || !result.userId) {
           console.error('❌ [REGISTER INVITE] Result do serviço inválido:', result)
           return reply.status(500).send({ 
             error: 'Erro ao processar registro: userId não encontrado no membro',
             details: result ? 'Member sem userId' : 'Result é null/undefined'
+          })
+        }
+        
+        // Type guard para garantir que result é um Member
+        if (!('id' in result) || !('email' in result) || !('name' in result)) {
+          return reply.status(500).send({ 
+            error: 'Erro ao processar registro: formato de dados inválido'
           })
         }
         
@@ -74,8 +81,8 @@ export async function registerController(request: FastifyRequest, reply: Fastify
           name: user.name,
           type: 'member' as const,
           memberId: result.id,
-          role: result.role,
-          branchId: result.branchId,
+          role: 'role' in result ? result.role : null,
+          branchId: 'branchId' in result ? result.branchId : null,
           permissions: [],
         }
         
@@ -95,9 +102,9 @@ export async function registerController(request: FastifyRequest, reply: Fastify
             entityId: result.id,
             metadata: {
               memberEmail: result.email,
-              role: result.role,
-              branchId: result.branchId,
-              inviteLinkId: result.inviteLinkId,
+              role: 'role' in result ? result.role : null,
+              branchId: 'branchId' in result ? result.branchId : null,
+              inviteLinkId: 'inviteLinkId' in result ? result.inviteLinkId : null,
             },
           }
         )
@@ -107,10 +114,10 @@ export async function registerController(request: FastifyRequest, reply: Fastify
           id: result.id,
           name: result.name,
           email: result.email,
-          role: result.role,
-          branchId: result.branchId,
+          role: 'role' in result ? result.role : null,
+          branchId: 'branchId' in result ? result.branchId : null,
           userId: result.userId,
-          inviteLinkId: result.inviteLinkId,
+          inviteLinkId: 'inviteLinkId' in result ? result.inviteLinkId : null,
           phone: result.phone || null,
           address: result.address || null,
           birthDate: 'birthDate' in result && result.birthDate ? (result.birthDate instanceof Date ? result.birthDate.toISOString() : result.birthDate) : null,
@@ -278,7 +285,7 @@ export async function registerController(request: FastifyRequest, reply: Fastify
       email: result.email,
       role: 'role' in result ? result.role : undefined,
       branchId: 'branchId' in result ? result.branchId : undefined,
-      permissions: 'Permission' in result ? (result.Permission?.map((p: any) => ({ type: p.type })) || []) : [],
+      permissions: 'Permission' in result && Array.isArray(result.Permission) ? (result.Permission.map((p: any) => ({ type: p.type })) || []) : [],
     })
   } catch (error: any) {
     // Erros de validação do Zod retornam 400

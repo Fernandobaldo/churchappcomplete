@@ -12,6 +12,7 @@ export class ChurchController {
             const bodySchema = z.object({
                 name: z.string(),
                 logoUrl: z.string().url().optional(),
+                avatarUrl: z.string().nullable().optional(),
                 address: z.string().optional(),
                 phone: z.string().optional(),
                 email: z.string().email().optional(),
@@ -38,7 +39,12 @@ export class ChurchController {
             if (!dbUser) {
                 return reply.code(401).send({ message: 'Usuário não encontrado.' });
             }
-            const result = await this.service.createChurchWithMainBranch(data, dbUser);
+            // Converter null para undefined para avatarUrl
+            const churchData = {
+                ...data,
+                avatarUrl: data.avatarUrl ?? undefined
+            };
+            const result = await this.service.createChurchWithMainBranch(churchData, dbUser);
             // Busca o User com Member associado para gerar o token atualizado
             let newToken = null;
             if (result.member) {
@@ -72,14 +78,7 @@ export class ChurchController {
                         permissions: member.Permission.map(p => p.type),
                     };
                     newToken = request.server.jwt.sign(tokenPayload, { expiresIn: '7d' });
-                    console.log(`[CHURCH] ✅ Token gerado para member ${member.id} com role ${member.role} e ${member.Permission.length} permissões`);
                 }
-                else {
-                    console.warn(`[CHURCH] ⚠️ Member não encontrado após criação para user ${dbUser.id}`);
-                }
-            }
-            else {
-                console.warn('[CHURCH] ⚠️ Member não foi criado (withBranch pode ser false)');
             }
             // Log de auditoria
             await AuditLogger.churchCreated(request, result.church.id, result.church.name);
@@ -88,6 +87,7 @@ export class ChurchController {
                     id: result.church.id,
                     name: result.church.name,
                     logoUrl: result.church.logoUrl,
+                    avatarUrl: result.church.avatarUrl,
                     isActive: result.church.isActive,
                 },
                 branch: result.branch,
@@ -113,7 +113,8 @@ export class ChurchController {
     async getAll(request, reply) {
         try {
             // Obtém o branchId do usuário do token (se disponível)
-            const userBranchId = request.user?.branchId || null;
+            const user = request.user;
+            const userBranchId = user?.branchId || null;
             const churches = await this.service.getAllChurches(userBranchId);
             return reply.send(churches);
         }
@@ -151,6 +152,7 @@ export class ChurchController {
                 .object({
                 name: z.string().optional(),
                 logoUrl: z.string().url().optional(),
+                avatarUrl: z.string().nullable().optional(),
                 address: z.string().optional(),
                 phone: z.string().optional(),
                 email: z.string().email().optional(),
@@ -193,7 +195,17 @@ export class ChurchController {
                     }
                 }
             }
-            const church = await this.service.updateChurch(id, data);
+            // Converter null para undefined e garantir que name existe
+            const updateData = {
+                ...data,
+            };
+            if (data.name !== undefined) {
+                updateData.name = data.name;
+            }
+            if (data.avatarUrl !== undefined) {
+                updateData.avatarUrl = data.avatarUrl ?? undefined;
+            }
+            const church = await this.service.updateChurch(id, updateData);
             return reply.send(church);
         }
         catch (error) {

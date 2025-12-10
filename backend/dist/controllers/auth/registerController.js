@@ -37,11 +37,17 @@ export async function registerController(request, reply) {
             try {
                 const result = await registerUserService(serviceData);
                 // O serviço retorna um Member, que tem userId
-                if (!result || !result.userId) {
+                if (!result || !('userId' in result) || !result.userId) {
                     console.error('❌ [REGISTER INVITE] Result do serviço inválido:', result);
                     return reply.status(500).send({
                         error: 'Erro ao processar registro: userId não encontrado no membro',
                         details: result ? 'Member sem userId' : 'Result é null/undefined'
+                    });
+                }
+                // Type guard para garantir que result é um Member
+                if (!('id' in result) || !('email' in result) || !('name' in result)) {
+                    return reply.status(500).send({
+                        error: 'Erro ao processar registro: formato de dados inválido'
                     });
                 }
                 // Gerar token JWT para o novo membro
@@ -61,8 +67,8 @@ export async function registerController(request, reply) {
                     name: user.name,
                     type: 'member',
                     memberId: result.id,
-                    role: result.role,
-                    branchId: result.branchId,
+                    role: 'role' in result ? result.role : null,
+                    branchId: 'branchId' in result ? result.branchId : null,
                     permissions: [],
                 };
                 if (!request.server?.jwt) {
@@ -74,9 +80,9 @@ export async function registerController(request, reply) {
                     entityId: result.id,
                     metadata: {
                         memberEmail: result.email,
-                        role: result.role,
-                        branchId: result.branchId,
-                        inviteLinkId: result.inviteLinkId,
+                        role: 'role' in result ? result.role : null,
+                        branchId: 'branchId' in result ? result.branchId : null,
+                        inviteLinkId: 'inviteLinkId' in result ? result.inviteLinkId : null,
                     },
                 });
                 // Garantir que o objeto member está completo antes de enviar
@@ -84,16 +90,16 @@ export async function registerController(request, reply) {
                     id: result.id,
                     name: result.name,
                     email: result.email,
-                    role: result.role,
-                    branchId: result.branchId,
+                    role: 'role' in result ? result.role : null,
+                    branchId: 'branchId' in result ? result.branchId : null,
                     userId: result.userId,
-                    inviteLinkId: result.inviteLinkId,
+                    inviteLinkId: 'inviteLinkId' in result ? result.inviteLinkId : null,
                     phone: result.phone || null,
                     address: result.address || null,
-                    birthDate: result.birthDate ? (result.birthDate instanceof Date ? result.birthDate.toISOString() : result.birthDate) : null,
-                    avatarUrl: result.avatarUrl || null,
-                    createdAt: result.createdAt ? (result.createdAt instanceof Date ? result.createdAt.toISOString() : result.createdAt) : new Date().toISOString(),
-                    updatedAt: result.updatedAt ? (result.updatedAt instanceof Date ? result.updatedAt.toISOString() : result.updatedAt) : new Date().toISOString(),
+                    birthDate: 'birthDate' in result && result.birthDate ? (result.birthDate instanceof Date ? result.birthDate.toISOString() : result.birthDate) : null,
+                    avatarUrl: 'avatarUrl' in result ? (result.avatarUrl || null) : null,
+                    createdAt: 'createdAt' in result && result.createdAt ? (result.createdAt instanceof Date ? result.createdAt.toISOString() : result.createdAt) : new Date().toISOString(),
+                    updatedAt: 'updatedAt' in result && result.updatedAt ? (result.updatedAt instanceof Date ? result.updatedAt.toISOString() : result.updatedAt) : new Date().toISOString(),
                 };
                 return reply.status(201).send({
                     member: memberResponse,
@@ -213,7 +219,21 @@ export async function registerController(request, reply) {
         if (!serviceData.fromLandingPage && result && 'id' in result) {
             await AuditLogger.memberCreated(request, result.id, result.email, result.role, result.branchId);
         }
-        return reply.status(201).send(result);
+        // Retorna os campos diretamente no body para registro interno (conforme schema Swagger)
+        // Para registro via invite, retorna { member: ..., token: ... }
+        // Para registro público, retorna { user: ..., token: ... }
+        // Para registro interno, retorna os campos diretamente
+        if (!result || !('id' in result)) {
+            return reply.status(500).send({ error: 'Erro ao criar registro' });
+        }
+        return reply.status(201).send({
+            id: result.id,
+            name: result.name,
+            email: result.email,
+            role: 'role' in result ? result.role : undefined,
+            branchId: 'branchId' in result ? result.branchId : undefined,
+            permissions: 'Permission' in result && Array.isArray(result.Permission) ? (result.Permission.map((p) => ({ type: p.type })) || []) : [],
+        });
     }
     catch (error) {
         // Erros de validação do Zod retornam 400

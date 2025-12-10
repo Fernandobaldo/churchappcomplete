@@ -1,5 +1,5 @@
 import { EventService } from '../services/eventService';
-import { createEventSchema } from '../schemas';
+import { eventBodySchema } from '../schemas/eventSchemas';
 import { parse, isValid } from 'date-fns';
 export class EventController {
     constructor() {
@@ -7,6 +7,9 @@ export class EventController {
     }
     async getAll(request, reply) {
         const user = request.user;
+        if (!user || !user.branchId) {
+            return reply.status(400).send({ message: 'Usuário não vinculado a uma filial.' });
+        }
         const events = await this.service.getAll(user.branchId);
         return reply.send(events);
     }
@@ -19,8 +22,11 @@ export class EventController {
         return reply.send(event);
     }
     async create(request, reply) {
-        const body = createEventSchema.body.parse(request.body);
+        const body = eventBodySchema.parse(request.body);
         const user = request.user;
+        if (!user || !user.branchId) {
+            return reply.status(400).send({ message: 'Usuário não vinculado a uma filial.' });
+        }
         const parsedStartDate = parse(body.startDate.trim(), 'dd-MM-yyyy', new Date());
         const parsedEndDate = parse(body.endDate.trim(), 'dd-MM-yyyy', new Date());
         const newEvent = await this.service.create({

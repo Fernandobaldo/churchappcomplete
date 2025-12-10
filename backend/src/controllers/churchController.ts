@@ -4,6 +4,7 @@ import { ChurchService } from '../services/churchService'
 import { AuditLogger } from '../utils/auditHelper'
 import { prisma } from '../lib/prisma'
 import { getMemberFromUserId } from '../utils/authorization'
+import type { AuthenticatedUser } from '../@types/fastify'
 
 export class ChurchController {
   private service = new ChurchService()
@@ -32,7 +33,7 @@ export class ChurchController {
       const data = bodySchema.parse(request.body)
 
       // Obtém o usuário logado a partir do token JWT
-      const user = request.user
+      const user = request.user as AuthenticatedUser | undefined
       if (!user) {
         return reply.code(401).send({ message: 'Usuário não autenticado.' })
       }
@@ -128,7 +129,8 @@ export class ChurchController {
   async getAll(request: FastifyRequest, reply: FastifyReply) {
     try {
       // Obtém o branchId do usuário do token (se disponível)
-      const userBranchId = request.user?.branchId || null
+      const user = request.user as AuthenticatedUser | undefined
+      const userBranchId = user?.branchId || null
       const churches = await this.service.getAllChurches(userBranchId)
       return reply.send(churches)
     } catch (error: any) {

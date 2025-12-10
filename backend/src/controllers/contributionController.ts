@@ -2,12 +2,13 @@ import { FastifyRequest, FastifyReply } from 'fastify'
 import { ZodError } from 'zod'
 import { ContributionService } from '../services/contributionService'
 import { createContributionBodySchema } from '../schemas/contributionSchemas'
+import type { AuthenticatedUser } from '../@types/fastify'
 
 export class ContributionController {
   private service = new ContributionService()
 
   async getAll(request: FastifyRequest, reply: FastifyReply) {
-    const user = request.user
+    const user = request.user as AuthenticatedUser | undefined
     if (!user?.branchId) {
       return reply.status(400).send({ message: 'Usuário não vinculado a uma filial.' })
     }
@@ -45,7 +46,7 @@ export class ContributionController {
   async create(request: FastifyRequest, reply: FastifyReply) {
     try {
       const data = createContributionBodySchema.parse(request.body)
-      const user = request.user
+      const user = request.user as AuthenticatedUser | undefined
 
       // branchId já foi validado pelo middleware checkBranchId
 

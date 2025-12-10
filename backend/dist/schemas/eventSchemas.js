@@ -9,7 +9,34 @@ const baseEventSchema = z.object({
     hasDonation: z.boolean().optional(),
     donationReason: z.string().optional(),
     donationLink: z.preprocess((val) => (val === '' || val === null ? undefined : val), z.string().url('Link inválido').optional()),
-    imageUrl: z.preprocess((val) => (val === '' || val === null ? undefined : val), z.string().url('URL da imagem inválida').optional()),
+    imageUrl: z.preprocess((val) => {
+        // Normaliza: string vazia, null ou undefined vira undefined
+        if (val === '' || val === null || val === undefined) {
+            return undefined;
+        }
+        return val;
+    }, z
+        .string()
+        .refine((val) => {
+        // Aceita URLs completas (http://, https://)
+        if (val.startsWith('http://') || val.startsWith('https://')) {
+            try {
+                new URL(val);
+                return true;
+            }
+            catch {
+                return false;
+            }
+        }
+        // Aceita caminhos relativos que começam com /
+        if (val.startsWith('/')) {
+            return true;
+        }
+        return false;
+    }, {
+        message: 'URL da imagem inválida. Deve ser uma URL completa (http:// ou https://) ou um caminho relativo começando com /',
+    })
+        .optional()),
 });
 // Schema completo com validação condicional
 export const eventBodySchema = baseEventSchema.refine((data) => {

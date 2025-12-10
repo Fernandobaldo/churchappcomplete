@@ -1,6 +1,5 @@
 import { isValid, parse } from 'date-fns';
 import { prisma } from '../lib/prisma';
-import { checkRole } from '../middlewares/checkRole';
 import { checkPermission } from '../middlewares/checkPermission';
 import { checkBranchId } from '../middlewares/checkBranchId';
 import { authenticate } from '../middlewares/authenticate';
@@ -66,7 +65,8 @@ export async function eventsRoutes(app) {
         preHandler: [
             authenticate,
             checkBranchId(), // Verifica branchId antes dos middlewares de permissão
-            checkRole(['ADMINGERAL', 'ADMINFILIAL', 'COORDINATOR']),
+            // checkPermission já verifica se é ADMINGERAL/ADMINFILIAL (têm todas as permissões)
+            // ou se tem a permissão events_manage específica
             checkPermission(['events_manage']),
         ],
     }, async (request, reply) => {
@@ -130,7 +130,8 @@ export async function eventsRoutes(app) {
     app.put('/:id', {
         preHandler: [
             authenticate,
-            checkRole(['ADMINGERAL', 'ADMINFILIAL', 'COORDINATOR']),
+            // checkPermission já verifica se é ADMINGERAL/ADMINFILIAL (têm todas as permissões)
+            // ou se tem a permissão events_manage específica
             checkPermission(['events_manage']),
         ],
     }, async (request, reply) => {
@@ -197,6 +198,58 @@ export async function eventsRoutes(app) {
             // Outros erros retornam 500
             console.error('❌ Erro ao atualizar evento:', error);
             return reply.status(500).send({ error: 'Erro interno ao atualizar evento', details: error.message });
+        }
+    });
+    app.delete('/:id', {
+        preHandler: [
+            authenticate,
+            // checkPermission já verifica se é ADMINGERAL/ADMINFILIAL (têm todas as permissões)
+            // ou se tem a permissão events_manage específica
+            checkPermission(['events_manage']),
+        ],
+    }, async (request, reply) => {
+        try {
+            const { id } = eventIdParamSchema.params.parse(request.params);
+            const user = request.user;
+            if (!user?.branchId) {
+                return reply.status(400).send({
+                    message: 'Usuário não está associado a uma filial. Não é possível excluir eventos.'
+                });
+            }
+            // Verifica se o evento existe e pertence à filial do usuário
+            const event = await prisma.event.findUnique({
+                where: { id },
+                include: {
+                    Branch: {
+                        select: { id: true, churchId: true },
+                    },
+                },
+            });
+            if (!event) {
+                return reply.status(404).send({ message: 'Evento não encontrado' });
+            }
+            // Verifica se o evento pertence à filial do usuário
+            if (event.branchId !== user.branchId) {
+                return reply.status(403).send({ message: 'Você não tem permissão para excluir este evento' });
+            }
+            // Exclui o evento
+            await prisma.event.delete({
+                where: { id },
+            });
+            return reply.status(200).send({ message: 'Evento excluído com sucesso' });
+        }
+        catch (error) {
+            // Erros de validação do Zod retornam 400 (Bad Request)
+            if (error.name === 'ZodError') {
+                return reply.status(400).send({
+                    error: 'Dados inválidos',
+                    message: error.errors?.[0]?.message || 'Erro de validação',
+                    details: error.errors
+                });
+            }
+            // Outros erros retornam 500
+            console.error('❌ Erro ao excluir evento:', error);
+            return reply.status(500).send({ error: 'Erro interno ao excluir evento', details: error.message });
         }
     });
 }

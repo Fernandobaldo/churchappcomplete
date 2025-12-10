@@ -1,5 +1,6 @@
 // src/services/public/publicRegisterService.ts
 import { prisma } from '../../lib/prisma';
+import { SubscriptionStatus } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { env } from '../../env';
 import jwt from 'jsonwebtoken';
@@ -38,7 +39,7 @@ export async function publicRegisterUserService(data) {
             Subscription: {
                 create: {
                     planId: freePlan.id,
-                    status: 'active',
+                    status: SubscriptionStatus.active,
                 },
             },
         },

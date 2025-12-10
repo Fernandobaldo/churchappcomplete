@@ -366,9 +366,11 @@ describe('Registro via Link de Convite - E2E', () => {
   })
 
   it('deve retornar 403 com PLAN_LIMIT_REACHED quando limite de membros do plano for atingido durante registro', async () => {
-    // Criar membros até atingir o limite (5 membros)
+    // O plano tem limite de 5 membros
+    // Já existe 1 admin, então precisamos criar apenas 4 membros para atingir o limite
+    // (1 admin + 4 novos = 5 membros = limite)
     const timestamp = Date.now()
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 4; i++) {
       const user = await prisma.user.create({
         data: {
           name: `Member ${i}`,

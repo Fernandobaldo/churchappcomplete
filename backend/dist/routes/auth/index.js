@@ -40,5 +40,4 @@ export async function authRoutes(app) {
             },
         },
     }, getMyProfile);
-    console.log('🔑 LoginRoute foi executado!');
 }

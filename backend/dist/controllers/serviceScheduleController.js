@@ -17,6 +17,9 @@ export class ServiceScheduleController {
             }
             // Usa o branchId do usuário se não for fornecido no body
             const bodyData = createServiceScheduleSchema.body.parse(request.body);
+            if (!user) {
+                return reply.status(401).send({ message: 'Usuário não autenticado.' });
+            }
             const finalBranchId = bodyData.branchId || user.branchId;
             if (!finalBranchId) {
                 return reply.status(400).send({
@@ -82,8 +85,7 @@ export class ServiceScheduleController {
                 try {
                     const eventsResult = await this.service.createEventsFromSchedule(schedule.id, undefined, // startDate - usa hoje como padrão
                     undefined, // endDate - usa autoCreateDaysAhead
-                    schedule.autoCreateDaysAhead);
-                    console.log(`✅ ${eventsResult.created} eventos criados automaticamente para o horário '${schedule.title}'`);
+                    schedule.autoCreateDaysAhead ?? undefined);
                 }
                 catch (error) {
                     // Log do erro mas não falha a criação do horário
@@ -176,8 +178,11 @@ export class ServiceScheduleController {
             }
             // Verifica se o usuário tem acesso
             const user = request.user;
-            if (schedule.branchId !== user?.branchId) {
-                const member = await getMemberFromUserId(user?.userId || user?.id || '');
+            if (!user) {
+                return reply.status(401).send({ message: 'Usuário não autenticado.' });
+            }
+            if (schedule.branchId !== user.branchId) {
+                const member = await getMemberFromUserId(user.userId || user.id);
                 if (!member || member.role !== 'ADMINGERAL') {
                     return reply.status(403).send({
                         message: 'Você não tem permissão para visualizar este horário.',
@@ -211,8 +216,11 @@ export class ServiceScheduleController {
             }
             // Verifica se o usuário tem acesso
             const user = request.user;
-            if (schedule.branchId !== user?.branchId) {
-                const member = await getMemberFromUserId(user?.userId || user?.id || '');
+            if (!user) {
+                return reply.status(401).send({ message: 'Usuário não autenticado.' });
+            }
+            if (schedule.branchId !== user.branchId) {
+                const member = await getMemberFromUserId(user.userId || user.id);
                 if (!member || member.role !== 'ADMINGERAL') {
                     return reply.status(403).send({
                         message: 'Você não tem permissão para editar este horário.',
@@ -256,6 +264,9 @@ export class ServiceScheduleController {
                 // Log do erro mas não falha a atualização do horário
                 console.error('⚠️ Erro ao atualizar eventos relacionados:', error.message);
             }
+            if (!user) {
+                return reply.status(401).send({ message: 'Usuário não autenticado.' });
+            }
             await logAudit(request, AuditAction.SERVICE_SCHEDULE_UPDATED, 'ServiceSchedule', `Horário de culto '${updatedSchedule.title}' atualizado para a filial ${user.branchId}`, {
                 entityId: updatedSchedule.id,
                 metadata: {
@@ -273,8 +284,7 @@ export class ServiceScheduleController {
                 try {
                     const eventsResult = await this.service.createEventsFromSchedule(updatedSchedule.id, undefined, // startDate - usa hoje como padrão
                     undefined, // endDate - usa autoCreateDaysAhead
-                    updatedSchedule.autoCreateDaysAhead);
-                    console.log(`✅ ${eventsResult.created} eventos criados automaticamente para o horário '${updatedSchedule.title}'`);
+                    updatedSchedule.autoCreateDaysAhead ?? undefined);
                 }
                 catch (error) {
                     // Log do erro mas não falha a atualização do horário
@@ -315,8 +325,11 @@ export class ServiceScheduleController {
             }
             // Verifica se o usuário tem acesso
             const user = request.user;
-            if (schedule.branchId !== user?.branchId) {
-                const member = await getMemberFromUserId(user?.userId || user?.id || '');
+            if (!user) {
+                return reply.status(401).send({ message: 'Usuário não autenticado.' });
+            }
+            if (schedule.branchId !== user.branchId) {
+                const member = await getMemberFromUserId(user.userId || user.id);
                 if (!member || member.role !== 'ADMINGERAL') {
                     return reply.status(403).send({
                         message: 'Você não tem permissão para visualizar este horário.',
@@ -355,8 +368,11 @@ export class ServiceScheduleController {
             }
             // Verifica se o usuário tem acesso
             const user = request.user;
-            if (schedule.branchId !== user?.branchId) {
-                const member = await getMemberFromUserId(user?.userId || user?.id || '');
+            if (!user) {
+                return reply.status(401).send({ message: 'Usuário não autenticado.' });
+            }
+            if (schedule.branchId !== user.branchId) {
+                const member = await getMemberFromUserId(user.userId || user.id);
                 if (!member || member.role !== 'ADMINGERAL') {
                     return reply.status(403).send({
                         message: 'Você não tem permissão para deletar este horário.',

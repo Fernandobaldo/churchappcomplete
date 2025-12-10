@@ -111,7 +111,6 @@ export async function sendWelcomeEmail(email, name, churchName) {
     };
     try {
         await transporter.sendMail(mailOptions);
-        console.log(`✅ Email de boas-vindas enviado para ${email}`);
     }
     catch (error) {
         console.error(`❌ Erro ao enviar email para ${email}:`, error);
@@ -206,7 +205,6 @@ export async function sendMemberLimitReachedNotification(adminEmails, churchName
     };
     try {
         await transporter.sendMail(mailOptions);
-        console.log(`✅ Notificação de limite enviada para admins`);
     }
     catch (error) {
         console.error(`❌ Erro ao enviar notificação de limite:`, error);
@@ -287,7 +285,6 @@ export async function sendMemberRegistrationAttemptNotification(adminEmails, chu
     };
     try {
         await transporter.sendMail(mailOptions);
-        console.log(`✅ Notificação de tentativa de registro enviada para admins`);
     }
     catch (error) {
         console.error(`❌ Erro ao enviar notificação de tentativa de registro:`, error);

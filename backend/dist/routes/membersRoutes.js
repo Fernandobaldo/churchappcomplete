@@ -26,6 +26,7 @@ Lista todos os membros.
                             email: { type: 'string' },
                             role: { type: 'string' },
                             branchId: { type: 'string' },
+                            avatarUrl: { type: ['string', 'null'] },
                             permissions: {
                                 type: 'array',
                                 items: {
@@ -36,6 +37,7 @@ Lista todos os membros.
                                 },
                             },
                         },
+                        additionalProperties: true, // Permite campos adicionais não definidos no schema
                     },
                 },
                 401: {

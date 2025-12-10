@@ -182,11 +182,15 @@ export async function validateInviteLink(token: string): Promise<{
   try {
     // Buscar qualquer usuário da igreja que tenha subscription ativa para verificar o plano
     // O plano é compartilhado por todos os membros da igreja
-    const churchUser = await prisma.user.findFirst({
+    // Primeiro tenta buscar um membro admin que geralmente tem subscription
+    let churchUser = await prisma.user.findFirst({
       where: {
         Member: {
           Branch: {
             churchId: inviteLink.Branch.churchId,
+          },
+          role: {
+            in: ['ADMINGERAL', 'ADMINFILIAL'],
           },
         },
       },
@@ -197,6 +201,25 @@ export async function validateInviteLink(token: string): Promise<{
         },
       },
     })
+
+    // Se não encontrou admin com subscription, busca qualquer usuário da igreja
+    if (!churchUser?.Subscription[0]?.Plan) {
+      churchUser = await prisma.user.findFirst({
+        where: {
+          Member: {
+            Branch: {
+              churchId: inviteLink.Branch.churchId,
+            },
+          },
+        },
+        include: {
+          Subscription: {
+            where: { status: SubscriptionStatus.active },
+            include: { Plan: true },
+          },
+        },
+      })
+    }
 
     if (churchUser?.Subscription[0]?.Plan) {
       const plan = churchUser.Subscription[0].Plan
@@ -209,6 +232,9 @@ export async function validateInviteLink(token: string): Promise<{
 
         const totalMembers = branches.reduce((sum, b) => sum + b._count.Member, 0)
 
+        // Verificar se o limite será atingido (incluindo o membro que está sendo criado)
+        // Se totalMembers já é >= maxMembers, não pode criar mais
+        // IMPORTANTE: Verificar ANTES de criar o membro, então se já temos maxMembers, não pode criar mais
         if (totalMembers >= plan.maxMembers) {
           // Notificar admins
           const admins = await prisma.member.findMany({
@@ -249,9 +275,17 @@ export async function validateInviteLink(token: string): Promise<{
         }
       }
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Erro ao verificar limite de plano:', error)
-    // Se houver erro na verificação, não bloqueia o registro
+    // Se o erro for relacionado ao limite, propagar
+    if (error.message?.includes('limite') || error.message?.includes('LIMIT_REACHED')) {
+      return {
+        valid: false,
+        error: 'LIMIT_REACHED',
+        inviteLink,
+      }
+    }
+    // Se houver outro erro na verificação, não bloqueia o registro
     // Mas loga o erro para investigação
   }
 

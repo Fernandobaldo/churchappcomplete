@@ -1,6 +1,9 @@
 import { changePlanSchema } from '../schemas/subscriptionSchema';
 import { getMySubscription, listAllSubscriptions, changePlan } from '../services/subscriptionService';
 export async function getMySubscriptionHandler(request, reply) {
+    if (!request.user) {
+        return reply.status(401).send({ error: 'Usuário não autenticado' });
+    }
     const userId = request.user.id;
     const sub = await getMySubscription(userId);
     return reply.send(sub);
@@ -13,6 +16,9 @@ export async function changePlanHandler(request, reply) {
     const parsed = changePlanSchema.safeParse(request.body);
     if (!parsed.success) {
         return reply.status(400).send({ error: parsed.error.flatten() });
+    }
+    if (!request.user) {
+        return reply.status(401).send({ error: 'Usuário não autenticado' });
     }
     const { planId } = parsed.data;
     const userId = request.user.id;

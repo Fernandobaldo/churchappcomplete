@@ -9,17 +9,18 @@ import {
 } from '../services/auditService'
 import { getMemberFromUserId } from '../utils/authorization'
 import { AuditAction } from '@prisma/client'
+import type { AuthenticatedUser } from '../@types/fastify'
 
 export async function getAuditLogsHandler(request: FastifyRequest, reply: FastifyReply) {
   try {
-    const user = request.user
+    const user = request.user as AuthenticatedUser | undefined
 
     if (!user || !user.memberId) {
       return reply.status(401).send({ error: 'Autenticação necessária' })
     }
 
     // Buscar dados do membro para obter churchId
-    const currentMember = await getMemberFromUserId(user.userId)
+    const currentMember = await getMemberFromUserId(user.userId || user.id)
     if (!currentMember) {
       return reply.status(404).send({ error: 'Membro não encontrado' })
     }
@@ -67,7 +68,7 @@ export async function getAuditLogsHandler(request: FastifyRequest, reply: Fastif
 
 export async function getMemberAuditLogsHandler(request: FastifyRequest, reply: FastifyReply) {
   try {
-    const user = request.user
+    const user = request.user as AuthenticatedUser | undefined
 
     if (!user || !user.memberId) {
       return reply.status(401).send({ error: 'Autenticação necessária' })
@@ -76,7 +77,7 @@ export async function getMemberAuditLogsHandler(request: FastifyRequest, reply: 
     const { id } = z.object({ id: z.string() }).parse(request.params)
 
     // Buscar dados do membro atual
-    const currentMember = await getMemberFromUserId(user.userId)
+    const currentMember = await getMemberFromUserId(user.userId || user.id)
     if (!currentMember) {
       return reply.status(404).send({ error: 'Membro atual não encontrado' })
     }
@@ -104,7 +105,7 @@ export async function getMemberAuditLogsHandler(request: FastifyRequest, reply: 
 
 export async function getBranchAuditLogsHandler(request: FastifyRequest, reply: FastifyReply) {
   try {
-    const user = request.user
+    const user = request.user as AuthenticatedUser | undefined
 
     if (!user || !user.memberId) {
       return reply.status(401).send({ error: 'Autenticação necessária' })
@@ -113,7 +114,7 @@ export async function getBranchAuditLogsHandler(request: FastifyRequest, reply: 
     const { id } = z.object({ id: z.string() }).parse(request.params)
 
     // Apenas ADMINGERAL pode ver logs de branches
-    const currentMember = await getMemberFromUserId(user.userId)
+    const currentMember = await getMemberFromUserId(user.userId || user.id)
     if (!currentMember || currentMember.role !== 'ADMINGERAL') {
       return reply.status(403).send({ error: 'Apenas Administradores Gerais podem visualizar logs de filiais' })
     }
@@ -134,9 +135,9 @@ export async function getBranchAuditLogsHandler(request: FastifyRequest, reply: 
 
 export async function getMyAuditLogsHandler(request: FastifyRequest, reply: FastifyReply) {
   try {
-    const user = request.user
+    const user = request.user as AuthenticatedUser | undefined
 
-    if (!user || !user.userId) {
+    if (!user || (!user.userId && !user.id)) {
       return reply.status(401).send({ error: 'Autenticação necessária' })
     }
 
@@ -146,7 +147,7 @@ export async function getMyAuditLogsHandler(request: FastifyRequest, reply: Fast
 
     const query = querySchema.parse(request.query)
 
-    const result = await getUserAuditLogs(user.userId, query.limit)
+    const result = await getUserAuditLogs(user.userId || user.id, query.limit)
 
     return reply.send(result)
   } catch (error: any) {

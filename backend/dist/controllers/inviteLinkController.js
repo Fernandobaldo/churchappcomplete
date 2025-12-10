@@ -27,7 +27,6 @@ export async function createInviteLinkController(request, reply) {
                 maxUses: bodyData.maxUses ?? null,
                 expiresAt: bodyData.expiresAt ? new Date(bodyData.expiresAt) : null,
             });
-            console.log('✅ [INVITE LINK CONTROLLER] Link criado:', { id: inviteLink.id, token: inviteLink.token });
         }
         catch (error) {
             console.error('❌ [INVITE LINK CONTROLLER] Erro ao criar link:', error.message, error.code);
@@ -71,7 +70,6 @@ export async function createInviteLinkController(request, reply) {
                 expiresAt: bodyData.expiresAt,
             },
         }).catch(err => console.error('Erro ao criar log de auditoria:', err));
-        console.log('✅ [INVITE LINK CONTROLLER] Retornando link:', JSON.stringify(responseData, null, 2));
         return reply.status(201).send(responseData);
     }
     catch (error) {
@@ -271,7 +269,6 @@ export async function getInviteLinkInfoController(request, reply) {
             currentUses: inviteLink.currentUses,
             isActive: inviteLink.isActive,
         };
-        console.log('✅ [GET INVITE LINK INFO] Retornando dados:', JSON.stringify(responseData, null, 2));
         return reply.status(200).send(responseData);
     }
     catch (error) {
