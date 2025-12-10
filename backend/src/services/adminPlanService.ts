@@ -67,6 +67,15 @@ export class AdminPlanService {
   }
 
   async createPlan(data: PlanData, adminUserId: string, request?: FastifyRequest) {
+    // Verificar se já existe um plano com o mesmo nome
+    const existingPlan = await prisma.plan.findUnique({
+      where: { name: data.name },
+    })
+
+    if (existingPlan) {
+      throw new Error(`Já existe um plano com o nome "${data.name}". Escolha um nome diferente.`)
+    }
+
     // Criar plano no banco
     const plan = await prisma.plan.create({
       data: {

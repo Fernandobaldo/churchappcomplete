@@ -99,3 +99,4 @@ Para testes, use as credenciais de sandbox do MercadoPago:
 - Crie credenciais de teste
 - Use cartões de teste fornecidos pelo MercadoPago
 
+

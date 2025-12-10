@@ -31,3 +31,4 @@ npm run build
 echo "✅ Deploy concluído!"
 npm start
 
+

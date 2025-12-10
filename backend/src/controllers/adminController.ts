@@ -340,6 +340,7 @@ export async function createPlanHandler(req: FastifyRequest, reply: FastifyReply
       features: z.array(z.string()),
       maxBranches: z.number().optional(),
       maxMembers: z.number().optional(),
+      billingInterval: z.string().optional(),
     })
     const data = bodySchema.parse(req.body)
     
@@ -354,9 +355,19 @@ export async function createPlanHandler(req: FastifyRequest, reply: FastifyReply
     }
     
     const adminUserId = getAdminUserId(req)
-    const plan = await planService.createPlan(data, adminUserId)
+    const plan = await planService.createPlan(data, adminUserId, req)
     return reply.status(201).send(plan)
   } catch (error: any) {
+    // Tratar erro de constraint única (nome duplicado)
+    if (
+      error.code === 'P2002' || 
+      error.message?.includes('Unique constraint') ||
+      error.message?.includes('Já existe um plano com o nome')
+    ) {
+      return reply.status(409).send({ 
+        error: error.message || 'Já existe um plano com este nome. Escolha um nome diferente.' 
+      })
+    }
     return reply.status(500).send({ error: error.message })
   }
 }
