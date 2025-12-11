@@ -19,12 +19,15 @@ model AuditLog {
   metadata    Json?
   ipAddress   String?
   userAgent   String?
+  adminUserId String?
+  AdminUser   AdminUser?  @relation(fields: [adminUserId], references: [id])
   createdAt   DateTime    @default(now())
 
   @@index([action])
   @@index([createdAt])
   @@index([entityType, entityId])
   @@index([userId])
+  @@index([adminUserId])
 }
 
 model Branch {
@@ -37,39 +40,41 @@ model Branch {
   Devotional       Devotional[]
   Event            Event[]
   Member           Member[]
-  MemberInviteLink MemberInviteLink[]
   Notice           Notice[]
-  ServiceSchedule  ServiceSchedule[]
   Transaction      Transaction[]
+  ServiceSchedule  ServiceSchedule[]
+  MemberInviteLink MemberInviteLink[]
 }
 
 model Church {
-  id       String   @id @default(cuid())
-  name     String
-  logoUrl  String?
-  isActive Boolean  @default(true)
-  Branch   Branch[]
+  id          String          @id @default(cuid())
+  name        String
+  logoUrl     String?
+  avatarUrl   String?
+  isActive    Boolean         @default(true)
+  address     String?
+  phone       String?
+  email       String?
+  website     String?
+  socialMedia Json?
+  Branch      Branch[]
+  Positions   ChurchPosition[]
 }
 
 model Contribution {
-  id          String           @id @default(cuid())
-  title       String
-  description String?
-  value       Float
-  date        DateTime
-  type        ContributionType
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-  branchId    String
-  goal        Float?
-  raised      Float?           @default(0)
-  bankName    String?
-  agency      String?
-  accountName String?
-  qrCodeUrl   String?
-  paymentLink String?
-  Branch      Branch           @relation(fields: [branchId], references: [id])
-  Transaction Transaction[]
+  id                String                      @id @default(cuid())
+  title             String
+  description       String?
+  goal              Float?
+  endDate           DateTime?
+  raised            Float?                       @default(0)
+  isActive          Boolean                      @default(true)
+  createdAt         DateTime                     @default(now())
+  updatedAt         DateTime                     @updatedAt
+  branchId          String
+  Branch            Branch                       @relation(fields: [branchId], references: [id])
+  Transaction      Transaction[]
+  PaymentMethods    ContributionPaymentMethod[]
 }
 
 model Devotional {
@@ -128,12 +133,14 @@ model Member {
   phone          String?
   userId         String?           @unique
   inviteLinkId   String?
+  positionId     String?
   Devotional     Devotional[]
   DevotionalLike DevotionalLike[]
   Branch         Branch            @relation(fields: [branchId], references: [id])
-  InviteLink     MemberInviteLink? @relation(fields: [inviteLinkId], references: [id])
   User           User?             @relation(fields: [userId], references: [id])
   Permission     Permission[]
+  InviteLink     MemberInviteLink? @relation(fields: [inviteLinkId], references: [id])
+  Position       ChurchPosition?   @relation(fields: [positionId], references: [id])
 }
 
 model Notice {
@@ -186,17 +193,17 @@ model Transaction {
   amount             Float
   type               TransactionType
   category           String?
+  entryType          EntryType?
+  exitType           ExitType?
+  exitTypeOther      String?
+  tithePayerMemberId String?
+  tithePayerName     String?
+  isTithePayerMember Boolean?
+  contributionId    String?
+  createdBy          String?
   branchId           String
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt
-  entryType          EntryType?
-  isTithePayerMember Boolean?
-  tithePayerMemberId String?
-  tithePayerName     String?
-  contributionId     String?
-  createdBy          String?
-  exitType           ExitType?
-  exitTypeOther      String?
   Branch             Branch          @relation(fields: [branchId], references: [id])
   Contribution       Contribution?   @relation(fields: [contributionId], references: [id])
   CreatedByUser      User?           @relation(fields: [createdBy], references: [id])
@@ -205,14 +212,14 @@ model Transaction {
 model ServiceSchedule {
   id                  String   @id @default(cuid())
   branchId            String
-  dayOfWeek           Int
-  time                String
+  dayOfWeek           Int // 0-6, onde 0 = Domingo
+  time                String // formato HH:mm
   title               String
   description         String?
   location            String?
   isDefault           Boolean  @default(false)
   autoCreateEvents    Boolean  @default(false)
-  autoCreateDaysAhead Int?
+  autoCreateDaysAhead Int? // quantos dias à frente criar eventos, padrão: 90
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
   Branch              Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
@@ -221,11 +228,25 @@ model ServiceSchedule {
   @@index([dayOfWeek])
 }
 
+model AdminUser {
+  id           String      @id @default(cuid())
+  name         String
+  email        String      @unique
+  passwordHash String
+  adminRole    AdminRole   @default(SUPPORT)
+  isActive     Boolean     @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  AuditLog     AuditLog[]
+}
+
 model User {
   id           String         @id @default(cuid())
   name         String
   email        String         @unique
   password     String
+  isBlocked    Boolean        @default(false)
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
   Member       Member?
@@ -244,12 +265,37 @@ model MemberInviteLink {
   isActive    Boolean   @default(true)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
-  Member      Member[]
   Branch      Branch    @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  Member      Member[]
 
   @@index([token])
   @@index([branchId])
   @@index([isActive])
+}
+
+model ChurchPosition {
+  id        String   @id @default(cuid())
+  name      String
+  churchId  String
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  Church    Church   @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  Members   Member[]
+
+  @@index([churchId])
+}
+
+model ContributionPaymentMethod {
+  id             String            @id @default(cuid())
+  contributionId String
+  type           PaymentMethodType
+  data           Json // Campos específicos por tipo: PIX (chave), CONTA_BR (banco, agencia, conta, tipo), IBAN (iban, banco, nome)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  Contribution   Contribution      @relation(fields: [contributionId], references: [id], onDelete: Cascade)
+
+  @@index([contributionId])
 }
 
 enum AuditAction {
@@ -277,6 +323,24 @@ enum AuditAction {
   MEMBER_REGISTRATION_ATTEMPT
   INVITE_LINK_CREATED
   INVITE_LINK_DEACTIVATED
+  ADMIN_LOGIN
+  ADMIN_LOGOUT
+  USER_BLOCKED
+  USER_UNBLOCKED
+  CHURCH_SUSPENDED
+  CHURCH_REACTIVATED
+  PLAN_CHANGED
+  SUBSCRIPTION_CHANGED
+  IMPERSONATE_USER
+  IMPERSONATE_CHURCH_OWNER
+  PASSWORD_RESET_SENT
+  ADMIN_CONFIG_UPDATED
+}
+
+enum PaymentMethodType {
+  PIX
+  CONTA_BR
+  IBAN
 }
 
 enum Role {
@@ -305,8 +369,8 @@ enum ExitType {
   OUTROS
 }
 
-enum ContributionType {
-  OFERTA
-  DIZIMO
-  OUTRO
+enum AdminRole {
+  SUPERADMIN
+  SUPPORT
+  FINANCE
 }
