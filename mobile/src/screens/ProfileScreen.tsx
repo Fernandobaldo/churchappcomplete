@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 
-import { View, Text, StyleSheet, Image, TouchableOpacity, ActivityIndicator } from 'react-native'
+import { View, Text, StyleSheet, Image, TouchableOpacity, ActivityIndicator, ScrollView, RefreshControl } from 'react-native'
 
 import {useNavigation, useRoute} from '@react-navigation/native'
 import DetailScreenLayout from '../components/layouts/DetailScreenLayout'
@@ -9,7 +9,7 @@ import { Ionicons } from '@expo/vector-icons'
 import api from '../api/api'
 
 import { useAuthStore } from '../stores/authStore'
-import { format } from 'date-fns'
+import { format, parse, isValid } from 'date-fns'
 import ptBR from 'date-fns/locale/pt-BR'
 
 export default function ProfileScreen() {
@@ -24,29 +24,75 @@ export default function ProfileScreen() {
     const [loading, setLoading] = useState(true)
     const navigation = useNavigation()
 
-    useEffect(() => {
-        async function fetchProfile() {
-            try {
-                if (isOwnProfile) {
-                    const res = await api.get('/members/me')
-                    setProfile(res.data)
-                } else {
-                    const res = await api.get(`/members/${memberId}`)
-                    setProfile(res.data)
-                }
-            } catch (err) {
-                console.error('Erro ao carregar perfil:', err)
-            } finally {
-                setLoading(false)
+    const fetchProfile = async () => {
+        try {
+            setLoading(true)
+            if (isOwnProfile) {
+                const res = await api.get('/members/me')
+                setProfile(res.data)
+            } else {
+                const res = await api.get(`/members/${memberId}`)
+                setProfile(res.data)
             }
+        } catch (err) {
+            console.error('Erro ao carregar perfil:', err)
+        } finally {
+            setLoading(false)
         }
+    }
+
+    useEffect(() => {
         fetchProfile()
     }, [memberId])
-    // const handleRefresh = async () => {
-    //     setRefreshing(true)
-    //     await ProfileScreen()
-    //     setRefreshing(false)
-    // }
+
+    const handleRefresh = async () => {
+        setRefreshing(true)
+        await fetchProfile()
+        setRefreshing(false)
+    }
+
+    // Função para formatar data de nascimento
+    const formatBirthDate = (dateString: string | null | undefined): string => {
+        if (!dateString) return ''
+        
+        // Se já está no formato dd/MM/yyyy do backend, converter para exibição
+        if (dateString.includes('/')) {
+            try {
+                // Backend retorna dd/MM/yyyy, precisa parsear corretamente
+                const [day, month, year] = dateString.split('/')
+                if (day && month && year) {
+                    const date = parse(`${year}-${month}-${day}`, 'yyyy-MM-dd', new Date())
+                    if (isValid(date)) {
+                        return format(date, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })
+                    }
+                }
+                // Se não conseguir parsear, retorna como está
+                return dateString
+            } catch (e) {
+                // Se falhar, tenta formatar como ISO
+                try {
+                    const date = new Date(dateString)
+                    if (isValid(date)) {
+                        return format(date, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })
+                    }
+                } catch (e2) {
+                    return dateString
+                }
+            }
+        }
+        
+        // Se está no formato ISO
+        try {
+            const date = new Date(dateString)
+            if (isValid(date)) {
+                return format(date, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })
+            }
+        } catch (e) {
+            return dateString
+        }
+        
+        return dateString
+    }
 
 
     if (loading) {
@@ -106,75 +152,93 @@ export default function ProfileScreen() {
             }}
             backgroundColor="#f2f2f2"
         >
-            <View style={styles.card}>
-                <Image
-                    source={{ uri: profile.avatarUrl || 'https://via.placeholder.com/150' }}
-                    style={styles.avatar}
-                    defaultSource={require('../../assets/worshipImage.png')} //
-                />
-                <Text style={styles.name}>{profile.name}</Text>
-                {profile.email && <Text style={styles.email}>{profile.email}</Text>}
+            <ScrollView
+                contentContainerStyle={styles.scrollContent}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={handleRefresh}
+                        colors={['#3366FF']}
+                        tintColor="#3366FF"
+                    />
+                }
+            >
+                <View style={styles.card}>
+                    {profile.avatarUrl && typeof profile.avatarUrl === 'string' && profile.avatarUrl.trim().length > 0 ? (
+                        <Image
+                            source={{
+                                uri: profile.avatarUrl.startsWith('http')
+                                    ? profile.avatarUrl
+                                    : `${api.defaults.baseURL}${profile.avatarUrl}`,
+                            }}
+                            style={styles.avatar}
+                        />
+                    ) : (
+                        <View style={styles.avatarPlaceholder}>
+                            <Text style={styles.avatarPlaceholderText}>
+                                {profile.name?.charAt(0).toUpperCase() || 'U'}
+                            </Text>
+                        </View>
+                    )}
+                    <Text style={styles.name}>{profile.name}</Text>
+                    {profile.email && <Text style={styles.email}>{profile.email}</Text>}
 
-                <View style={styles.divider} />
+                    <View style={styles.divider} />
 
-                {profile.email && (
                     <View style={styles.infoRow}>
                         <Text style={styles.label}>Email</Text>
-                        <Text style={styles.value}>{profile.email}</Text>
+                        <Text style={styles.value}>{profile.email || 'Não informado'}</Text>
                     </View>
-                )}
-                {profile.phone && (
+                    {profile.phone && (
+                        <View style={styles.infoRow}>
+                            <Text style={styles.label}>Telefone</Text>
+                            <Text style={styles.value}>{profile.phone}</Text>
+                        </View>
+                    )}
+                    {profile.address && (
+                        <View style={styles.infoRow}>
+                            <Text style={styles.label}>Endereço</Text>
+                            <Text style={styles.value}>{profile.address}</Text>
+                        </View>
+                    )}
+                    {profile.birthDate && (
+                        <View style={styles.infoRow}>
+                            <Text style={styles.label}>Data de Nascimento</Text>
+                            <Text style={styles.value}>{formatBirthDate(profile.birthDate)}</Text>
+                        </View>
+                    )}
+                    {profile.branch && (
+                        <View style={styles.infoRow}>
+                            <Text style={styles.label}>Congregação</Text>
+                            <Text style={styles.value}>{profile.branch?.church?.name || 'Não informado'}</Text>
+                        </View>
+                    )}
                     <View style={styles.infoRow}>
-                        <Text style={styles.label}>Telefone</Text>
-                        <Text style={styles.value}>{profile.phone}</Text>
+                        <Text style={styles.label}>Cargo na Igreja</Text>
+                        <Text style={styles.value}>{profile.position?.name || 'Nenhum'}</Text>
                     </View>
-                )}
-                {profile.address && (
                     <View style={styles.infoRow}>
-                        <Text style={styles.label}>Endereço</Text>
-                        <Text style={styles.value}>{profile.address}</Text>
+                        <Text style={styles.label}>Nível de Acesso</Text>
+                        <Text style={styles.value}>{formatRole(profile.role) || 'Nenhum'}</Text>
                     </View>
-                )}
-                {profile.birthDate && (
-                    <View style={styles.infoRow}>
-                        <Text style={styles.label}>Data de Nascimento</Text>
-                        <Text style={styles.value}>
-                            {format(new Date(profile.birthDate), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
-                        </Text>
-                    </View>
-                )}
-                {profile.branch && (
-                    <View style={styles.infoRow}>
-                        <Text style={styles.label}>Congregação</Text>
-                        <Text style={styles.value}>{profile.branch?.church?.name || 'Não informado'}</Text>
-                    </View>
-                )}
-                <View style={styles.infoRow}>
-                    <Text style={styles.label}>Cargo na Igreja</Text>
-                    <Text style={styles.value}> {profile.position?.name || 'Nenhum'}</Text>
+                    {(canManagePermissions || isOwnProfile) && (
+                        <View style={styles.infoRow}>
+                            <Text style={styles.label}>Permissões:</Text>
+                            <Text style={styles.valuePermission}>
+                                {formatPermission(profile.permissions) || 'Nenhum'}
+                            </Text>
+                        </View>
+                    )}
+                    {canManagePermissions && (
+                        <TouchableOpacity
+                            style={styles.button}
+                            onPress={() => navigation.navigate('Permissions' as never)}
+                        >
+                            <Text style={styles.buttonText}>Gerenciar Permissões</Text>
+                        </TouchableOpacity>
+                    )}
                 </View>
-                <View style={styles.infoRow}>
-                    <Text style={styles.label}>Nível de Acesso</Text>
-                    <Text style={styles.value}> {formatRole(profile.role) || 'Nenhum'}</Text>
-                </View>
-                {(canManagePermissions || isOwnProfile) && (
-                <View style={styles.infoRow}>
-                <Text style={styles.label}>Permissões:</Text>
-                <Text style={styles.valuePermission}> {formatPermission(profile.permissions) || 'Nenhum'}
-                </Text>
-                </View>
-                )}
-                {/*refreshing={refreshing}*/}
-                {/*onRefresh={handleRefresh}*/}
-                {canManagePermissions && (
-                    <TouchableOpacity
-                        style={styles.button}
-                        onPress={() => navigation.navigate('EditMemberPermissions', { memberId: profile.id })}
-                    >
-                        <Text style={styles.buttonText}>Gerenciar Permissões</Text>
-                    </TouchableOpacity>
-                )}
-            </View>
+            </ScrollView>
         </DetailScreenLayout>
     )
 }
@@ -183,6 +247,9 @@ export default function ProfileScreen() {
 
 
 const styles = StyleSheet.create({
+    scrollContent: {
+        padding: 16,
+    },
     card: {
         backgroundColor: '#fff',
         borderRadius: 16,
@@ -200,6 +267,20 @@ const styles = StyleSheet.create({
         height: 100,
         borderRadius: 50,
         marginBottom: 12,
+    },
+    avatarPlaceholder: {
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+        backgroundColor: '#e0e7ff',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    avatarPlaceholderText: {
+        fontSize: 40,
+        fontWeight: '600',
+        color: '#3366FF',
     },
     name: {
         fontSize: 22,

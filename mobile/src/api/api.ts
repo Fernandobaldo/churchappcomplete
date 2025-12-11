@@ -136,4 +136,37 @@ export const removeToken = () => {
   delete api.defaults.headers.common['Authorization']
 }
 
+// ==================== SUBSCRIPTIONS ====================
+export const subscriptionApi = {
+  checkout: async (planId: string, trialDays?: number) => {
+    const response = await api.post('/api/subscriptions/checkout', {
+      planId,
+      trialDays,
+    })
+    return response.data
+  },
+  getMySubscription: async () => {
+    const response = await api.get('/api/subscriptions')
+    return response.data
+  },
+  cancel: async (cancelAtPeriodEnd = true) => {
+    const response = await api.post('/api/subscriptions/cancel', {
+      cancelAtPeriodEnd,
+    })
+    return response.data
+  },
+  resume: async () => {
+    const response = await api.post('/api/subscriptions/resume')
+    return response.data
+  },
+}
+
+// ==================== PLANS ====================
+export const plansApi = {
+  getAll: async () => {
+    const response = await api.get('/plans')
+    return response.data
+  },
+}
+
 export default api

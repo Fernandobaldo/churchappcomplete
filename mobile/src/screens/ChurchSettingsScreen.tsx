@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react'
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert } from 'react-native'
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert, Image } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
+import * as ImagePicker from 'expo-image-picker'
 import api from '../api/api'
 import { useAuthStore } from '../stores/authStore'
 import { hasAccess } from '../utils/authUtils'
@@ -13,6 +14,7 @@ interface Church {
   id: string
   name: string
   logoUrl?: string
+  avatarUrl?: string | null
 }
 
 export default function ChurchSettingsScreen() {
@@ -24,6 +26,9 @@ export default function ChurchSettingsScreen() {
   const [churchName, setChurchName] = useState('')
   const [logoUrl, setLogoUrl] = useState('')
   const [saving, setSaving] = useState(false)
+  const [avatarUri, setAvatarUri] = useState<string | null>(null)
+  const [currentAvatarUrl, setCurrentAvatarUrl] = useState<string | null>(null)
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
 
   const canManageChurch = hasAccess(user, 'church_manage')
 
@@ -57,6 +62,7 @@ export default function ChurchSettingsScreen() {
               id: church.id,
               name: church.name,
               logoUrl: church.logoUrl,
+              avatarUrl: church.avatarUrl,
             }
             break
           }
@@ -67,6 +73,7 @@ export default function ChurchSettingsScreen() {
         setChurch(userChurch)
         setChurchName(userChurch.name)
         setLogoUrl(userChurch.logoUrl || '')
+        setCurrentAvatarUrl(userChurch.avatarUrl || null)
       }
     } catch (error: any) {
       console.error('Erro ao carregar dados da igreja:', error)
@@ -87,22 +94,148 @@ export default function ChurchSettingsScreen() {
     }
   }
 
+  const handlePickImage = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
+      if (status !== 'granted') {
+        Toast.show({ type: 'error', text1: 'Permissão para acessar galeria negada' })
+        return
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      })
+
+      if (!result.canceled && result.assets[0]) {
+        const asset = result.assets[0]
+        
+        // Validar tamanho (5MB)
+        if (asset.fileSize && asset.fileSize > 5 * 1024 * 1024) {
+          Toast.show({ type: 'error', text1: 'A imagem deve ter no máximo 5MB' })
+          return
+        }
+
+        setAvatarUri(asset.uri)
+      }
+    } catch (error) {
+      console.error('Erro ao selecionar imagem:', error)
+      Toast.show({ type: 'error', text1: 'Erro ao selecionar imagem' })
+    }
+  }
+
+  const handleRemoveAvatar = () => {
+    setAvatarUri(null)
+    setCurrentAvatarUrl(null)
+  }
+
+  const uploadAvatar = async (): Promise<string | null> => {
+    if (!avatarUri) return null
+
+    try {
+      setUploadingAvatar(true)
+      
+      // Criar FormData
+      const formData = new FormData()
+      const filename = avatarUri.split('/').pop() || 'avatar.jpg'
+      const match = /\.(\w+)$/.exec(filename)
+      const type = match ? `image/${match[1]}` : `image/jpeg`
+      
+      formData.append('file', {
+        uri: avatarUri,
+        name: filename,
+        type,
+      } as any)
+
+      const response = await api.post('/upload/church-avatar', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      })
+
+      return response.data.url
+    } catch (error: any) {
+      console.error('Erro ao fazer upload do avatar:', error)
+      Toast.show({ type: 'error', text1: error.response?.data?.error || 'Erro ao fazer upload do avatar' })
+      throw error
+    } finally {
+      setUploadingAvatar(false)
+    }
+  }
+
   const handleSaveChurch = async () => {
     if (!church) return
 
     setSaving(true)
     try {
+      let avatarUrl = currentAvatarUrl
+
+      // Se há um novo avatar, faz upload primeiro
+      if (avatarUri) {
+        avatarUrl = await uploadAvatar()
+        if (!avatarUrl) {
+          Toast.show({ type: 'error', text1: 'Erro ao fazer upload do avatar' })
+          setSaving(false)
+          return
+        }
+      }
+
+      // Se o avatar foi removido (avatarUri é null e currentAvatarUrl também)
+      const finalAvatarUrl = avatarUri === null && currentAvatarUrl === null 
+        ? null 
+        : avatarUrl || currentAvatarUrl
+
       await api.put(`/churches/${church.id}`, {
         name: churchName,
         logoUrl: logoUrl || undefined,
+        avatarUrl: finalAvatarUrl !== undefined ? finalAvatarUrl : undefined,
       })
+      
       Toast.show({ type: 'success', text1: 'Configurações atualizadas com sucesso!' })
+      setAvatarUri(null)
       fetchChurchData()
     } catch (error: any) {
       Toast.show({ type: 'error', text1: error.response?.data?.message || 'Erro ao atualizar configurações' })
     } finally {
       setSaving(false)
     }
+  }
+
+  const handleSetDefault = async (id: string) => {
+    try {
+      await serviceScheduleApi.setDefault(id)
+      Toast.show({ type: 'success', text1: 'Horário definido como padrão!' })
+      fetchSchedules()
+    } catch (error: any) {
+      Toast.show({ type: 'error', text1: error.response?.data?.message || 'Erro ao definir horário como padrão' })
+    }
+  }
+
+  const handleCreateEvents = (schedule: ServiceSchedule) => {
+    Alert.alert(
+      'Criar Eventos',
+      `Criar eventos a partir do horário "${schedule.title}"?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Criar',
+          onPress: async () => {
+            try {
+              const result = await serviceScheduleApi.createEvents(schedule.id)
+              Toast.show({
+                type: 'success',
+                text1: `${result.created} eventos criados com sucesso!`,
+              })
+              fetchSchedules()
+            } catch (error: any) {
+              Toast.show({ type: 'error', text1: error.response?.data?.message || 'Erro ao criar eventos' })
+            }
+          },
+        },
+      ]
+    )
   }
 
   const handleDeleteSchedule = async (id: string) => {
@@ -202,6 +335,44 @@ export default function ChurchSettingsScreen() {
       <ScrollView style={styles.scrollView}>
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Informações da Igreja</Text>
+          
+          {/* Avatar Section */}
+          <View style={styles.avatarSection}>
+            <View style={styles.avatarContainer}>
+              {(avatarUri || currentAvatarUrl) ? (
+                <View style={styles.avatarPreview}>
+                  <Image
+                    source={{ uri: avatarUri || (currentAvatarUrl?.startsWith('http') ? currentAvatarUrl : `${api.defaults.baseURL}${currentAvatarUrl}`) }}
+                    style={styles.avatarImage}
+                  />
+                  <TouchableOpacity
+                    style={styles.removeAvatarButton}
+                    onPress={handleRemoveAvatar}
+                  >
+                    <Ionicons name="close-circle" size={24} color="#dc2626" />
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View style={styles.avatarPlaceholder}>
+                  <Ionicons name="church" size={32} color="#3366FF" />
+                </View>
+              )}
+            </View>
+            <TouchableOpacity
+              style={styles.avatarButton}
+              onPress={handlePickImage}
+              disabled={uploadingAvatar}
+            >
+              <Ionicons name="camera-outline" size={20} color="#3366FF" />
+              <Text style={styles.avatarButtonText}>
+                {avatarUri || currentAvatarUrl ? 'Alterar Avatar' : 'Selecionar Avatar'}
+              </Text>
+            </TouchableOpacity>
+            <Text style={styles.avatarHint}>
+              O avatar da igreja será usado como padrão para todos os membros que não tiverem avatar próprio.
+            </Text>
+          </View>
+
           <TextInput
             style={styles.input}
             placeholder="Nome da Igreja"
@@ -216,11 +387,13 @@ export default function ChurchSettingsScreen() {
             keyboardType="url"
           />
           <TouchableOpacity
-            style={[styles.button, saving && styles.buttonDisabled]}
+            style={[styles.button, (saving || uploadingAvatar) && styles.buttonDisabled]}
             onPress={handleSaveChurch}
-            disabled={saving}
+            disabled={saving || uploadingAvatar}
           >
-            <Text style={styles.buttonText}>{saving ? 'Salvando...' : 'Salvar Alterações'}</Text>
+            <Text style={styles.buttonText}>
+              {(saving || uploadingAvatar) ? 'Salvando...' : 'Salvar Alterações'}
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -253,7 +426,31 @@ export default function ChurchSettingsScreen() {
                   {DAYS_OF_WEEK[schedule.dayOfWeek]} às {schedule.time}
                 </Text>
                 {schedule.location && <Text style={styles.scheduleInfo}>{schedule.location}</Text>}
+                {schedule.autoCreateEvents && (
+                  <Text style={styles.scheduleInfo}>
+                    Auto-criar eventos ({schedule.autoCreateDaysAhead || 90} dias)
+                  </Text>
+                )}
+                {schedule.description && (
+                  <Text style={styles.scheduleDescription}>{schedule.description}</Text>
+                )}
                 <View style={styles.scheduleActions}>
+                  {!schedule.isDefault && (
+                    <TouchableOpacity
+                      onPress={() => handleSetDefault(schedule.id)}
+                      style={styles.actionButton}
+                      title="Definir como padrão"
+                    >
+                      <Ionicons name="star-outline" size={20} color="#FFD700" />
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity
+                    onPress={() => handleCreateEvents(schedule)}
+                    style={styles.actionButton}
+                    title="Criar eventos a partir deste horário"
+                  >
+                    <Ionicons name="calendar-outline" size={20} color="#16a34a" />
+                  </TouchableOpacity>
                   <TouchableOpacity
                     onPress={() => navigation.navigate('ServiceScheduleForm' as never, { schedule })}
                     style={styles.actionButton}
@@ -382,6 +579,64 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     padding: 8,
+  },
+  scheduleDescription: {
+    fontSize: 13,
+    color: '#666',
+    marginTop: 4,
+    fontStyle: 'italic',
+  },
+  avatarSection: {
+    marginBottom: 16,
+  },
+  avatarContainer: {
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  avatarPreview: {
+    position: 'relative',
+  },
+  avatarImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+  },
+  removeAvatarButton: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+  },
+  avatarPlaceholder: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    backgroundColor: '#e0e7ff',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: '#3366FF',
+    borderRadius: 8,
+    gap: 8,
+    marginBottom: 8,
+  },
+  avatarButtonText: {
+    color: '#3366FF',
+    fontWeight: '500',
+    fontSize: 14,
+  },
+  avatarHint: {
+    fontSize: 12,
+    color: '#6b7280',
+    textAlign: 'center',
   },
 })
 
