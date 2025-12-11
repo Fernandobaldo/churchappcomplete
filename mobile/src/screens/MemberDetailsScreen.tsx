@@ -90,7 +90,7 @@ export default function MemberDetailsScreen() {
           <Ionicons name="shield-outline" size={24} color="white" />
         ) : undefined,
         onRightButtonPress: canManagePermissions
-          ? () => (navigation as any).navigate('EditMemberPermissions', { memberId: member.id })
+          ? () => (navigation as any).navigate('Permissions')
           : undefined,
       }}
     >
@@ -153,22 +153,6 @@ export default function MemberDetailsScreen() {
             </View>
           )}
         </View>
-
-        {member.permissions && member.permissions.length > 0 && (
-          <View style={styles.card}>
-            <View style={styles.permissionsHeader}>
-              <Ionicons name="shield-outline" size={20} color="#333" />
-              <Text style={styles.permissionsTitle}>Permissões</Text>
-            </View>
-            <View style={styles.permissionsList}>
-              {member.permissions.map((permission) => (
-                <View key={permission.id} style={styles.permissionBadge}>
-                  <Text style={styles.permissionText}>{permission.type}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
-        )}
     </DetailScreenLayout>
   )
 }
@@ -259,32 +243,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
     fontWeight: '400',
-  },
-  permissionsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  permissionsTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginLeft: 8,
-  },
-  permissionsList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  permissionBadge: {
-    backgroundColor: '#f0f0f0',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-  },
-  permissionText: {
-    fontSize: 14,
-    color: '#333',
   },
 })
 

@@ -15,6 +15,7 @@ export default function MoreScreen() {
         { label: 'Meu Perfil', icon: <Ionicons name="person-outline" size={20} />, screen: 'ProfileScreen' },
         { label: 'Minhas Contribuições', icon: <Ionicons name="heart-outline" size={20} />, screen: 'MyContributions' },
         { label: 'Estudos Bíblicos / Devocional', icon: <Ionicons name="book-outline" size={20} />, screen: 'Devotionals' },
+        { label: 'Minha Assinatura', icon: <Ionicons name="card-outline" size={20} />, screen: 'Subscription' },
         { label: 'Configurações do App', icon: <Ionicons name="settings-outline" size={20} />, screen: 'AppSettings' },
     ]
 
@@ -24,11 +25,15 @@ export default function MoreScreen() {
         { label: 'Igreja', icon: <Ionicons name="church-outline" size={20} />, screen: 'ChurchSettings', permission: 'church_manage' },
         { label: 'Membros', icon: <Ionicons name="people-outline" size={20} />, screen: 'MembersListScreen', permission: 'members_manage' },
         { label: 'Gestão de Eventos', icon: <Ionicons name="calendar-outline" size={20} />, screen: 'Events', permission: 'events_manage' },
+        { label: 'Cargos', icon: <Ionicons name="shield-outline" size={20} />, screen: 'Positions', role: 'ADMINGERAL' },
         { label: 'Painel Administrativo', icon: <MaterialIcons name="admin-panel-settings" size={20} />, screen: 'AdminPanel', permission: 'admin_access' },
         { label: 'Convites e Cadastro de Membros', icon: <Ionicons name="person-add-outline" size={20} />, screen: 'InviteLinks', permission: 'members_manage' },
     ]
 
-    const hasPermission = (required: string | undefined) => {
+    const hasPermission = (required: string | undefined, role?: string) => {
+        if (role) {
+            return user?.role === role
+        }
         if (!required) return true
         return user?.role === 'ADMINGERAL' ||
             user?.role === 'ADMINFILIAL' ||
@@ -36,7 +41,7 @@ export default function MoreScreen() {
             permissions.includes(required)
     }
 
-    const filteredAdminOptions = adminOptions.filter(opt => hasPermission(opt.permission))
+    const filteredAdminOptions = adminOptions.filter(opt => hasPermission(opt.permission, (opt as any).role))
 
     const handleNavigate = (screen: string) => {
         navigation.navigate(screen as never)

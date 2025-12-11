@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   View,
   Text,
@@ -7,8 +7,12 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
+  Linking,
+  Alert,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import { subscriptionApi, plansApi } from '../api/api'
+import Toast from 'react-native-toast-message'
 
 interface PlanUpgradeModalProps {
   visible: boolean
@@ -26,63 +30,9 @@ interface Plan {
   maxMembers: number | null
   maxBranches: number | null
   features: string[]
+  isActive: boolean
   popular?: boolean
 }
-
-// Planos mockados - em produção viriam da API
-const mockPlans: Plan[] = [
-  {
-    id: 'free',
-    name: 'Free',
-    price: 0,
-    maxMembers: 10,
-    maxBranches: 1,
-    features: ['Até 10 membros', '1 filial', 'Funcionalidades básicas'],
-  },
-  {
-    id: 'basic',
-    name: 'Básico',
-    price: 29.9,
-    maxMembers: 50,
-    maxBranches: 3,
-    features: [
-      'Até 50 membros',
-      'Até 3 filiais',
-      'Todas as funcionalidades básicas',
-      'Suporte por email',
-    ],
-    popular: true,
-  },
-  {
-    id: 'premium',
-    name: 'Premium',
-    price: 79.9,
-    maxMembers: 200,
-    maxBranches: 10,
-    features: [
-      'Até 200 membros',
-      'Até 10 filiais',
-      'Todas as funcionalidades',
-      'Suporte prioritário',
-      'Relatórios avançados',
-    ],
-  },
-  {
-    id: 'enterprise',
-    name: 'Enterprise',
-    price: 199.9,
-    maxMembers: null,
-    maxBranches: null,
-    features: [
-      'Membros ilimitados',
-      'Filiais ilimitadas',
-      'Todas as funcionalidades',
-      'Suporte 24/7',
-      'Relatórios personalizados',
-      'API dedicada',
-    ],
-  },
-]
 
 export default function PlanUpgradeModal({
   visible,
@@ -91,21 +41,63 @@ export default function PlanUpgradeModal({
 }: PlanUpgradeModalProps) {
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null)
   const [upgrading, setUpgrading] = useState(false)
+  const [plans, setPlans] = useState<Plan[]>([])
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (visible) {
+      loadPlans()
+    }
+  }, [visible])
+
+  const loadPlans = async () => {
+    try {
+      setLoading(true)
+      const response = await plansApi.getAll()
+      // Filtrar apenas planos ativos e ordenar por preço
+      const activePlans = (Array.isArray(response) ? response : response.plans || [])
+        .filter((plan: Plan) => plan.isActive !== false)
+        .sort((a: Plan, b: Plan) => a.price - b.price)
+      
+      // Marcar o plano do meio como popular (se houver 3+ planos)
+      if (activePlans.length >= 3) {
+        const middleIndex = Math.floor(activePlans.length / 2)
+        activePlans[middleIndex].popular = true
+      }
+      
+      setPlans(activePlans)
+    } catch (error) {
+      console.error('Erro ao carregar planos:', error)
+      Toast.show({ type: 'error', text1: 'Erro ao carregar planos' })
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleUpgrade = async (planId: string) => {
     setUpgrading(true)
     try {
-      // TODO: Implementar chamada real à API quando estiver disponível
-      // await api.post('/subscriptions/upgrade', { planId })
-
-      // Mock por enquanto
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-
-      alert(`Upgrade para o plano ${mockPlans.find((p) => p.id === planId)?.name} realizado com sucesso!`)
-      onClose()
-    } catch (error) {
+      const response = await subscriptionApi.checkout(planId, 7) // 7 dias de trial
+      
+      // Se houver checkoutUrl (MercadoPago), abrir no navegador
+      if (response.subscription?.checkoutUrl) {
+        Toast.show({ type: 'success', text1: 'Redirecionando para o checkout...' })
+        const canOpen = await Linking.canOpenURL(response.subscription.checkoutUrl)
+        if (canOpen) {
+          await Linking.openURL(response.subscription.checkoutUrl)
+        } else {
+          Alert.alert('Erro', 'Não foi possível abrir o link de checkout')
+        }
+        onClose()
+      } else {
+        // Se não houver (pagamento direto), mostrar sucesso
+        Toast.show({ type: 'success', text1: 'Assinatura criada com sucesso!' })
+        onClose()
+      }
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.error || 'Erro ao criar assinatura'
+      Toast.show({ type: 'error', text1: errorMessage })
       console.error('Erro ao fazer upgrade:', error)
-      alert('Erro ao fazer upgrade. Tente novamente.')
     } finally {
       setUpgrading(false)
     }
@@ -147,7 +139,17 @@ export default function PlanUpgradeModal({
 
           {/* Plans List */}
           <ScrollView style={styles.plansContainer} showsVerticalScrollIndicator={false}>
-            {mockPlans.map((plan) => {
+            {loading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#3366FF" />
+                <Text style={styles.loadingText}>Carregando planos...</Text>
+              </View>
+            ) : plans.length === 0 ? (
+              <View style={styles.loadingContainer}>
+                <Text style={styles.loadingText}>Nenhum plano disponível</Text>
+              </View>
+            ) : (
+              plans.map((plan) => {
               const isCurrentPlan =
                 currentPlan?.name.toLowerCase() === plan.name.toLowerCase()
               const isSelected = selectedPlan === plan.id
@@ -217,7 +219,7 @@ export default function PlanUpgradeModal({
                   </TouchableOpacity>
                 </TouchableOpacity>
               )
-            })}
+            }))}
           </ScrollView>
 
           {/* Footer */}
@@ -423,6 +425,16 @@ const styles = StyleSheet.create({
   },
   footerBold: {
     fontWeight: '600',
+  },
+  loadingContainer: {
+    padding: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    color: '#6b7280',
+    fontSize: 14,
   },
 })
 

@@ -42,6 +42,9 @@ import BemVindoScreen from '../screens/onboarding/BemVindoScreen'
 import ConvitesScreen from '../screens/onboarding/ConvitesScreen'
 import SettingsScreen from '../screens/onboarding/SettingsScreen'
 import ForbiddenScreen from '../screens/ForbiddenScreen'
+import SubscriptionScreen from '../screens/SubscriptionScreen'
+import SubscriptionSuccessScreen from '../screens/SubscriptionSuccessScreen'
+import PositionsScreen from '../screens/PositionsScreen'
 
 
 
@@ -103,6 +106,9 @@ export default function AppNavigator() {
                 <Stack.Screen name="ChurchSettings" component={ChurchSettingsScreen} />
                 <Stack.Screen name="ServiceScheduleForm" component={ServiceScheduleFormScreen} />
                 <Stack.Screen name="Forbidden" component={ForbiddenScreen} />
+                <Stack.Screen name="Subscription" component={SubscriptionScreen} />
+                <Stack.Screen name="SubscriptionSuccess" component={SubscriptionSuccessScreen} />
+                <Stack.Screen name="Positions" component={PositionsScreen} />
 
 
 

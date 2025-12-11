@@ -104,3 +104,4 @@ export function BibleText({ passage, className = '' }: BibleTextProps) {
   )
 }
 
+
