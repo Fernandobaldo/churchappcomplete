@@ -239,3 +239,4 @@ Adicione as variáveis conforme `backend/ENV_PAYMENT_GATEWAY.md`
 Todas as funcionalidades descritas no plano foram implementadas com sucesso. O sistema está pronto para integração com MercadoPago e pode ser estendido para outros gateways no futuro.
 
 
+

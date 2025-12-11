@@ -74,3 +74,4 @@ npm run fix:subscription-status
 O script é **seguro** e **idempotente**. Você pode executá-lo quantas vezes quiser sem causar problemas. Ele só altera o que precisa ser alterado.
 
 
+
