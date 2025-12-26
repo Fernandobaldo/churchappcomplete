@@ -36,7 +36,7 @@ export function SubscriptionCard({ subscription, onClick }: SubscriptionCardProp
           variant={
             subscription.status === 'active'
               ? 'success'
-              : subscription.status === 'canceled' || subscription.status === 'unpaid'
+              : subscription.status === 'canceled' || subscription.status === 'cancelled' || subscription.status === 'unpaid'
               ? 'danger'
               : subscription.status === 'past_due'
               ? 'warning'

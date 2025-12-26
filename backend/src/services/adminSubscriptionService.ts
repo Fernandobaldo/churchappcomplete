@@ -52,7 +52,9 @@ export class AdminSubscriptionService {
       subscriptions: subscriptions.map((sub) => ({
         id: sub.id,
         userId: sub.User.id,
-        userName: sub.User.name,
+        userName: sub.User.firstName && sub.User.lastName 
+          ? `${sub.User.firstName} ${sub.User.lastName}`.trim()
+          : sub.User.firstName || sub.User.lastName || 'Usuário',
         userEmail: sub.User.email,
         planId: sub.Plan.id,
         planName: sub.Plan.name,
@@ -64,7 +66,9 @@ export class AdminSubscriptionService {
         // Manter também o formato aninhado para compatibilidade
         user: {
           id: sub.User.id,
-          name: sub.User.name,
+          name: sub.User.firstName && sub.User.lastName 
+            ? `${sub.User.firstName} ${sub.User.lastName}`.trim()
+            : sub.User.firstName || sub.User.lastName || 'Usuário',
           email: sub.User.email,
         },
         plan: {
@@ -97,7 +101,9 @@ export class AdminSubscriptionService {
       id: subscription.id,
       user: {
         id: subscription.User.id,
-        name: subscription.User.name,
+        name: subscription.User.firstName && subscription.User.lastName 
+          ? `${subscription.User.firstName} ${subscription.User.lastName}`.trim()
+          : subscription.User.firstName || subscription.User.lastName || 'Usuário',
         email: subscription.User.email,
       },
       plan: {

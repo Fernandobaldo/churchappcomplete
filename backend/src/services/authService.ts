@@ -133,10 +133,12 @@ export class AuthService {
     }
 
     // Monta payload do token
+    const { getUserFullName } = await import('../utils/userUtils')
+    const fullName = getUserFullName(user)
     const tokenPayload: any = {
       sub: user.id,
       email: user.email,
-      name: user.name,
+      name: fullName,
       type: type,
     }
 
@@ -159,7 +161,7 @@ export class AuthService {
     // Monta resposta
     const responseUser: any = {
       id: user.id,
-      name: user.name,
+      name: fullName,
       email: user.email,
     }
 

@@ -30,7 +30,7 @@ export class AdminPlanService {
       orderBy: { price: 'asc' },
     })
 
-    return plans.map((plan) => ({
+    return plans.map((plan: any) => ({
       id: plan.id,
       name: plan.name,
       price: plan.price,
@@ -77,6 +77,10 @@ export class AdminPlanService {
     }
 
     // Criar plano no banco
+    // NOTA: Não criamos PreApproval Plan no Mercado Pago aqui
+    // O PreApproval Plan será criado apenas quando o cliente fizer checkout
+    const gatewayProvider = env.PAYMENT_GATEWAY
+    
     const plan = await prisma.plan.create({
       data: {
         name: data.name,
@@ -85,107 +89,43 @@ export class AdminPlanService {
         maxBranches: data.maxBranches,
         maxMembers: data.maxMembers,
         billingInterval: data.billingInterval || 'month',
-        syncStatus: 'pending',
+        gatewayProvider: gatewayProvider as any,
+        // Criar IDs fictícios para referência interna (não são usados no Mercado Pago)
+        gatewayProductId: `prod_${data.name.toLowerCase().replace(/\s+/g, '_')}`,
+        gatewayPriceId: `price_${data.name.toLowerCase().replace(/\s+/g, '_')}_${Math.round(data.price * 100)}_${data.billingInterval || 'month'}`,
+        syncStatus: 'synced', // 'synced' porque não precisa sincronizar com gateway (será criado no checkout)
       },
     })
 
-    try {
-      // Sincronizar com gateway
-      const gateway = PaymentGatewayService.getGateway()
-      const gatewayProvider = env.PAYMENT_GATEWAY
-
-      // Criar produto no gateway
-      const product = await gateway.createProduct({
-        name: plan.name,
-        description: `Plano ${plan.name} - ${plan.features.join(', ')}`,
-      })
-
-      // Criar preço no gateway (valor em centavos)
-      const price = await gateway.createPrice({
-        productId: product.id,
-        amount: Math.round(plan.price * 100), // Converter para centavos
-        currency: 'BRL',
-        interval: (data.billingInterval || 'month') as any,
-      })
-
-      // Atualizar plano com IDs do gateway
-      const updatedPlan = await prisma.plan.update({
-        where: { id: plan.id },
-        data: {
-          gatewayProvider,
-          gatewayProductId: product.id,
-          gatewayPriceId: price.id,
-          syncStatus: 'synced',
+    // Registrar no audit log
+    if (request) {
+      await logAudit(request, AuditAction.PLAN_SYNCED_TO_GATEWAY, 'Plan', 
+        `Plano ${plan.name} criado. PreApproval Plan será criado no checkout.`, {
+        entityId: plan.id,
+        metadata: {
+          gateway: gatewayProvider,
+          note: 'PreApproval Plan será criado quando cliente fizer checkout',
         },
       })
-
-      // Registrar no audit log
-      if (request) {
-        await logAudit(request, AuditAction.PLAN_SYNCED_TO_GATEWAY, 'Plan', 
-          `Plano ${plan.name} sincronizado com ${gatewayProvider}`, {
+    } else {
+      await prisma.auditLog.create({
+        data: {
+          action: AuditAction.PLAN_SYNCED_TO_GATEWAY,
+          entityType: 'Plan',
           entityId: plan.id,
+          userId: adminUserId,
+          userEmail: '',
+          description: `Plano ${plan.name} criado. PreApproval Plan será criado no checkout.`,
+          adminUserId,
           metadata: {
             gateway: gatewayProvider,
-            gatewayProductId: product.id,
-            gatewayPriceId: price.id,
+            note: 'PreApproval Plan será criado quando cliente fizer checkout',
           },
-        })
-      } else {
-        await prisma.auditLog.create({
-          data: {
-            action: AuditAction.PLAN_SYNCED_TO_GATEWAY,
-            entityType: 'Plan',
-            entityId: plan.id,
-            userId: adminUserId,
-            userEmail: '',
-            description: `Plano ${plan.name} sincronizado com ${gatewayProvider}`,
-            adminUserId,
-            metadata: {
-              gateway: gatewayProvider,
-              gatewayProductId: product.id,
-              gatewayPriceId: price.id,
-            },
-          },
-        })
-      }
-
-      return updatedPlan
-    } catch (error: any) {
-      // Atualizar status de erro
-      await prisma.plan.update({
-        where: { id: plan.id },
-        data: { syncStatus: 'error' },
+        },
       })
-
-      // Registrar erro no audit log
-      if (request) {
-        await logAudit(request, AuditAction.PLAN_SYNC_ERROR, 'Plan',
-          `Erro ao sincronizar plano ${plan.name} com gateway: ${error.message}`, {
-          entityId: plan.id,
-          metadata: {
-            error: error.message,
-          },
-        })
-      } else {
-        await prisma.auditLog.create({
-          data: {
-            action: AuditAction.PLAN_SYNC_ERROR,
-            entityType: 'Plan',
-            entityId: plan.id,
-            userId: adminUserId,
-            userEmail: '',
-            description: `Erro ao sincronizar plano ${plan.name} com gateway: ${error.message}`,
-            adminUserId,
-            metadata: {
-              error: error.message,
-            },
-          },
-        })
-      }
-
-      // Retornar plano mesmo com erro (para não quebrar o fluxo)
-      return plan
     }
+
+    return plan
   }
 
   async updatePlan(id: string, data: Partial<PlanData>, adminUserId: string, request?: FastifyRequest) {

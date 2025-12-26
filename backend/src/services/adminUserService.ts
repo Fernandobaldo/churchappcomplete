@@ -101,7 +101,9 @@ export class AdminUserService {
 
       return {
         id: user.id,
-        name: user.name,
+        name: user.firstName && user.lastName 
+          ? `${user.firstName} ${user.lastName}`.trim()
+          : user.firstName || user.lastName || 'Usuário',
         email: user.email,
         createdAt: user.createdAt,
         isBlocked: user.isBlocked,
@@ -176,9 +178,13 @@ export class AdminUserService {
 
     const activeSubscription = user.Subscription.find((sub) => sub.status === SubscriptionStatus.active)
 
+    const fullName = user.firstName && user.lastName 
+      ? `${user.firstName} ${user.lastName}`.trim()
+      : user.firstName || user.lastName || 'Usuário'
+    
     return {
       id: user.id,
-      name: user.name,
+      name: fullName,
       email: user.email,
       isBlocked: user.isBlocked,
       createdAt: user.createdAt,
@@ -346,10 +352,14 @@ export class AdminUserService {
     }
 
     // Gera token JWT especial para impersonação
+    const fullName = user.firstName && user.lastName 
+      ? `${user.firstName} ${user.lastName}`.trim()
+      : user.firstName || user.lastName || 'Usuário'
+    
     const tokenPayload: any = {
       sub: user.id,
       email: user.email,
-      name: user.name,
+      name: fullName,
       type: user.Member ? 'member' : 'user',
       impersonatedByAdminId: adminUserId,
       isImpersonated: true,

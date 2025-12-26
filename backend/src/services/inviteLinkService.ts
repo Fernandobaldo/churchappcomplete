@@ -438,11 +438,13 @@ export async function getActiveLinksByBranch(branchId: string, userId: string) {
     links.map(async (link) => {
       const creator = await prisma.user.findUnique({
         where: { id: link.createdBy },
-        select: { name: true, email: true },
+        select: { firstName: true, lastName: true, email: true },
       })
       return {
         ...link,
-        creatorName: creator?.name || 'Usuário desconhecido',
+        creatorName: creator?.firstName && creator?.lastName 
+          ? `${creator.firstName} ${creator.lastName}`.trim()
+          : creator?.firstName || creator?.lastName || 'Usuário desconhecido',
         creatorEmail: creator?.email || null,
       }
     })
@@ -500,11 +502,13 @@ export async function getAllLinksByBranch(branchId: string, userId: string) {
     links.map(async (link) => {
       const creator = await prisma.user.findUnique({
         where: { id: link.createdBy },
-        select: { name: true, email: true },
+        select: { firstName: true, lastName: true, email: true },
       })
       return {
         ...link,
-        creatorName: creator?.name || 'Usuário desconhecido',
+        creatorName: creator?.firstName && creator?.lastName 
+          ? `${creator.firstName} ${creator.lastName}`.trim()
+          : creator?.firstName || creator?.lastName || 'Usuário desconhecido',
         creatorEmail: creator?.email || null,
       }
     })

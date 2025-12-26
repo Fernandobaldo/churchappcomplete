@@ -20,7 +20,8 @@ interface CreateChurchData {
 
 interface UserData {
   id: string
-  name: string
+  firstName: string
+  lastName: string
   email: string
   password: string // já deve estar criptografada
 }
@@ -77,9 +78,10 @@ export class ChurchService {
           })
         } else {
           // Se não existe, cria novo Member (sem senha - usa senha do User)
+          const { getUserFullName } = await import('../utils/userUtils')
           member = await tx.member.create({
             data: {
-              name: user.name,
+              name: getUserFullName(user),
               email: user.email,
               role: Role.ADMINGERAL,
               branchId: branch.id,

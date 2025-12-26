@@ -13,5 +13,12 @@ export async function createPlan(data: PlanInput) {
 }
 
 export async function listPlans() {
-  return prisma.plan.findMany();
+  return prisma.plan.findMany({
+    where: {
+      isActive: true, // Apenas planos ativos
+    },
+    orderBy: {
+      price: 'asc', // Ordenar por preço (menor para maior)
+    },
+  });
 }

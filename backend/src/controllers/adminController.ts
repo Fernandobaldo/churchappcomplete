@@ -533,7 +533,13 @@ export async function updateSubscriptionStatusHandler(
     const bodySchema = z.object({
       status: z.string(),
     })
-    const { status } = bodySchema.parse(req.body)
+    let { status } = bodySchema.parse(req.body)
+    
+    // Normalizar status: frontend pode enviar 'cancelled', backend usa 'canceled'
+    if (status === 'cancelled') {
+      status = 'canceled'
+    }
+    
     const adminUserId = getAdminUserId(req)
     const subscription = await subscriptionService.updateSubscriptionStatus(
       id,

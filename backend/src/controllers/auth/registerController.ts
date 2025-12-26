@@ -75,10 +75,11 @@ export async function registerController(request: FastifyRequest, reply: Fastify
           })
         }
         
+        const { getUserFullName } = await import('../../utils/userUtils')
         const tokenPayload = {
           sub: user.id,
           email: user.email,
-          name: user.name,
+          name: getUserFullName(user),
           type: 'member' as const,
           memberId: result.id,
           role: 'role' in result ? result.role : null,
@@ -224,10 +225,12 @@ export async function registerController(request: FastifyRequest, reply: Fastify
         
         // Não inclui campos de Member no token quando não há Member associado
         // Isso mantém o token limpo e permite que o frontend verifique com toBeUndefined()
+        const { getUserFullName } = await import('../../utils/userUtils')
+        const fullName = getUserFullName(user)
         const tokenPayload = {
           sub: user.id,
           email: user.email,
-          name: user.name,
+          name: fullName,
           type: 'user' as const,
           permissions: [], // Usuário não tem permissões (apenas membros têm)
         }
@@ -243,7 +246,8 @@ export async function registerController(request: FastifyRequest, reply: Fastify
         const response = {
           user: {
             id: user.id,
-            name: user.name,
+            firstName: user.firstName,
+            lastName: user.lastName,
             email: user.email,
           },
           token,

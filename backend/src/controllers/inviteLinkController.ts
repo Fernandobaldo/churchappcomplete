@@ -43,6 +43,8 @@ export async function createInviteLinkController(
       })
     } catch (error: any) {
       console.error('❌ [INVITE LINK CONTROLLER] Erro ao criar link:', error.message, error.code)
+      
+      // Erro de limite de plano atingido
       if (error.code === 'PLAN_LIMIT_REACHED' || error.message === 'PLAN_LIMIT_REACHED') {
         return reply.status(403).send({
           error: 'PLAN_LIMIT_REACHED',
@@ -50,6 +52,15 @@ export async function createInviteLinkController(
           code: 'PLAN_LIMIT_REACHED',
         })
       }
+      
+      // Erro de plano não encontrado
+      if (error.message?.includes('Plano não encontrado')) {
+        return reply.status(400).send({
+          error: 'PLAN_NOT_FOUND',
+          message: error.message || 'Nenhum plano ativo encontrado. Verifique se há uma assinatura ativa para o usuário ou para o administrador geral da igreja.',
+        })
+      }
+      
       throw error
     }
 
@@ -105,6 +116,14 @@ export async function createInviteLinkController(
 
     if (error.name === 'ZodError') {
       return reply.status(400).send({ error: 'Dados inválidos', details: error.errors })
+    }
+
+    // Erro de plano não encontrado (tratado antes do genérico "não encontrado")
+    if (error.message?.includes('Plano não encontrado')) {
+      return reply.status(400).send({
+        error: 'PLAN_NOT_FOUND',
+        message: error.message || 'Nenhum plano ativo encontrado. Verifique se há uma assinatura ativa para o usuário ou para o administrador geral da igreja.',
+      })
     }
 
     if (

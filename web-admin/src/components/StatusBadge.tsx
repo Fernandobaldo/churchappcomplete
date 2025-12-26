@@ -19,8 +19,13 @@ export function StatusBadge({ status, variant = 'neutral' }: StatusBadgeProps) {
       blocked: 'Bloqueado',
       suspended: 'Suspenso',
       cancelled: 'Cancelado',
+      canceled: 'Cancelado', // Suporte para ambos os formatos
       trial: 'Trial',
+      trialing: 'Trial',
       'payment_failed': 'Pagamento Falhou',
+      past_due: 'Pagamento Atrasado',
+      unpaid: 'Não Pago',
+      pending: 'Pendente',
     }
     return labels[status.toLowerCase()] || status
   }

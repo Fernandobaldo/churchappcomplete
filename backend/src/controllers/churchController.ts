@@ -77,7 +77,9 @@ export class ChurchController {
         const tokenPayload = {
           sub: userWithMember.id,
           email: userWithMember.email,
-          name: userWithMember.name,
+          name: userWithMember.firstName && userWithMember.lastName 
+            ? `${userWithMember.firstName} ${userWithMember.lastName}`.trim()
+            : userWithMember.firstName || userWithMember.lastName || 'Usuário',
           type: 'member' as const,
           memberId: member.id,
           role: member.role,

@@ -22,11 +22,15 @@ Cria um User e associa automaticamente ao plano Free.
       summary: 'Registro público (landing page)',
       body: {
         type: 'object',
-        required: ['name', 'email', 'password'],
+        required: ['firstName', 'lastName', 'email', 'password', 'phone', 'document'],
         properties: {
-          name: {
+          firstName: {
             type: 'string',
-            description: 'Nome do responsável',
+            description: 'Primeiro nome',
+          },
+          lastName: {
+            type: 'string',
+            description: 'Sobrenome',
           },
           email: {
             type: 'string',
@@ -39,6 +43,15 @@ Cria um User e associa automaticamente ao plano Free.
             minLength: 6,
             description: 'Senha (mínimo 6 caracteres)',
           },
+          phone: {
+            type: 'string',
+            description: 'Telefone (obrigatório, formato livre)',
+          },
+          document: {
+            type: 'string',
+            minLength: 11,
+            description: 'CPF (11 dígitos) ou CNPJ (14 dígitos) - Obrigatório',
+          },
         },
       },
       response: {
@@ -50,7 +63,8 @@ Cria um User e associa automaticamente ao plano Free.
               type: 'object',
               properties: {
                 id: { type: 'string' },
-                name: { type: 'string' },
+                firstName: { type: 'string' },
+                lastName: { type: 'string' },
                 email: { type: 'string' },
               },
             },

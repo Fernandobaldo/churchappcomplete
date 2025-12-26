@@ -97,7 +97,9 @@ export class AdminChurchService {
           owner: owner?.User
             ? {
                 id: owner.User.id,
-                name: owner.User.name,
+                name: owner.User.firstName && owner.User.lastName 
+                  ? `${owner.User.firstName} ${owner.User.lastName}`.trim()
+                  : owner.User.firstName || owner.User.lastName || 'Usuário',
                 email: owner.User.email,
               }
             : null,
@@ -192,7 +194,9 @@ export class AdminChurchService {
       owner: owner?.User
         ? {
             id: owner.User.id,
-            name: owner.User.name,
+            name: owner.User.firstName && owner.User.lastName 
+              ? `${owner.User.firstName} ${owner.User.lastName}`.trim()
+              : owner.User.firstName || owner.User.lastName || 'Usuário',
             email: owner.User.email,
           }
         : null,

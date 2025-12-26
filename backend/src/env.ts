@@ -33,7 +33,7 @@ export const env = {
   MERCADOPAGO_PUBLIC_KEY: process.env.MERCADOPAGO_PUBLIC_KEY || '',
   MERCADOPAGO_WEBHOOK_SECRET: process.env.MERCADOPAGO_WEBHOOK_SECRET || '',
   MERCADOPAGO_ENVIRONMENT: (process.env.MERCADOPAGO_ENVIRONMENT || 'sandbox') as 'sandbox' | 'production',
-  MERCADOPAGO_BACK_URL: process.env.MERCADOPAGO_BACK_URL || 'http://localhost:5173/subscription/success',
+  MERCADOPAGO_BACK_URL: process.env.MERCADOPAGO_BACK_URL || 'https://conectachurch.com/',
   MERCADOPAGO_WEBHOOK_URL: process.env.MERCADOPAGO_WEBHOOK_URL || '',
   
   // CORS

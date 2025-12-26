@@ -6,10 +6,42 @@ import api from '../api/api'
 import { useAuthStore } from '../stores/authStore'
 import { Upload, X } from 'lucide-react'
 
-interface RegisterForm {
+interface Country {
+  code: string
   name: string
+  dialCode: string
+}
+
+const countries: Country[] = [
+  { code: 'BR', name: 'Brasil', dialCode: '+55' },
+  { code: 'US', name: 'Estados Unidos', dialCode: '+1' },
+  { code: 'AR', name: 'Argentina', dialCode: '+54' },
+  { code: 'PT', name: 'Portugal', dialCode: '+351' },
+  { code: 'ES', name: 'Espanha', dialCode: '+34' },
+  { code: 'MX', name: 'México', dialCode: '+52' },
+  { code: 'CO', name: 'Colômbia', dialCode: '+57' },
+  { code: 'CL', name: 'Chile', dialCode: '+56' },
+  { code: 'PE', name: 'Peru', dialCode: '+51' },
+  { code: 'UY', name: 'Uruguai', dialCode: '+598' },
+  { code: 'PY', name: 'Paraguai', dialCode: '+595' },
+  { code: 'BO', name: 'Bolívia', dialCode: '+591' },
+  { code: 'VE', name: 'Venezuela', dialCode: '+58' },
+  { code: 'EC', name: 'Equador', dialCode: '+593' },
+  { code: 'CR', name: 'Costa Rica', dialCode: '+506' },
+  { code: 'PA', name: 'Panamá', dialCode: '+507' },
+  { code: 'DO', name: 'República Dominicana', dialCode: '+1' },
+  { code: 'CU', name: 'Cuba', dialCode: '+53' },
+  { code: 'GT', name: 'Guatemala', dialCode: '+502' },
+  { code: 'HN', name: 'Honduras', dialCode: '+504' },
+]
+
+interface RegisterForm {
+  firstName: string
+  lastName: string
   email: string
   password: string
+  phone: string
+  document: string
   churchName: string
 }
 
@@ -19,6 +51,9 @@ export default function Register() {
   const [loading, setLoading] = useState(false)
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+  const [selectedCountry, setSelectedCountry] = useState<Country>(
+    countries.find(c => c.code === 'BR') || countries[0]
+  )
   const {
     register,
     handleSubmit,
@@ -64,9 +99,12 @@ export default function Register() {
       // Tenta primeiro o endpoint /register (registro público)
       try {
         response = await api.post('/register', {
-          name: data.name,
+          firstName: data.firstName,
+          lastName: data.lastName,
           email: data.email,
           password: data.password,
+          phone: data.phone ? `${selectedCountry.dialCode} ${data.phone}` : undefined,
+          document: data.document,
           avatarUrl,
         })
         
@@ -128,9 +166,12 @@ export default function Register() {
           
           // Registra o usuário primeiro
           const registerResponse = await api.post('/public/register', {
-            name: data.name,
+            firstName: data.firstName,
+            lastName: data.lastName,
             email: data.email,
             password: data.password,
+            phone: data.phone ? `${selectedCountry.dialCode} ${data.phone}` : undefined,
+            document: data.document,
           })
           
           const { token } = registerResponse.data
@@ -212,21 +253,40 @@ export default function Register() {
           <p className="text-center text-gray-600 mb-8">Crie sua conta para começar</p>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
-                Nome completo
-              </label>
-              <input
-                id="name"
-                type="text"
-                {...register('name', {
-                  required: 'Nome é obrigatório',
-                  minLength: { value: 2, message: 'Nome deve ter pelo menos 2 caracteres' },
-                })}
-                className="input"
-                placeholder="Seu nome completo"
-              />
-              {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-1">
+                  Primeiro nome
+                </label>
+                <input
+                  id="firstName"
+                  type="text"
+                  {...register('firstName', {
+                    required: 'Primeiro nome é obrigatório',
+                    minLength: { value: 2, message: 'Primeiro nome deve ter pelo menos 2 caracteres' },
+                  })}
+                  className="input"
+                  placeholder="João"
+                />
+                {errors.firstName && <p className="mt-1 text-sm text-red-600">{errors.firstName.message}</p>}
+              </div>
+
+              <div>
+                <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-1">
+                  Sobrenome
+                </label>
+                <input
+                  id="lastName"
+                  type="text"
+                  {...register('lastName', {
+                    required: 'Sobrenome é obrigatório',
+                    minLength: { value: 2, message: 'Sobrenome deve ter pelo menos 2 caracteres' },
+                  })}
+                  className="input"
+                  placeholder="Silva"
+                />
+                {errors.lastName && <p className="mt-1 text-sm text-red-600">{errors.lastName.message}</p>}
+              </div>
             </div>
 
             <div>
@@ -264,6 +324,60 @@ export default function Register() {
                 placeholder="••••••••"
               />
               {errors.password && <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>}
+            </div>
+
+            <div>
+              <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
+                Telefone
+              </label>
+              <div className="flex gap-2">
+                <select
+                  id="countryCode"
+                  value={selectedCountry.code}
+                  onChange={(e) => {
+                    const country = countries.find(c => c.code === e.target.value)
+                    if (country) setSelectedCountry(country)
+                  }}
+                  className="input w-32"
+                >
+                  {countries.map((country) => (
+                    <option key={country.code} value={country.code}>
+                      {country.dialCode} {country.code}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  id="phone"
+                  type="tel"
+                  {...register('phone', {
+                    required: 'Telefone é obrigatório',
+                  })}
+                  className="input flex-1"
+                  placeholder="Número do telefone"
+                />
+              </div>
+              {errors.phone && <p className="mt-1 text-sm text-red-600">{errors.phone.message}</p>}
+            </div>
+
+            <div>
+              <label htmlFor="document" className="block text-sm font-medium text-gray-700 mb-1">
+                CPF/CNPJ
+              </label>
+              <input
+                id="document"
+                type="text"
+                {...register('document', {
+                  required: 'CPF/CNPJ é obrigatório',
+                  minLength: { value: 11, message: 'CPF/CNPJ deve ter no mínimo 11 dígitos' },
+                  pattern: {
+                    value: /^[\d\.\-\/]+$/,
+                    message: 'CPF/CNPJ inválido',
+                  },
+                })}
+                className="input"
+                placeholder="000.000.000-00"
+              />
+              {errors.document && <p className="mt-1 text-sm text-red-600">{errors.document.message}</p>}
             </div>
 
             <div>

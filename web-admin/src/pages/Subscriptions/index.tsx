@@ -35,14 +35,24 @@ export function SubscriptionsList() {
   const loadSubscriptions = async () => {
     try {
       setLoading(true)
+      // Normalizar status do filtro: frontend usa 'cancelled', backend espera 'canceled'
+      const normalizedStatusFilter = statusFilter === 'cancelled' ? 'canceled' : statusFilter
+      
       const response = await subscriptionsApi.getAll({
         page: pagination.page,
         limit: pagination.limit,
         search: search || undefined,
-        status: statusFilter || undefined,
+        status: normalizedStatusFilter || undefined,
         planId: planFilter || undefined,
       })
-      setSubscriptions(response.subscriptions || [])
+      
+      // Normalizar status das subscriptions: backend retorna 'canceled', frontend usa 'cancelled'
+      const normalizedSubscriptions = (response.subscriptions || []).map((sub: Subscription) => ({
+        ...sub,
+        status: sub.status === 'canceled' ? 'cancelled' : sub.status,
+      }))
+      
+      setSubscriptions(normalizedSubscriptions)
       setPagination({
         page: response.page || response.pagination?.page || pagination.page,
         limit: response.limit || response.pagination?.limit || pagination.limit,

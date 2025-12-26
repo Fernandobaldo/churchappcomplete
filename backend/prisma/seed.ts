@@ -27,24 +27,57 @@ async function main() {
       },
     })
 
+    // Features válidas baseadas em AVAILABLE_PLAN_FEATURES
+    // IDs válidos: 'events', 'members', 'contributions', 'finances', 'devotionals', 'white_label_app', 'advanced_reports'
+    const validFreePlanFeatures = [
+      'events',        // Eventos
+      'members',       // Membros
+      'contributions', // Contribuições
+      'devotionals',   // Devocionais
+      // Não inclui: finances, white_label_app, advanced_reports (recursos premium)
+    ]
+
     if (!existingPlan) {
       await prisma.plan.create({
         data: {
           name: 'free',
           price: 0,
-          features: [
-            'Até 1 igreja',
-            'Até 1 filial',
-            'Até 20 membros',
-            'Painel de controle limitado',
-          ],
+          features: validFreePlanFeatures,
           maxBranches: 1,
           maxMembers: 20,
+          billingInterval: 'month',
+          isActive: true,
+          gatewayProvider: 'mercadopago',
+          // IDs fictícios para referência interna (não são usados no Mercado Pago)
+          gatewayProductId: 'prod_free',
+          gatewayPriceId: 'price_free_0_month',
+          syncStatus: 'synced', // Não precisa sincronizar com gateway (será criado no checkout)
         },
       })
       console.log('✅ Plano Free criado com sucesso.')
     } else {
-      console.log(`ℹ️ Plano Free já existe (nome: "${existingPlan.name}").`)
+      // Verificar se o plano existente tem features válidas
+      const hasInvalidFeatures = existingPlan.features.some(
+        (feature: string) => !validFreePlanFeatures.includes(feature)
+      )
+      
+      if (hasInvalidFeatures) {
+        // Atualizar features para usar IDs válidos
+        await prisma.plan.update({
+          where: { id: existingPlan.id },
+          data: {
+            features: validFreePlanFeatures,
+            // Garantir que outros campos estão corretos
+            billingInterval: existingPlan.billingInterval || 'month',
+            isActive: existingPlan.isActive !== null ? existingPlan.isActive : true,
+            gatewayProvider: existingPlan.gatewayProvider || 'mercadopago',
+            syncStatus: 'synced',
+          },
+        })
+        console.log(`✅ Plano Free atualizado com features válidas.`)
+      } else {
+        console.log(`ℹ️ Plano Free já existe (nome: "${existingPlan.name}") com features válidas.`)
+      }
     }
 
     // ==================== ADMIN USERS ====================

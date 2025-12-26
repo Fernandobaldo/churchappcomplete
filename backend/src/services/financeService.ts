@@ -79,7 +79,8 @@ export class FinanceService {
         CreatedByUser: {
           select: {
             id: true,
-            name: true,
+            firstName: true,
+            lastName: true,
             email: true,
           },
         },
@@ -186,7 +187,8 @@ export class FinanceService {
         CreatedByUser: {
           select: {
             id: true,
-            name: true,
+            firstName: true,
+            lastName: true,
             email: true,
           },
         },
@@ -243,7 +245,8 @@ export class FinanceService {
         CreatedByUser: {
           select: {
             id: true,
-            name: true,
+            firstName: true,
+            lastName: true,
             email: true,
           },
         },
@@ -281,7 +284,8 @@ export class FinanceService {
         CreatedByUser: {
           select: {
             id: true,
-            name: true,
+            firstName: true,
+            lastName: true,
             email: true,
           },
         },

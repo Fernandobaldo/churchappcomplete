@@ -47,10 +47,17 @@ export function SubscriptionDetails() {
         subscriptionsApi.getById(id!),
         plansApi.getAll(),
       ])
-      setSubscription(subData)
+      
+      // Normalizar status: backend retorna 'canceled', frontend usa 'cancelled'
+      const normalizedStatus = subData.status === 'canceled' ? 'cancelled' : subData.status
+      
+      setSubscription({
+        ...subData,
+        status: normalizedStatus,
+      })
       setFormData({
         planId: subData.plan?.id || '',
-        status: subData.status || '',
+        status: normalizedStatus || '',
       })
       // Backend retorna { plans, availableFeatures }
       setPlans((plansData.plans || plansData || []).filter((p: any) => p.isActive !== false))
@@ -70,7 +77,9 @@ export function SubscriptionDetails() {
         toast.success('Plano alterado com sucesso')
       }
       if (formData.status && formData.status !== subscription.status) {
-        await subscriptionsApi.updateStatus(id!, formData.status)
+        // Normalizar status: frontend usa 'cancelled', backend espera 'canceled'
+        const backendStatus = formData.status === 'cancelled' ? 'canceled' : formData.status
+        await subscriptionsApi.updateStatus(id!, backendStatus)
         toast.success('Status atualizado com sucesso')
       }
       loadData()
@@ -220,9 +229,11 @@ export function SubscriptionDetails() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-admin focus:border-admin"
               >
                 <option value="active">Ativa</option>
-                <option value="trial">Trial</option>
+                <option value="trialing">Trial</option>
+                <option value="pending">Pendente</option>
+                <option value="past_due">Pagamento Atrasado</option>
                 <option value="cancelled">Cancelada</option>
-                <option value="payment_failed">Pagamento Falhou</option>
+                <option value="unpaid">Não Pago</option>
               </select>
             </div>
           </div>
