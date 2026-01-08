@@ -24,6 +24,7 @@ import MemberLimitReachedScreen from '../screens/MemberLimitReachedScreen'
 import TabNavigator from './TabNavigator'
 import MoreScreen from '../screens/MoreScreen'
 import AddContributions from '../screens/AddContributionsScreen'
+import EditContributionScreen from '../screens/EditContributionScreen'
 import ProfileScreen from '../screens/ProfileScreen'
 import MembersListScreen from '../screens/MembersListScreen'
 import EditProfileScreen from '../screens/EditProfileScreen'
@@ -56,7 +57,13 @@ export default function AppNavigator() {
     return (
         <NavigationContainer>
             <Stack.Navigator initialRouteName="Login" screenOptions={{animation: 'slide_from_right', headerShown: false }}>
-                <Stack.Screen name="Login" component={LoginScreen} />
+                <Stack.Screen 
+                    name="Login" 
+                    component={LoginScreen}
+                    options={{ 
+                        gestureEnabled: false,
+                    }}
+                />
                 <Stack.Screen name="Register" component={RegisterScreen} />
                 <Stack.Screen 
                     name="Dashboard" 
@@ -71,6 +78,7 @@ export default function AppNavigator() {
                 <Stack.Screen name="TransactionDetails" component={TransactionDetailsScreen} />
                 <Stack.Screen name="Contributions" component={ContributionsScreen} />
                 <Stack.Screen name="ContributionDetail" component={ContributionDetailScreen} />
+                <Stack.Screen name="EditContributionScreen" component={EditContributionScreen} />
                 <Stack.Screen name="Devotionals" component={DevotionalsScreen} />
                 <Stack.Screen
                     name="DevotionalDetails"
@@ -87,7 +95,13 @@ export default function AppNavigator() {
                 <Stack.Screen name="InviteLinks" component={InviteLinksScreen} />
                 <Stack.Screen name="RegisterInvite" component={RegisterInviteScreen} />
                 <Stack.Screen name="MemberLimitReached" component={MemberLimitReachedScreen} />
-                <Stack.Screen name="Main" component={TabNavigator} />
+                <Stack.Screen 
+                    name="Main" 
+                    component={TabNavigator}
+                    options={{ 
+                        gestureEnabled: false,
+                    }}
+                />
                 <Stack.Screen name="More" component={MoreScreen} />
                 <Stack.Screen name="AddContributions" component={AddContributions} />
                 <Stack.Screen name="ProfileScreen" component={ProfileScreen} />

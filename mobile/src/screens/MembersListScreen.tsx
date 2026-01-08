@@ -1,20 +1,24 @@
 // screens/MembersListScreen.tsx
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback, useMemo } from 'react'
 import {
     View,
     Text,
     StyleSheet,
     FlatList,
-    TextInput,
-    TouchableOpacity,
     Image,
+    RefreshControl,
+    ActivityIndicator,
 } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import api from '../api/api'
 import { Ionicons } from '@expo/vector-icons'
-import PageHeader from '../components/PageHeader'
+import ViewScreenLayout from '../components/layouts/ViewScreenLayout'
+import GlassCard from '../components/GlassCard'
+import TextInputField from '../components/TextInputField'
 import FontAwesome5 from "@expo/vector-icons/FontAwesome5";
+import { colors } from '../theme/colors'
+import EmptyState from '../components/EmptyState'
 
 
 interface Member {
@@ -32,6 +36,9 @@ export default function MembersListScreen() {
     const [members, setMembers] = useState<Member[]>([])
     const [search, setSearch] = useState('')
     const [refreshing, setRefreshing] = useState(false)
+    const [page, setPage] = useState(1)
+    const [loadingMore, setLoadingMore] = useState(false)
+    const ITEMS_PER_PAGE = 10
 
 
     useEffect(() => {
@@ -46,151 +53,176 @@ export default function MembersListScreen() {
         fetchMembers()
     }, [])
 
-    const filteredMembers = members.filter((m) =>
-        m.name.toLowerCase().includes(search.toLowerCase())
+    const filteredMembers = useMemo(() => 
+        members.filter((m) =>
+            m.name.toLowerCase().includes(search.toLowerCase())
+        ),
+        [members, search]
     )
+    
+    // Paginação: mostra apenas os primeiros N itens
+    const paginatedMembers = useMemo(() => 
+        filteredMembers.slice(0, page * ITEMS_PER_PAGE),
+        [filteredMembers, page]
+    )
+    
+    const loadMore = useCallback(() => {
+        if (!loadingMore && paginatedMembers.length < filteredMembers.length) {
+            setLoadingMore(true)
+            setTimeout(() => {
+                setPage(prev => prev + 1)
+                setLoadingMore(false)
+            }, 300)
+        }
+    }, [loadingMore, paginatedMembers.length, filteredMembers.length])
+    
+    // Reset paginação quando muda busca
+    useEffect(() => {
+        setPage(1)
+    }, [search])
 
     const handleRefresh = async () => {
         setRefreshing(true)
-        await filteredMembers
+        setPage(1)
+        try {
+            const res = await api.get('/members')
+            setMembers(res.data)
+        } catch (err) {
+            console.error('Erro ao buscar membros:', err)
+        }
         setRefreshing(false)
     }
 
     return (
-        <View style={styles.container}>
-            <PageHeader
-                title="Membros"
-                Icon={FontAwesome5}
-                iconName="user"
-                rightButtonIcon={<Ionicons name="add" size={24} color="white" />}
-                keyExtractor={(item) => item.branchId}
-
-                onRightButtonPress={() => {
-                    navigation.navigate('MemberRegistrationScreen')
-
-                }}
-            />
-            <View style={styles.contentContainer}>
+        <ViewScreenLayout
+            headerProps={{
+                title: "Membros",
+                Icon: FontAwesome5,
+                iconName: "user",
+                rightButtonIcon: <Ionicons name="add" size={24} color="white" />,
+                onRightButtonPress: () => navigation.navigate('MemberRegistrationScreen'),
+            }}
+            scrollable={false}
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            contentContainerStyle={styles.viewContent}
+        >
             <View style={styles.actionsContainer}>
-                <TouchableOpacity
-                    style={styles.actionButton}
+                <GlassCard
                     onPress={() => navigation.navigate('InviteLinks' as never)}
+                    opacity={0.4}
+                    blurIntensity={20}
+                    borderRadius={20}
+                    style={styles.actionCard}
                 >
-                    <Ionicons name="link" size={20} color="#4F46E5" />
+                    <Ionicons name="link" size={20} color={colors.gradients.primary[1]} />
                     <Text style={styles.actionButtonText}>Links de Convite</Text>
-                </TouchableOpacity>
+                </GlassCard>
             </View>
-            <TextInput
-                style={styles.searchInput}
-                placeholder="Buscar membros"
-                value={search}
-                onChangeText={setSearch}
-            />
+            <View style={styles.searchContainer}>
+                <TextInputField
+                    fieldKey="search"
+                    label=""
+                    value={search}
+                    onChangeText={setSearch}
+                    placeholder="Buscar membros"
+                />
+            </View>
 
             <FlatList
-                data={filteredMembers}
+                data={paginatedMembers}
                 keyExtractor={(item) => item.id}
                 style={styles.list}
+                contentContainerStyle={styles.listContent}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={handleRefresh}
+                        colors={colors.gradients.primary}
+                        tintColor={colors.gradients.primary[1]}
+                    />
+                }
+                onEndReached={loadMore}
+                onEndReachedThreshold={0.5}
+                ListFooterComponent={
+                    loadingMore ? (
+                        <View style={styles.loadingMore}>
+                            <ActivityIndicator size="small" color={colors.gradients.primary[1]} />
+                        </View>
+                    ) : null
+                }
+                ListEmptyComponent={
+                    <EmptyState
+                        icon="people-outline"
+                        message="Nenhum membro encontrado"
+                    />
+                }
                 renderItem={({ item }) => (
-                    <TouchableOpacity
-                        style={styles.memberRow}
+                    <GlassCard
                         onPress={() => navigation.navigate('MemberDetails' as never, { id: item.id } as never)}
+                        opacity={0.4}
+                        blurIntensity={20}
+                        borderRadius={20}
+                        style={styles.memberCard}
                     >
                         <Image
                             source={{ uri: item.avatarUrl || 'https://via.placeholder.com/50' }}
                             style={styles.avatar}
                         />
-                        <View>
+                        <View style={styles.memberInfo}>
                             <Text style={styles.memberName}>{item.name}</Text>
                             <Text style={styles.memberRole}>{item.role}</Text>
                         </View>
-                        <View style={styles.icon}>{item.icon}</View>
-                        <Ionicons name="chevron-forward" size={18} color="#ccc"/>
-                    </TouchableOpacity>
+                        <Ionicons name="chevron-forward" size={18} color={colors.text.tertiary}/>
+                    </GlassCard>
                 )}
-                refreshing={refreshing}
-                onRefresh={handleRefresh}
             />
-            </View>
-        </View>
+        </ViewScreenLayout>
     )
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#fff'},
-    contentContainer: {
-        marginTop: 110, // Altura do header fixo
-    },
-    list: {
-        marginTop: 0, // Removido porque contentContainer já tem o espaçamento
+    viewContent: {
+        flex: 1,
+        padding: 0,
     },
     actionsContainer: {
         flexDirection: 'row',
-        paddingHorizontal: 20,
-        paddingVertical: 12,
+        paddingHorizontal: 16,
+        paddingTop: 16,
+        paddingBottom: 12,
         gap: 12,
     },
-    actionButton: {
+    actionCard: {
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#eef2ff',
-        padding: 12,
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: '#4F46E5',
+        padding: 16,
+        gap: 8,
     },
     actionButtonText: {
-        marginLeft: 8,
-        color: '#4F46E5',
-        fontWeight: '500',
         fontSize: 14,
+        fontWeight: '600',
+        lineHeight: 20,
+        color: colors.gradients.primary[1],
     },
-    icon: {
-        width: 26,
-        alignItems: 'flex-start',
-        marginRight: 180,
+    searchContainer: {
+        marginHorizontal: 16,
+        marginBottom: 16,
     },
-    header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: 20,
-        marginBottom: 10,
+    list: {
+        flex: 1,
     },
-    headerTitle: {
-        fontSize: 28,
-        fontWeight: 'bold',
+    listContent: {
+        paddingHorizontal: 16,
+        paddingBottom: 100,
     },
-    addButton: {
+    memberCard: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#3366FF',
-        paddingVertical: 8,
-        paddingHorizontal: 12,
-        borderRadius: 20,
-    },
-    addText: {
-        color: '#fff',
-        fontWeight: 'bold',
-        marginLeft: 6,
-    },
-    searchInput: {
-        marginTop: 20,
-        backgroundColor: '#f1f1f1',
-        marginHorizontal: 20,
-        borderRadius: 12,
-        padding: 10,
-        marginBottom: 10,
-    },
-    memberRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 20,
-        paddingVertical: 14,
-        borderBottomWidth: 1,
-        borderColor: '#eee',
+        padding: 16,
+        marginBottom: 16,
     },
     avatar: {
         width: 48,
@@ -198,12 +230,24 @@ const styles = StyleSheet.create({
         borderRadius: 24,
         marginRight: 12,
     },
+    memberInfo: {
+        flex: 1,
+    },
     memberName: {
         fontSize: 16,
-        fontWeight: 'bold',
+        fontWeight: '600',
+        lineHeight: 24,
+        color: '#0F172A',
+        marginBottom: 4,
     },
     memberRole: {
         fontSize: 14,
-        color: '#666',
+        fontWeight: '400',
+        lineHeight: 20,
+        color: '#475569',
+    },
+    loadingMore: {
+        paddingVertical: 16,
+        alignItems: 'center',
     },
 })

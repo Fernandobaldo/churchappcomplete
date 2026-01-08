@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { View, Text, TextInput, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
+import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Keyboard, Platform } from 'react-native'
 import api from '../api/api'
 
 interface Member {
@@ -21,7 +21,30 @@ export default function MemberSearch({ value, onChange, placeholder = 'Buscar me
   const [isOpen, setIsOpen] = useState(false)
   const [selectedMember, setSelectedMember] = useState<Member | null>(null)
   const [loading, setLoading] = useState(false)
+  const [keyboardVisible, setKeyboardVisible] = useState(false)
   const searchTimeoutRef = useRef<NodeJS.Timeout>()
+  const inputRef = useRef<TextInput>(null)
+
+  useEffect(() => {
+    // Listener para detectar quando o teclado aparece/desaparece
+    const keyboardDidShowListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => {
+        setKeyboardVisible(true)
+      }
+    )
+    const keyboardDidHideListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        setKeyboardVisible(false)
+      }
+    )
+
+    return () => {
+      keyboardDidShowListener.remove()
+      keyboardDidHideListener.remove()
+    }
+  }, [])
 
   useEffect(() => {
     // Buscar membros quando houver termo de busca
@@ -70,6 +93,8 @@ export default function MemberSearch({ value, onChange, placeholder = 'Buscar me
     setSearchTerm(member.name)
     setIsOpen(false)
     onChange(member.id, member.name)
+    inputRef.current?.blur()
+    Keyboard.dismiss()
   }
 
   const handleClear = () => {
@@ -77,6 +102,7 @@ export default function MemberSearch({ value, onChange, placeholder = 'Buscar me
     setSearchTerm('')
     setIsOpen(false)
     onChange(null)
+    inputRef.current?.focus()
   }
 
   // Se houver value inicial, buscar o membro
@@ -103,6 +129,7 @@ export default function MemberSearch({ value, onChange, placeholder = 'Buscar me
     <View style={styles.container}>
       <View style={styles.inputContainer}>
         <TextInput
+          ref={inputRef}
           style={styles.input}
           value={searchTerm}
           onChangeText={(text) => {
@@ -127,19 +154,23 @@ export default function MemberSearch({ value, onChange, placeholder = 'Buscar me
       </View>
 
       {isOpen && (members.length > 0 || loading) && (
-        <View style={styles.dropdown}>
+        <View style={[styles.dropdown, keyboardVisible && styles.dropdownKeyboardVisible]}>
           {loading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="small" color="#4F46E5" />
               <Text style={styles.loadingText}>Buscando...</Text>
             </View>
           ) : (
-            <FlatList
-              data={members}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
+            <ScrollView
+              style={styles.list}
+              nestedScrollEnabled
+              keyboardShouldPersistTaps="handled"
+            >
+              {members.map((item) => (
                 <TouchableOpacity
+                  key={item.id}
                   style={styles.memberItem}
+                  activeOpacity={0.7}
                   onPress={() => handleSelectMember(item)}
                 >
                   <Text style={styles.memberName}>{item.name}</Text>
@@ -147,16 +178,14 @@ export default function MemberSearch({ value, onChange, placeholder = 'Buscar me
                     <Text style={styles.memberEmail}>{item.email}</Text>
                   )}
                 </TouchableOpacity>
-              )}
-              style={styles.list}
-              nestedScrollEnabled
-            />
+              ))}
+            </ScrollView>
           )}
         </View>
       )}
 
       {isOpen && !loading && searchTerm.length >= 2 && members.length === 0 && (
-        <View style={styles.dropdown}>
+        <View style={[styles.dropdown, keyboardVisible && styles.dropdownKeyboardVisible]}>
           <Text style={styles.noResults}>Nenhum membro encontrado</Text>
         </View>
       )}
@@ -167,7 +196,7 @@ export default function MemberSearch({ value, onChange, placeholder = 'Buscar me
 const styles = StyleSheet.create({
   container: {
     position: 'relative',
-    zIndex: 10,
+    zIndex: 1000,
   },
   inputContainer: {
     position: 'relative',
@@ -186,6 +215,7 @@ const styles = StyleSheet.create({
     top: '50%',
     transform: [{ translateY: -10 }],
     padding: 4,
+    zIndex: 1,
   },
   clearButtonText: {
     fontSize: 18,
@@ -206,7 +236,13 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 5,
+    elevation: 10,
+    zIndex: 1001,
+  },
+  dropdownKeyboardVisible: {
+    // Quando o teclado está visível, ajustar para aparecer acima
+    elevation: 15,
+    shadowOpacity: 0.2,
   },
   list: {
     maxHeight: 240,

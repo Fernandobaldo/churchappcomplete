@@ -1,23 +1,28 @@
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import {
     View,
     Text,
     TextInput,
     TouchableOpacity,
     StyleSheet,
-    KeyboardAvoidingView,
-    TouchableWithoutFeedback,
-    Keyboard,
-    Platform,
     ScrollView,
-    ActivityIndicator,
     Modal,
     Switch,
+    ActivityIndicator,
+    KeyboardAvoidingView,
+    Platform,
 } from 'react-native'
-import DateTimePicker from '@react-native-community/datetimepicker'
+import { LinearGradient } from 'expo-linear-gradient'
+import FormScreenLayout from '../components/layouts/FormScreenLayout'
+import FormsComponent from '../components/FormsComponent'
+import TextInputField from '../components/TextInputField'
+import GlassCard from '../components/GlassCard'
+import { colors } from '../theme/colors'
+import { typography } from '../theme/typography'
 import api from '../api/api'
 import { useNavigation } from '@react-navigation/native'
 import Toast from 'react-native-toast-message'
+import DateTimePickerComponent from '../components/DateTimePicker'
 
 interface PaymentMethod {
     id: string
@@ -28,22 +33,38 @@ interface PaymentMethod {
 export default function AddContributionScreen() {
     const navigation = useNavigation()
 
-    const [title, setTitle] = useState('')
-    const [description, setDescription] = useState('')
-    const [goal, setGoal] = useState('')
-    const [endDate, setEndDate] = useState<Date | null>(null)
-    const [isActive, setIsActive] = useState(true)
-    const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([])
+    const [form, setForm] = useState({
+        title: '',
+        description: '',
+        goal: '',
+        endDate: null as Date | null,
+        isActive: true,
+    })
 
-    const [showDatePicker, setShowDatePicker] = useState(false)
-    const [tempDate, setTempDate] = useState(new Date())
-    const [isLoading, setIsLoading] = useState(false)
+    const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([])
     const [showPaymentModal, setShowPaymentModal] = useState(false)
     const [paymentMethodType, setPaymentMethodType] = useState<'PIX' | 'CONTA_BR' | 'IBAN'>('PIX')
     const [paymentData, setPaymentData] = useState<Record<string, string>>({})
+    const [isLoading, setIsLoading] = useState(false)
+
+    const fields = useMemo(() => [
+        { 
+            key: 'title', 
+            label: 'Título', 
+            type: 'string' as const, 
+            required: true, 
+            placeholder: 'Ex: Campanha de Construção' 
+        },
+        { 
+            key: 'description', 
+            label: 'Descrição', 
+            type: 'string' as const, 
+            placeholder: 'Descrição opcional' 
+        },
+    ], [])
 
     const handleSave = async () => {
-        if (!title) {
+        if (!form.title) {
             Toast.show({
                 type: 'error',
                 text1: 'Campos obrigatórios',
@@ -52,7 +73,7 @@ export default function AddContributionScreen() {
             return
         }
 
-        if (goal && (isNaN(parseFloat(goal)) || parseFloat(goal) <= 0)) {
+        if (form.goal && (isNaN(parseFloat(form.goal)) || parseFloat(form.goal) <= 0)) {
             Toast.show({
                 type: 'error',
                 text1: 'Valor inválido',
@@ -65,17 +86,17 @@ export default function AddContributionScreen() {
             setIsLoading(true)
 
             const submitData: any = {
-                title,
-                description: description || undefined,
-                isActive,
+                title: form.title,
+                description: form.description || undefined,
+                isActive: form.isActive,
             }
 
-            if (goal) {
-                submitData.goal = parseFloat(goal.replace(',', '.'))
+            if (form.goal) {
+                submitData.goal = parseFloat(form.goal.replace(',', '.'))
             }
 
-            if (endDate) {
-                submitData.endDate = endDate.toISOString()
+            if (form.endDate) {
+                submitData.endDate = form.endDate.toISOString()
             }
 
             if (paymentMethods.length > 0) {
@@ -122,385 +143,433 @@ export default function AddContributionScreen() {
         setPaymentMethods(paymentMethods.filter(m => m.id !== id))
     }
 
+    const isFormValid = form.title.trim().length > 0
+
     return (
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.container}>
-            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-                <ScrollView contentContainerStyle={styles.form}>
-                    <Text style={styles.title}>Nova Campanha de Contribuição</Text>
+        <FormScreenLayout
+            headerProps={{
+                title: "Nova Campanha de Contribuição",
+            }}
+        >
+            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                <FormsComponent
+                    form={form}
+                    setForm={setForm}
+                    fields={fields}
+                    onSubmit={() => {}}
+                    hideButtons={true}
+                />
 
-                    <Text style={styles.label}>
-                        Título <Text style={styles.required}>*</Text>
-                    </Text>
-                    <TextInput
-                        style={styles.input}
-                        value={title}
-                        onChangeText={setTitle}
-                        placeholder="Ex: Campanha de Construção"
-                        placeholderTextColor="#999"
-                    />
+                <TextInputField
+                    fieldKey="goal"
+                    label="Meta de Arrecadação"
+                    value={form.goal}
+                    onChangeText={(text) => setForm((prev: any) => ({ ...prev, goal: text }))}
+                    placeholder="R$ 0,00"
+                    keyboardType="numeric"
+                />
 
-                    <Text style={styles.label}>Descrição</Text>
-                    <TextInput
-                        style={[styles.input, { height: 80 }]}
-                        value={description}
-                        onChangeText={setDescription}
-                        multiline
-                        placeholder="Descrição opcional"
-                        placeholderTextColor="#999"
-                        textAlignVertical="top"
-                    />
-
-                    <Text style={styles.label}>Meta de Arrecadação</Text>
-                    <TextInput
-                        style={styles.input}
-                        value={goal}
-                        onChangeText={setGoal}
-                        keyboardType="numeric"
-                        placeholder="R$ 0,00"
-                        placeholderTextColor="#999"
-                    />
+                <View style={styles.helpTextContainer}>
                     <Text style={styles.helpText}>
                         Este é o valor objetivo da campanha. O usuário poderá contribuir com qualquer valor.
                     </Text>
+                </View>
 
-                    <Text style={styles.label}>Data de Término</Text>
-                    <TouchableOpacity
-                        style={styles.input}
-                        onPress={() => {
-                            setTempDate(endDate || new Date())
-                            setShowDatePicker(true)
-                        }}
-                    >
-                        <Text style={endDate ? styles.inputText : styles.placeholderText}>
-                            {endDate ? endDate.toLocaleDateString('pt-BR') : 'Selecione a data (opcional)'}
+                <View style={styles.toggleContainer}>
+                    <Text style={styles.toggleLabel}>Campanha Ativa</Text>
+                    <Switch
+                        value={form.isActive}
+                        onValueChange={(value) => setForm((prev: any) => ({ ...prev, isActive: value }))}
+                        trackColor={{ false: '#767577', true: colors.gradients.primary[1] }}
+                    />
+                </View>
+
+                <DateTimePickerComponent
+                    label="Data de Término"
+                    value={form.endDate || undefined}
+                    onChange={(value) => {
+                        const dateValue = value instanceof Date ? value : (value ? new Date(value) : null)
+                        setForm((prev: any) => ({ ...prev, endDate: dateValue }))
+                    }}
+                    mode="date"
+                    placeholder="Selecione a data (opcional)"
+                />
+
+                <Text style={styles.sectionLabel}>Formas de Pagamento</Text>
+                {paymentMethods.map((pm) => (
+                    <View key={pm.id} style={styles.paymentMethodItem}>
+                        <Text style={styles.paymentMethodText}>
+                            {pm.type} - {pm.type === 'PIX' && pm.data.chave}
+                            {pm.type === 'CONTA_BR' && `${pm.data.banco} - ${pm.data.agencia}`}
+                            {pm.type === 'IBAN' && pm.data.iban}
                         </Text>
-                    </TouchableOpacity>
-
-                    <Modal
-                        visible={showDatePicker}
-                        transparent
-                        animationType="slide"
-                    >
-                        <View style={styles.modalOverlay}>
-                            <View style={styles.modalContent}>
-                                <DateTimePicker
-                                    value={tempDate}
-                                    mode="date"
-                                    display="spinner"
-                                    onChange={(event, selectedDate) => {
-                                        if (selectedDate) {
-                                            setTempDate(selectedDate)
-                                        }
-                                    }}
-                                    style={{ width: '100%', height: 150 }}
-                                />
-                                <View style={styles.modalButtons}>
-                                    <TouchableOpacity
-                                        style={styles.cancelButton}
-                                        onPress={() => {
-                                            setShowDatePicker(false)
-                                            setEndDate(null)
-                                        }}
-                                    >
-                                        <Text style={styles.cancelText}>Remover</Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                        style={styles.cancelButton}
-                                        onPress={() => setShowDatePicker(false)}
-                                    >
-                                        <Text style={styles.cancelText}>Cancelar</Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                        style={styles.saveButton}
-                                        onPress={() => {
-                                            setEndDate(tempDate)
-                                            setShowDatePicker(false)
-                                        }}
-                                    >
-                                        <Text style={styles.saveText}>Confirmar</Text>
-                                    </TouchableOpacity>
-                                </View>
-                            </View>
-                        </View>
-                    </Modal>
-
-                    <Text style={styles.label}>Formas de Pagamento</Text>
-                    {paymentMethods.map((pm) => (
-                        <View key={pm.id} style={styles.paymentMethodItem}>
-                            <Text style={styles.paymentMethodText}>
-                                {pm.type} - {pm.type === 'PIX' && pm.data.chave}
-                                {pm.type === 'CONTA_BR' && `${pm.data.banco} - ${pm.data.agencia}`}
-                                {pm.type === 'IBAN' && pm.data.iban}
-                            </Text>
-                            <TouchableOpacity onPress={() => removePaymentMethod(pm.id)}>
-                                <Text style={styles.removeText}>Remover</Text>
-                            </TouchableOpacity>
-                        </View>
-                    ))}
-                    <TouchableOpacity
-                        style={styles.addPaymentButton}
-                        onPress={() => setShowPaymentModal(true)}
-                    >
-                        <Text style={styles.addPaymentText}>+ Adicionar Forma de Pagamento</Text>
-                    </TouchableOpacity>
-
-                    <View style={styles.switchRow}>
-                        <Text style={styles.label}>Campanha Ativa</Text>
-                        <Switch
-                            value={isActive}
-                            onValueChange={setIsActive}
-                            trackColor={{ false: '#767577', true: '#3366FF' }}
-                        />
-                    </View>
-
-                    <View style={styles.buttonRow}>
-                        <TouchableOpacity
-                            style={styles.cancelButton}
-                            onPress={() => navigation.goBack()}
-                            disabled={isLoading}
-                        >
-                            <Text style={styles.cancelText}>Cancelar</Text>
+                        <TouchableOpacity onPress={() => removePaymentMethod(pm.id)}>
+                            <Text style={styles.removeText}>Remover</Text>
                         </TouchableOpacity>
+                    </View>
+                ))}
+                <TouchableOpacity
+                    style={styles.addPaymentButton}
+                    onPress={() => setShowPaymentModal(true)}
+                    activeOpacity={0.8}
+                >
+                    <Text style={styles.addPaymentText}>+ Adicionar Forma de Pagamento</Text>
+                </TouchableOpacity>
 
-                        <TouchableOpacity
-                            style={[styles.saveButton, isLoading && { opacity: 0.6 }]}
-                            onPress={handleSave}
-                            disabled={isLoading}
+                <View style={styles.buttonRow}>
+                    <TouchableOpacity
+                        style={styles.cancelButton}
+                        onPress={() => navigation.goBack()}
+                        disabled={isLoading}
+                        activeOpacity={0.8}
+                    >
+                        <Text style={styles.cancelText}>Cancelar</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={styles.saveButton}
+                        onPress={handleSave}
+                        disabled={isLoading || !isFormValid}
+                        activeOpacity={0.8}
+                    >
+                        <LinearGradient
+                            colors={
+                                isFormValid && !isLoading
+                                    ? colors.gradients.primary as [string, string]
+                                    : ['#94A3B8', '#94A3B8']
+                            }
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={styles.saveButtonGradient}
                         >
                             {isLoading ? (
                                 <ActivityIndicator color="#fff" />
                             ) : (
                                 <Text style={styles.saveText}>Criar Campanha</Text>
                             )}
-                        </TouchableOpacity>
-                    </View>
-                </ScrollView>
-            </TouchableWithoutFeedback>
+                        </LinearGradient>
+                    </TouchableOpacity>
+                </View>
+            </ScrollView>
 
             {/* Modal para adicionar forma de pagamento */}
             <Modal
                 visible={showPaymentModal}
                 transparent
                 animationType="slide"
+                onRequestClose={() => {
+                    setShowPaymentModal(false)
+                    setPaymentData({})
+                }}
             >
-                <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
-                        <Text style={styles.modalTitle}>Adicionar Forma de Pagamento</Text>
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    style={styles.modalOverlay}
+                    keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+                >
+                    <View style={styles.modalOverlayInner}>
+                        <GlassCard opacity={0.45} blurIntensity={25} borderRadius={20} style={styles.modalContent}>
+                            <ScrollView 
+                                style={styles.modalScrollView}
+                                contentContainerStyle={styles.modalScrollContent}
+                                showsVerticalScrollIndicator={false}
+                                keyboardShouldPersistTaps="handled"
+                            >
+                            <Text style={styles.modalTitle}>Adicionar Forma de Pagamento</Text>
 
-                        <Text style={styles.label}>Tipo *</Text>
-                        <View style={styles.pickerContainer}>
-                            <TouchableOpacity
-                                style={[styles.pickerOption, paymentMethodType === 'PIX' && styles.pickerOptionActive]}
-                                onPress={() => {
-                                    setPaymentMethodType('PIX')
-                                    setPaymentData({})
-                                }}
-                            >
-                                <Text style={paymentMethodType === 'PIX' ? styles.pickerOptionTextActive : styles.pickerOptionText}>PIX</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={[styles.pickerOption, paymentMethodType === 'CONTA_BR' && styles.pickerOptionActive]}
-                                onPress={() => {
-                                    setPaymentMethodType('CONTA_BR')
-                                    setPaymentData({})
-                                }}
-                            >
-                                <Text style={paymentMethodType === 'CONTA_BR' ? styles.pickerOptionTextActive : styles.pickerOptionText}>Conta BR</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={[styles.pickerOption, paymentMethodType === 'IBAN' && styles.pickerOptionActive]}
-                                onPress={() => {
-                                    setPaymentMethodType('IBAN')
-                                    setPaymentData({})
-                                }}
-                            >
-                                <Text style={paymentMethodType === 'IBAN' ? styles.pickerOptionTextActive : styles.pickerOptionText}>IBAN</Text>
-                            </TouchableOpacity>
-                        </View>
+                            <Text style={styles.label}>Tipo *</Text>
+                            <View style={styles.pickerContainer}>
+                                <TouchableOpacity
+                                    style={[styles.pickerOption, paymentMethodType === 'PIX' && styles.pickerOptionActive]}
+                                    onPress={() => {
+                                        setPaymentMethodType('PIX')
+                                        setPaymentData({})
+                                    }}
+                                    activeOpacity={0.8}
+                                >
+                                    <Text style={paymentMethodType === 'PIX' ? styles.pickerOptionTextActive : styles.pickerOptionText}>PIX</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[styles.pickerOption, paymentMethodType === 'CONTA_BR' && styles.pickerOptionActive]}
+                                    onPress={() => {
+                                        setPaymentMethodType('CONTA_BR')
+                                        setPaymentData({})
+                                    }}
+                                    activeOpacity={0.8}
+                                >
+                                    <Text style={paymentMethodType === 'CONTA_BR' ? styles.pickerOptionTextActive : styles.pickerOptionText}>Conta BR</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[styles.pickerOption, paymentMethodType === 'IBAN' && styles.pickerOptionActive]}
+                                    onPress={() => {
+                                        setPaymentMethodType('IBAN')
+                                        setPaymentData({})
+                                    }}
+                                    activeOpacity={0.8}
+                                >
+                                    <Text style={paymentMethodType === 'IBAN' ? styles.pickerOptionTextActive : styles.pickerOptionText}>IBAN</Text>
+                                </TouchableOpacity>
+                            </View>
 
-                        {paymentMethodType === 'PIX' && (
-                            <>
-                                <Text style={styles.label}>Chave PIX *</Text>
-                                <TextInput
-                                    style={styles.input}
+                            {paymentMethodType === 'PIX' && (
+                                <TextInputField
+                                    fieldKey="chave"
+                                    label="Chave PIX *"
                                     value={paymentData.chave || ''}
-                                    onChangeText={(text) => setPaymentData({ ...paymentData, chave: text })}
+                                    onChangeText={(text) => setPaymentData((prev) => ({ ...prev, chave: text }))}
                                     placeholder="CPF, Email, Telefone ou Chave Aleatória"
-                                    placeholderTextColor="#999"
+                                    required
                                 />
-                            </>
-                        )}
+                            )}
 
                         {paymentMethodType === 'CONTA_BR' && (
                             <>
-                                <Text style={styles.label}>Banco *</Text>
-                                <TextInput
-                                    style={styles.input}
+                                <TextInputField
+                                    fieldKey="banco"
+                                    label="Banco *"
                                     value={paymentData.banco || ''}
-                                    onChangeText={(text) => setPaymentData({ ...paymentData, banco: text })}
+                                    onChangeText={(text) => setPaymentData((prev) => ({ ...prev, banco: text }))}
                                     placeholder="Nome do banco"
-                                    placeholderTextColor="#999"
+                                    required
                                 />
-                                <Text style={styles.label}>Agência *</Text>
-                                <TextInput
-                                    style={styles.input}
+                                <TextInputField
+                                    fieldKey="agencia"
+                                    label="Agência *"
                                     value={paymentData.agencia || ''}
-                                    onChangeText={(text) => setPaymentData({ ...paymentData, agencia: text })}
-                                    placeholder="0000"
-                                    placeholderTextColor="#999"
+                                    onChangeText={(text) => {
+                                        // Aceita números, hífen e X (dígito verificador)
+                                        // Formato: 1234-5 ou 1234-X
+                                        const allowedText = text.replace(/[^0-9X-]/gi, '').slice(0, 6)
+                                        setPaymentData((prev) => ({ ...prev, agencia: allowedText }))
+                                    }}
+                                    placeholder="1234-5"
+                                    keyboardType="default"
+                                    maxLength={6}
+                                    required
                                 />
-                                <Text style={styles.label}>Conta *</Text>
-                                <TextInput
-                                    style={styles.input}
+                                <TextInputField
+                                    fieldKey="conta"
+                                    label="Conta *"
                                     value={paymentData.conta || ''}
-                                    onChangeText={(text) => setPaymentData({ ...paymentData, conta: text })}
-                                    placeholder="00000-0"
-                                    placeholderTextColor="#999"
+                                    onChangeText={(text) => {
+                                        // Aceita números, hífen e X (dígito verificador)
+                                        // Formato: 12345678-9 ou 12345678-X
+                                        const allowedText = text.replace(/[^0-9X-]/gi, '').slice(0, 10)
+                                        setPaymentData((prev) => ({ ...prev, conta: allowedText }))
+                                    }}
+                                    placeholder="12345678-9"
+                                    keyboardType="default"
+                                    maxLength={10}
+                                    required
                                 />
                             </>
                         )}
 
-                        {paymentMethodType === 'IBAN' && (
-                            <>
-                                <Text style={styles.label}>IBAN *</Text>
-                                <TextInput
-                                    style={styles.input}
+                            {paymentMethodType === 'IBAN' && (
+                                <TextInputField
+                                    fieldKey="iban"
+                                    label="IBAN *"
                                     value={paymentData.iban || ''}
-                                    onChangeText={(text) => setPaymentData({ ...paymentData, iban: text })}
+                                    onChangeText={(text) => setPaymentData((prev) => ({ ...prev, iban: text }))}
                                     placeholder="GB82 WEST 1234 5698 7654 32"
-                                    placeholderTextColor="#999"
+                                    required
                                 />
-                            </>
-                        )}
+                            )}
 
-                        <View style={styles.modalButtons}>
-                            <TouchableOpacity
-                                style={styles.cancelButton}
-                                onPress={() => {
-                                    setShowPaymentModal(false)
-                                    setPaymentData({})
-                                }}
-                            >
-                                <Text style={styles.cancelText}>Cancelar</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={[styles.saveButton, (
-                                    (paymentMethodType === 'PIX' && !paymentData.chave) ||
-                                    (paymentMethodType === 'CONTA_BR' && (!paymentData.banco || !paymentData.agencia || !paymentData.conta)) ||
-                                    (paymentMethodType === 'IBAN' && !paymentData.iban)
-                                ) && { opacity: 0.5 }]}
-                                onPress={addPaymentMethod}
-                                disabled={
-                                    (paymentMethodType === 'PIX' && !paymentData.chave) ||
-                                    (paymentMethodType === 'CONTA_BR' && (!paymentData.banco || !paymentData.agencia || !paymentData.conta)) ||
-                                    (paymentMethodType === 'IBAN' && !paymentData.iban)
-                                }
-                            >
-                                <Text style={styles.saveText}>Adicionar</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
+                            <View style={styles.modalButtons}>
+                                <TouchableOpacity
+                                    style={styles.modalCancelButton}
+                                    onPress={() => {
+                                        setShowPaymentModal(false)
+                                        setPaymentData({})
+                                    }}
+                                    activeOpacity={0.8}
+                                >
+                                    <Text style={styles.modalCancelText}>Cancelar</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={styles.modalSaveButton}
+                                    onPress={addPaymentMethod}
+                                    disabled={
+                                        (paymentMethodType === 'PIX' && !paymentData.chave) ||
+                                        (paymentMethodType === 'CONTA_BR' && (!paymentData.banco || !paymentData.agencia || !paymentData.conta)) ||
+                                        (paymentMethodType === 'IBAN' && !paymentData.iban)
+                                    }
+                                    activeOpacity={0.8}
+                                >
+                                    <LinearGradient
+                                        colors={
+                                            (paymentMethodType === 'PIX' && !paymentData.chave) ||
+                                            (paymentMethodType === 'CONTA_BR' && (!paymentData.banco || !paymentData.agencia || !paymentData.conta)) ||
+                                            (paymentMethodType === 'IBAN' && !paymentData.iban)
+                                                ? ['#94A3B8', '#94A3B8'] 
+                                                : colors.gradients.primary as [string, string]
+                                        }
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 1, y: 1 }}
+                                        style={styles.modalSaveButtonGradient}
+                                    >
+                                        <Text style={styles.modalSaveText}>Adicionar</Text>
+                                    </LinearGradient>
+                                </TouchableOpacity>
+                            </View>
+                        </ScrollView>
+                    </GlassCard>
                 </View>
-            </Modal>
-        </KeyboardAvoidingView>
+            </KeyboardAvoidingView>
+        </Modal>
+        </FormScreenLayout>
     )
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#fff' },
-    form: { padding: 20, flexGrow: 1 },
-    title: { fontSize: 22, fontWeight: 'bold', marginBottom: 20, marginTop: 50 },
-    label: { marginTop: 16, marginBottom: 6, fontWeight: '600', color: '#333' },
-    required: {
-        color: '#e74c3c',
-        fontWeight: 'bold',
+    scrollContent: {
+        padding: 16,
+        paddingBottom: 40,
     },
-    helpText: {
-        fontSize: 12,
-        color: '#666',
+    helpTextContainer: {
         marginTop: -8,
-        marginBottom: 10,
+        marginBottom: 16,
+        marginLeft: 4,
     },
-    input: {
-        borderWidth: 1,
-        borderColor: '#ccc',
-        borderRadius: 8,
-        padding: 12,
-        justifyContent: 'center',
-        marginBottom: 10,
-        backgroundColor: '#fff',
-        fontSize: 16,
-    },
-    inputText: {
-        color: '#333',
-        fontSize: 16,
-    },
-    placeholderText: {
-        color: '#999',
-        fontSize: 16,
-    },
-    switchRow: {
+    toggleContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
+        marginBottom: 16,
+        paddingHorizontal: 4,
+    },
+    toggleLabel: {
+        fontSize: 16,
+        fontWeight: '600',
+        lineHeight: 24,
+        color: colors.text.primary,
+    },
+    helpText: {
+        fontSize: 12,
+        color: colors.text.secondary,
+        lineHeight: 18,
+    },
+    sectionLabel: {
+        fontSize: 16,
+        fontWeight: '600',
+        lineHeight: 24,
+        color: colors.text.primary,
         marginTop: 16,
-        marginBottom: 10,
+        marginBottom: 12,
     },
     paymentMethodItem: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         padding: 12,
-        backgroundColor: '#f9f9f9',
-        borderRadius: 8,
+        backgroundColor: colors.glass.overlay,
+        borderRadius: 12,
         marginBottom: 8,
+        borderWidth: 1,
+        borderColor: colors.glass.border,
     },
     paymentMethodText: {
         flex: 1,
         fontSize: 14,
-        color: '#333',
+        color: colors.text.primary,
+        fontWeight: '400',
     },
     removeText: {
-        color: '#e74c3c',
+        color: colors.status.error,
         fontSize: 14,
         fontWeight: '600',
     },
     addPaymentButton: {
         borderWidth: 2,
-        borderColor: '#3366FF',
+        borderColor: colors.gradients.primary[1],
         borderStyle: 'dashed',
-        borderRadius: 8,
-        padding: 12,
+        borderRadius: 12,
+        padding: 16,
         alignItems: 'center',
-        marginBottom: 10,
+        marginBottom: 16,
+        backgroundColor: 'transparent',
     },
     addPaymentText: {
-        color: '#3366FF',
+        color: colors.gradients.primary[1],
         fontSize: 14,
         fontWeight: '600',
     },
+    buttonRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginTop: 24,
+        gap: 12,
+    },
+    cancelButton: {
+        flex: 1,
+        backgroundColor: colors.glass.overlay,
+        padding: 16,
+        borderRadius: 18,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: colors.glass.border,
+    },
+    cancelText: { 
+        color: colors.text.primary, 
+        fontSize: 16,
+        fontWeight: '600',
+        lineHeight: 24,
+    },
+    saveButton: {
+        flex: 1,
+        borderRadius: 18,
+        overflow: 'hidden',
+    },
+    saveButtonGradient: {
+        padding: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: 56,
+    },
+    saveText: { 
+        color: '#FFFFFF', 
+        fontSize: 16,
+        fontWeight: '600',
+        lineHeight: 24,
+    },
     modalOverlay: {
         flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+    },
+    modalOverlayInner: {
+        flex: 1,
         justifyContent: 'flex-end',
-        backgroundColor: 'rgba(0,0,0,0.4)',
     },
     modalContent: {
-        backgroundColor: '#fff',
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-        padding: 20,
-        maxHeight: '90%',
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        maxHeight: '80%',
+        minHeight: 300,
+        overflow: 'hidden',
+        width: '100%',
+    },
+    modalScrollView: {
+        maxHeight: '100%',
+    },
+    modalScrollContent: {
+        padding: 24,
+        paddingBottom: 40,
+        flexGrow: 1,
     },
     modalTitle: {
         fontSize: 20,
-        fontWeight: 'bold',
+        fontWeight: '700',
         marginBottom: 20,
+        color: colors.text.primary,
     },
-    modalButtons: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginTop: 20,
-        gap: 10,
+    label: {
+        fontSize: 16,
+        fontWeight: '600',
+        lineHeight: 24,
+        color: colors.text.primary,
+        marginTop: 16,
+        marginBottom: 8,
     },
     pickerContainer: {
         flexDirection: 'row',
@@ -510,44 +579,62 @@ const styles = StyleSheet.create({
     pickerOption: {
         flex: 1,
         padding: 12,
-        borderRadius: 8,
+        borderRadius: 12,
         borderWidth: 1,
-        borderColor: '#ccc',
+        borderColor: colors.glass.border,
         alignItems: 'center',
+        backgroundColor: colors.glass.overlay,
     },
     pickerOptionActive: {
-        backgroundColor: '#3366FF',
-        borderColor: '#3366FF',
+        backgroundColor: colors.gradients.primary[1],
+        borderColor: colors.gradients.primary[1],
     },
     pickerOptionText: {
-        color: '#333',
+        color: colors.text.primary,
         fontSize: 14,
+        fontWeight: '400',
     },
     pickerOptionTextActive: {
-        color: '#fff',
+        color: '#FFFFFF',
         fontSize: 14,
         fontWeight: '600',
     },
-    buttonRow: {
+    modalButtons: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        marginTop: 30,
+        marginTop: 24,
         gap: 10,
     },
-    cancelButton: {
+    modalCancelButton: {
         flex: 1,
-        backgroundColor: '#eee',
+        backgroundColor: colors.glass.overlay,
         padding: 14,
-        borderRadius: 8,
+        borderRadius: 16,
         alignItems: 'center',
+        borderWidth: 1,
+        borderColor: colors.glass.border,
     },
-    cancelText: { color: '#333' },
-    saveButton: {
+    modalCancelText: { 
+        color: colors.text.primary, 
+        fontSize: 16,
+        fontWeight: '600',
+        lineHeight: 24,
+    },
+    modalSaveButton: {
         flex: 1,
-        backgroundColor: '#3366FF',
-        padding: 14,
-        borderRadius: 8,
-        alignItems: 'center',
+        borderRadius: 16,
+        overflow: 'hidden',
     },
-    saveText: { color: '#fff', fontWeight: 'bold' },
+    modalSaveButtonGradient: {
+        padding: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: 48,
+    },
+    modalSaveText: { 
+        color: '#FFFFFF', 
+        fontSize: 16,
+        fontWeight: '600',
+        lineHeight: 24,
+    },
 })

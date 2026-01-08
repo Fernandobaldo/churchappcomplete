@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
@@ -17,7 +16,10 @@ import { Picker } from '@react-native-picker/picker'
 import api from '../api/api'
 import Toast from 'react-native-toast-message'
 import { useAuthStore } from '../stores/authStore'
-import PageHeader from '../components/PageHeader'
+import FormScreenLayout from '../components/layouts/FormScreenLayout'
+import TextInputField from '../components/TextInputField'
+import { colors } from '../theme/colors'
+import GlassCard from '../components/GlassCard'
 
 interface Position {
   id: string
@@ -227,7 +229,7 @@ export default function EditProfileScreen() {
         uri: avatarUri,
         name: filename,
         type,
-      } as any)
+      } as unknown as Blob)
 
       const response = await api.post('/upload/avatar', formData, {
         headers: {
@@ -236,9 +238,10 @@ export default function EditProfileScreen() {
       })
 
       return response.data.url
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao fazer upload do avatar:', error)
-      Toast.show({ type: 'error', text1: error.response?.data?.error || 'Erro ao fazer upload do avatar' })
+      const apiError = error as { response?: { data?: { error?: string } } }
+      Toast.show({ type: 'error', text1: apiError.response?.data?.error || 'Erro ao fazer upload do avatar' })
       throw error
     } finally {
       setUploadingAvatar(false)
@@ -283,7 +286,7 @@ export default function EditProfileScreen() {
         try {
           const profileResponse = await api.get('/members/me')
           memberId = profileResponse.data.id
-        } catch (error: any) {
+        } catch (error: unknown) {
           Toast.show({ type: 'error', text1: 'Não foi possível obter o ID do membro. Faça login novamente.' })
           setSaving(false)
           return
@@ -303,7 +306,7 @@ export default function EditProfileScreen() {
       }
 
       // Preparar dados para atualização
-      const updateData: any = {}
+      const updateData: Record<string, string | null | undefined> = {}
 
       // Nome é obrigatório
       if (name && name.trim() !== '') {
@@ -377,40 +380,40 @@ export default function EditProfileScreen() {
 
       // Navegar de volta
       navigation.goBack()
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const apiError = error as { response?: { data?: { error?: string; message?: string } } }
       Toast.show({
         type: 'error',
-        text1: error.response?.data?.error || error.response?.data?.message || 'Erro ao atualizar perfil',
+        text1: apiError.response?.data?.error || apiError.response?.data?.message || 'Erro ao atualizar perfil',
       })
     } finally {
       setSaving(false)
     }
   }
 
+  const currentPosition = positions.find(p => String(p.id) === positionId)
+
   if (loading) {
     return (
-      <View style={styles.container}>
-        <PageHeader title="Editar Perfil" />
+      <FormScreenLayout
+        headerProps={{ title: "Editar Perfil" }}
+      >
         <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#3366FF" />
+          <ActivityIndicator size="large" color={colors.gradients.primary[1]} />
         </View>
-      </View>
+      </FormScreenLayout>
     )
   }
 
-  const currentPosition = positions.find(p => String(p.id) === positionId)
-
   return (
-    <View style={styles.container}>
-      <PageHeader title="Editar Perfil" />
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-      >
+    <FormScreenLayout
+      headerProps={{ title: "Editar Perfil" }}
+      contentContainerStyle={styles.contentContainer}
+    >
         <Text style={styles.subtitle}>Gerencie suas informações pessoais</Text>
 
         {/* Avatar Section */}
-        <View style={styles.avatarSection}>
+        <GlassCard opacity={0.4} blurIntensity={20} borderRadius={20} style={styles.avatarSection}>
           <View style={styles.avatarContainer}>
             {(avatarUri || currentAvatarUrl) ? (
               <View style={styles.avatarPreview}>
@@ -426,7 +429,7 @@ export default function EditProfileScreen() {
                   style={styles.removeAvatarButton}
                   onPress={handleRemoveAvatar}
                 >
-                  <Ionicons name="close-circle" size={24} color="#dc2626" />
+                  <Ionicons name="close-circle" size={24} color={colors.status.error} />
                 </TouchableOpacity>
               </View>
             ) : (
@@ -442,81 +445,79 @@ export default function EditProfileScreen() {
             onPress={handlePickImage}
             disabled={uploadingAvatar}
           >
-            <Ionicons name="camera-outline" size={20} color="#3366FF" />
+            <Ionicons name="camera-outline" size={20} color={colors.gradients.primary[1]} />
             <Text style={styles.avatarButtonText}>
               {avatarUri || currentAvatarUrl ? 'Alterar Foto' : 'Adicionar Foto'}
             </Text>
           </TouchableOpacity>
           <Text style={styles.avatarHint}>Máximo 5MB</Text>
-        </View>
+        </GlassCard>
 
         {/* Form Fields */}
-        <View style={styles.formSection}>
+        <GlassCard opacity={0.4} blurIntensity={20} borderRadius={20} style={styles.formSection}>
           {/* Nome */}
-          <View style={styles.fieldContainer}>
-            <Text style={styles.label}>
-              Nome <Text style={styles.required}>*</Text>
-            </Text>
-            <TextInput
-              style={[styles.input, nameError && styles.inputError]}
-              placeholder="Seu nome completo"
-              value={name}
-              onChangeText={(text) => {
-                setName(text)
-                if (nameError) setNameError('')
-              }}
-            />
-            {nameError ? <Text style={styles.errorText}>{nameError}</Text> : null}
-          </View>
+          <TextInputField
+            fieldKey="name"
+            label="Nome"
+            value={name}
+            onChangeText={(text) => {
+              setName(text)
+              if (nameError) setNameError('')
+            }}
+            placeholder="Seu nome completo"
+            required
+            error={nameError}
+          />
 
           {/* Email */}
           <View style={styles.fieldContainer}>
             <Text style={styles.label}>Email</Text>
-            <TextInput
-              style={[styles.input, styles.inputDisabled]}
-              value={email}
-              editable={false}
-              placeholderTextColor="#9ca3af"
-            />
+            <View style={styles.inputWrapper}>
+              <TextInput
+                style={[styles.input, styles.inputDisabled]}
+                value={email}
+                editable={false}
+                placeholderTextColor={colors.text.tertiary}
+              />
+            </View>
             <Text style={styles.hintText}>
               O email não pode ser alterado pelo próprio usuário. Entre em contato com um administrador.
             </Text>
           </View>
 
           {/* Telefone */}
-          <View style={styles.fieldContainer}>
-            <Text style={styles.label}>Telefone</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="(00) 00000-0000"
-              value={phone}
-              onChangeText={setPhone}
-              keyboardType="phone-pad"
-            />
-          </View>
+          <TextInputField
+            fieldKey="phone"
+            label="Telefone"
+            value={phone}
+            onChangeText={setPhone}
+            placeholder="(00) 00000-0000"
+            keyboardType="phone-pad"
+          />
 
           {/* Endereço */}
-          <View style={styles.fieldContainer}>
-            <Text style={styles.label}>Endereço</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Rua, número, bairro, cidade"
-              value={address}
-              onChangeText={setAddress}
-            />
-          </View>
+          <TextInputField
+            fieldKey="address"
+            label="Endereço"
+            value={address}
+            onChangeText={setAddress}
+            placeholder="Rua, número, bairro, cidade"
+          />
 
           {/* Data de Nascimento */}
           <View style={styles.fieldContainer}>
             <Text style={styles.label}>Data de Nascimento</Text>
-            <TextInput
-              style={[styles.input, birthDateError && styles.inputError]}
-              placeholder="dd/mm/yyyy"
-              value={birthDateDisplay}
-              onChangeText={handleBirthDateChange}
-              keyboardType="numeric"
-              maxLength={10}
-            />
+            <View style={styles.inputWrapper}>
+              <TextInput
+                style={[styles.input, birthDateError && styles.inputError]}
+                placeholder="dd/mm/yyyy"
+                placeholderTextColor={colors.text.tertiary}
+                value={birthDateDisplay}
+                onChangeText={handleBirthDateChange}
+                keyboardType="numeric"
+                maxLength={10}
+              />
+            </View>
             {birthDateError ? <Text style={styles.errorText}>{birthDateError}</Text> : null}
           </View>
 
@@ -536,7 +537,7 @@ export default function EditProfileScreen() {
               O cargo na igreja não pode ser alterado pelo próprio usuário. Entre em contato com um administrador.
             </Text>
           </View>
-        </View>
+        </GlassCard>
 
         {/* Save Button */}
         <TouchableOpacity
@@ -553,35 +554,25 @@ export default function EditProfileScreen() {
             </>
           )}
         </TouchableOpacity>
-      </ScrollView>
-    </View>
+    </FormScreenLayout>
   )
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
+  contentContainer: {
     padding: 16,
   },
   subtitle: {
     fontSize: 14,
-    color: '#6b7280',
+    color: colors.text.secondary,
     marginBottom: 16,
   },
   avatarSection: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
     padding: 16,
     marginBottom: 16,
     alignItems: 'center',
@@ -597,29 +588,31 @@ const styles = StyleSheet.create({
     height: 96,
     borderRadius: 48,
     borderWidth: 2,
-    borderColor: '#3366FF',
+    borderColor: colors.gradients.primary[1],
   },
   removeAvatarButton: {
     position: 'absolute',
     top: -8,
     right: -8,
-    backgroundColor: '#fff',
+    backgroundColor: colors.glass.overlay,
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.glass.border,
   },
   avatarPlaceholder: {
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: '#e0e7ff',
+    backgroundColor: colors.glass.overlay,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#3366FF',
+    borderColor: colors.gradients.primary[1],
   },
   avatarPlaceholderText: {
     fontSize: 36,
     fontWeight: '600',
-    color: '#3366FF',
+    color: colors.gradients.primary[1],
   },
   avatarButton: {
     flexDirection: 'row',
@@ -628,23 +621,22 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 16,
     borderWidth: 1,
-    borderColor: '#3366FF',
-    borderRadius: 8,
+    borderColor: colors.gradients.primary[1],
+    borderRadius: 16,
     gap: 8,
     marginBottom: 8,
+    backgroundColor: colors.glass.overlay,
   },
   avatarButtonText: {
-    color: '#3366FF',
-    fontWeight: '500',
+    color: colors.gradients.primary[1],
+    fontWeight: '600',
     fontSize: 14,
   },
   avatarHint: {
     fontSize: 12,
-    color: '#6b7280',
+    color: colors.text.secondary,
   },
   formSection: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
     padding: 16,
     marginBottom: 16,
   },
@@ -652,60 +644,81 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   label: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#374151',
+    fontSize: 16,
+    fontWeight: '600',
+    lineHeight: 24,
+    color: colors.text.primary,
     marginBottom: 8,
   },
   required: {
-    color: '#dc2626',
+    color: colors.status.error,
+  },
+  inputWrapper: {
+    width: '100%',
+    backgroundColor: colors.glass.overlay,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.glass.border,
+    ...colors.shadow.glassLight,
+    marginBottom: 0,
+    padding: 0,
   },
   input: {
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    padding: 12,
+    borderWidth: 0,
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 0,
+    backgroundColor: 'transparent',
     fontSize: 16,
-    color: '#111827',
-    backgroundColor: '#fff',
+    fontWeight: '400',
+    color: colors.text.primary,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   },
   inputDisabled: {
-    backgroundColor: '#f3f4f6',
-    color: '#6b7280',
+    backgroundColor: 'transparent',
+    color: colors.text.tertiary,
   },
   inputError: {
-    borderColor: '#dc2626',
+    borderColor: colors.status.error,
+    borderWidth: 1.5,
   },
   errorText: {
     fontSize: 12,
-    color: '#dc2626',
-    marginTop: 4,
+    color: colors.status.error,
+    marginTop: 6,
+    marginBottom: 4,
+    marginLeft: 4,
   },
   hintText: {
     fontSize: 12,
-    color: '#6b7280',
+    color: colors.text.secondary,
     marginTop: 4,
+    lineHeight: 18,
   },
   pickerContainer: {
     borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    backgroundColor: '#f3f4f6',
+    borderColor: colors.glass.border,
+    borderRadius: 16,
+    backgroundColor: colors.glass.overlay,
     overflow: 'hidden',
+    ...colors.shadow.glassLight,
   },
   picker: {
     height: 50,
+    color: colors.text.primary,
   },
   saveButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#3366FF',
+    backgroundColor: colors.gradients.primary[1],
     paddingVertical: 14,
     paddingHorizontal: 24,
-    borderRadius: 8,
+    borderRadius: 18,
     gap: 8,
     marginBottom: 24,
+    ...colors.shadow.glassLight,
   },
   saveButtonDisabled: {
     opacity: 0.6,

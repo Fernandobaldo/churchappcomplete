@@ -98,20 +98,30 @@ export default function ContributionDetails() {
       <div className="card">
         <div className="flex justify-between items-start mb-6">
           <h1 className="text-3xl font-bold">{contribution.title}</h1>
-          <PermissionGuard permission="contributions_manage">
-            <button
-              onClick={handleToggleActive}
-              disabled={toggling}
-              className={`px-4 py-2 rounded-lg font-medium flex items-center gap-2 ${
-                contribution.isActive
-                  ? 'bg-red-100 text-red-800 hover:bg-red-200'
-                  : 'bg-green-100 text-green-800 hover:bg-green-200'
-              }`}
-            >
-              <Power className="w-4 h-4" />
-              {contribution.isActive ? 'Desativar' : 'Ativar'} Campanha
-            </button>
-          </PermissionGuard>
+          <div className="flex gap-2">
+            <PermissionGuard permission="contributions_manage">
+              <button
+                onClick={() => navigate(`/app/contributions/${id}/edit`)}
+                className="px-4 py-2 rounded-lg font-medium bg-primary text-white hover:bg-primary-dark flex items-center gap-2"
+              >
+                Editar
+              </button>
+            </PermissionGuard>
+            <PermissionGuard permission="contributions_manage">
+              <button
+                onClick={handleToggleActive}
+                disabled={toggling}
+                className={`px-4 py-2 rounded-lg font-medium flex items-center gap-2 ${
+                  contribution.isActive
+                    ? 'bg-red-100 text-red-800 hover:bg-red-200'
+                    : 'bg-green-100 text-green-800 hover:bg-green-200'
+                }`}
+              >
+                <Power className="w-4 h-4" />
+                {contribution.isActive ? 'Desativar' : 'Ativar'} Campanha
+              </button>
+            </PermissionGuard>
+          </div>
         </div>
 
         <div className="space-y-6">

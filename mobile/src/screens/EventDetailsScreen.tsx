@@ -1,14 +1,17 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import {View, Text, TouchableOpacity, Linking, Alert, ActivityIndicator, StyleSheet} from 'react-native'
-import { useNavigation, useRoute } from '@react-navigation/native'
+import { LinearGradient } from 'expo-linear-gradient'
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import api from '../api/api'
 import { useAuthStore } from '../stores/authStore'
 import DetailScreenLayout from '../components/layouts/DetailScreenLayout'
+import GlassCard from '../components/GlassCard'
 import FontAwesome5 from "@expo/vector-icons/FontAwesome5";
 import Toast from "react-native-toast-message";
+import { colors } from '../theme/colors'
 export default function EventDetailsScreen() {
     const navigation = useNavigation()
     const route = useRoute()
@@ -16,8 +19,9 @@ export default function EventDetailsScreen() {
     const { user } = useAuthStore()
     const [event, setEvent] = useState<any>(null)
     const [loading, setLoading] = useState(true)
+    const [refreshing, setRefreshing] = useState(false)
 
-    const fetchEvent = async () => {
+    const fetchEvent = useCallback(async () => {
         try {
             const res = await api.get(`/events/${id}`)
             setEvent(res.data)
@@ -25,12 +29,25 @@ export default function EventDetailsScreen() {
             Alert.alert('Erro', 'Não foi possível carregar os detalhes do evento.')
         } finally {
             setLoading(false)
+            setRefreshing(false)
         }
-    }
+    }, [id])
 
     useEffect(() => {
         fetchEvent()
-    }, [id])
+    }, [fetchEvent])
+
+    // Recarrega quando a tela recebe foco (após editar)
+    useFocusEffect(
+        useCallback(() => {
+            fetchEvent()
+        }, [fetchEvent])
+    )
+
+    const handleRefresh = useCallback(() => {
+        setRefreshing(true)
+        fetchEvent()
+    }, [fetchEvent])
 
     const hasPermissionToEdit =
         user?.role === 'ADMINGERAL' ||
@@ -52,7 +69,7 @@ export default function EventDetailsScreen() {
     if (loading) {
         return (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                <ActivityIndicator size="large" color="#3366FF" />
+                <ActivityIndicator size="large" color={colors.gradients.primary[1]} />
             </View>
         )
     }
@@ -68,21 +85,44 @@ export default function EventDetailsScreen() {
     const formatDate = (dateStr: string) => {
         const date = new Date(dateStr)
         if (isNaN(date.getTime())) return 'Data inválida'
-        return format(date, "EEEE, dd 'de' MMMM 'de' yyyy 'às' HH:mm", { locale: ptBR })
+        return format(date, "EEEE, dd 'de' MMMM 'de' yyyy", { locale: ptBR })
     }
 
-    const formatTime = () => {
-        if (event.time) {
+    const getTimeDisplay = () => {
+        // Se há um campo time específico e não é 00:00
+        if (event.time && event.time !== '00:00' && event.time.trim() !== '') {
             return event.time
         }
+        
+        // Se não há time específico, tenta extrair do startDate
         if (event.startDate) {
             const date = new Date(event.startDate)
             if (!isNaN(date.getTime())) {
-                return format(date, 'HH:mm')
+                const hours = date.getHours()
+                const minutes = date.getMinutes()
+                // Só retorna se não for 00:00
+                if (hours !== 0 || minutes !== 0) {
+                    return format(date, 'HH:mm', { locale: ptBR })
+                }
             }
         }
-        return 'Horário não informado'
+        
+        // Retorna null se não houver horário válido
+        return null
     }
+
+    // Constrói URL completa da imagem do banner se necessário
+    const bannerImageUrl = event?.imageUrl ? (() => {
+        const imageUrl = event.imageUrl
+        if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+            // URL absoluta, usar como está
+            return imageUrl
+        } else {
+            // URL relativa, adicionar baseURL
+            const cleanUrl = imageUrl.startsWith('/') ? imageUrl.substring(1) : imageUrl
+            return `${api.defaults.baseURL}/${cleanUrl}`
+        }
+    })() : undefined
 
     return (
         <DetailScreenLayout
@@ -97,24 +137,27 @@ export default function EventDetailsScreen() {
                     ? () => (navigation as any).navigate('EditEventScreen', { id: event.id })
                     : undefined,
             }}
-            imageUrl={event.imageUrl}
+            imageUrl={bannerImageUrl}
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
         >
-            <View style={styles.card}>
+            <GlassCard opacity={0.4} blurIntensity={20} borderRadius={20} style={styles.card}>
                 <Text style={styles.eventName}>{event.title}</Text>
                 
                 <View style={styles.infoRow}>
-                    <Ionicons name="calendar-outline" size={20} color="#666" />
+                    <Ionicons name="calendar-outline" size={20} color={colors.text.secondary} />
                     <View style={styles.infoContent}>
                         <Text style={styles.infoLabel}>Data e Hora</Text>
                         <Text style={styles.infoValue}>
-                            {formatDate(event.startDate)} {event.time && `(${event.time})`}
+                            {formatDate(event.startDate)}
+                            {getTimeDisplay() && ` ${getTimeDisplay()}`}
                         </Text>
                     </View>
                 </View>
 
                 {event.location && (
                     <View style={styles.infoRow}>
-                        <Ionicons name="location-outline" size={20} color="#666" />
+                        <Ionicons name="location-outline" size={20} color={colors.text.secondary} />
                         <View style={styles.infoContent}>
                             <Text style={styles.infoLabel}>Local</Text>
                             <Text style={styles.infoValue}>{event.location}</Text>
@@ -128,12 +171,12 @@ export default function EventDetailsScreen() {
                         <Text style={styles.descriptionText}>{event.description}</Text>
                     </View>
                 )}
-            </View>
+            </GlassCard>
 
             {event.hasDonation && (
-                <View style={styles.donationCard}>
+                <GlassCard opacity={0.45} blurIntensity={20} borderRadius={20} style={styles.donationCard}>
                     <View style={styles.donationHeader}>
-                        <Ionicons name="heart" size={24} color="#EF4444" />
+                        <Ionicons name="heart" size={24} color={colors.status.error} />
                         <Text style={styles.donationTitle}>Contribuição</Text>
                     </View>
                     {event.donationReason && (
@@ -143,12 +186,19 @@ export default function EventDetailsScreen() {
                         </View>
                     )}
                     {event.donationLink && (
-                        <TouchableOpacity onPress={openDonationLink} style={styles.donationLinkBtn}>
-                            <Ionicons name="link-outline" size={20} color="#fff" />
-                            <Text style={styles.donationBtnText}>Abrir link de contribuição</Text>
+                        <TouchableOpacity onPress={openDonationLink} style={styles.donationLinkBtn} activeOpacity={0.8}>
+                            <LinearGradient
+                                colors={[colors.status.error, '#DC2626'] as [string, string]}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                                style={styles.donationLinkBtnGradient}
+                            >
+                                <Ionicons name="link-outline" size={20} color="#fff" />
+                                <Text style={styles.donationBtnText}>Abrir link de contribuição</Text>
+                            </LinearGradient>
                         </TouchableOpacity>
                     )}
-                </View>
+                </GlassCard>
             )}
         </DetailScreenLayout>
     )
@@ -158,20 +208,14 @@ export default function EventDetailsScreen() {
 
 const styles = StyleSheet.create({
     card: {
-        backgroundColor: '#fff',
-        borderRadius: 12,
-        padding: 16,
+        padding: 20,
         marginBottom: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
     },
     eventName: {
         fontSize: 24,
-        fontWeight: 'bold',
-        color: '#333',
+        fontWeight: '700',
+        lineHeight: 32,
+        color: '#0F172A',
         marginBottom: 20,
     },
     infoRow: {
@@ -185,38 +229,41 @@ const styles = StyleSheet.create({
     },
     infoLabel: {
         fontSize: 14,
-        color: '#666',
+        fontWeight: '400',
+        lineHeight: 20,
+        color: '#475569',
         marginBottom: 4,
     },
     infoValue: {
         fontSize: 16,
-        color: '#333',
-        fontWeight: '500',
+        fontWeight: '600',
+        lineHeight: 24,
+        color: '#0F172A',
     },
     descriptionSection: {
         marginTop: 8,
         paddingTop: 16,
         borderTopWidth: 1,
-        borderTopColor: '#eee',
+        borderTopColor: colors.glass.border,
     },
     descriptionHeader: {
         fontSize: 16,
         fontWeight: '600',
-        color: '#333',
+        lineHeight: 24,
+        color: '#0F172A',
         marginBottom: 8,
     },
     descriptionText: {
         fontSize: 16,
-        color: '#666',
+        fontWeight: '400',
         lineHeight: 24,
+        color: '#475569',
     },
     donationCard: {
-        backgroundColor: '#FEE2E2',
-        borderRadius: 12,
-        padding: 16,
+        padding: 20,
         marginBottom: 16,
         borderLeftWidth: 4,
-        borderLeftColor: '#EF4444',
+        borderLeftColor: colors.status.error,
     },
     donationHeader: {
         flexDirection: 'row',
@@ -225,8 +272,9 @@ const styles = StyleSheet.create({
     },
     donationTitle: {
         fontSize: 18,
-        fontWeight: 'bold',
-        color: '#333',
+        fontWeight: '700',
+        lineHeight: 24,
+        color: '#0F172A',
         marginLeft: 8,
     },
     donationInfo: {
@@ -234,26 +282,32 @@ const styles = StyleSheet.create({
     },
     donationLabel: {
         fontSize: 14,
-        color: '#666',
+        fontWeight: '400',
+        lineHeight: 20,
+        color: '#475569',
         marginBottom: 4,
     },
     donationValue: {
         fontSize: 16,
-        color: '#333',
-        fontWeight: '500',
+        fontWeight: '600',
+        lineHeight: 24,
+        color: '#0F172A',
     },
     donationLinkBtn: {
-        backgroundColor: '#EF4444',
+        borderRadius: 18,
+        overflow: 'hidden',
+    },
+    donationLinkBtnGradient: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: 12,
-        borderRadius: 8,
+        padding: 16,
         gap: 8,
     },
     donationBtnText: {
-        color: '#fff',
+        color: '#FFFFFF',
         fontSize: 16,
         fontWeight: '600',
+        lineHeight: 24,
     },
 })

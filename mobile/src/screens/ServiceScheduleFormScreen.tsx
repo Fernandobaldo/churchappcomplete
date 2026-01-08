@@ -1,34 +1,38 @@
 import React, { useEffect, useState } from 'react'
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Switch, Alert } from 'react-native'
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Switch } from 'react-native'
 import { useNavigation, useRoute } from '@react-navigation/native'
-import { Picker } from '@react-native-picker/picker'
+import ModalSelector from 'react-native-modal-selector'
+import { format } from 'date-fns'
 import { serviceScheduleApi, ServiceSchedule, CreateServiceScheduleData } from '../api/serviceScheduleApi'
 import { useAuthStore } from '../stores/authStore'
 import Toast from 'react-native-toast-message'
-import PageHeader from '../components/PageHeader'
+import FormScreenLayout from '../components/layouts/FormScreenLayout'
+import { colors } from '../theme/colors'
+import GlassCard from '../components/GlassCard'
+import TextInputField from '../components/TextInputField'
+import DateTimePickerComponent from '../components/DateTimePicker'
 
 const DAYS_OF_WEEK = [
-  { label: 'Domingo', value: 0 },
-  { label: 'Segunda-feira', value: 1 },
-  { label: 'Terça-feira', value: 2 },
-  { label: 'Quarta-feira', value: 3 },
-  { label: 'Quinta-feira', value: 4 },
-  { label: 'Sexta-feira', value: 5 },
-  { label: 'Sábado', value: 6 },
+  { key: '0', label: 'Domingo', value: '0' },
+  { key: '1', label: 'Segunda-feira', value: '1' },
+  { key: '2', label: 'Terça-feira', value: '2' },
+  { key: '3', label: 'Quarta-feira', value: '3' },
+  { key: '4', label: 'Quinta-feira', value: '4' },
+  { key: '5', label: 'Sexta-feira', value: '5' },
+  { key: '6', label: 'Sábado', value: '6' },
 ]
 
 export default function ServiceScheduleFormScreen() {
   const navigation = useNavigation()
   const route = useRoute()
   const { user } = useAuthStore()
-  const schedule = route.params?.schedule as ServiceSchedule | null
+  const schedule = (route.params as { schedule?: ServiceSchedule })?.schedule || null
 
-  const [dayOfWeek, setDayOfWeek] = useState(0)
+  const [dayOfWeek, setDayOfWeek] = useState<number>(0)
   const [time, setTime] = useState('10:00')
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [location, setLocation] = useState('')
-  const [isDefault, setIsDefault] = useState(false)
   const [autoCreateEvents, setAutoCreateEvents] = useState(false)
   const [autoCreateDaysAhead, setAutoCreateDaysAhead] = useState('90')
   const [saving, setSaving] = useState(false)
@@ -40,7 +44,6 @@ export default function ServiceScheduleFormScreen() {
       setTitle(schedule.title)
       setDescription(schedule.description || '')
       setLocation(schedule.location || '')
-      setIsDefault(schedule.isDefault)
       setAutoCreateEvents(schedule.autoCreateEvents)
       setAutoCreateDaysAhead(String(schedule.autoCreateDaysAhead || 90))
     }
@@ -65,8 +68,7 @@ export default function ServiceScheduleFormScreen() {
         time,
         title: title.trim(),
         description: description.trim() || undefined,
-        location: location.trim() || undefined,
-        isDefault,
+        location: location && location.trim() ? location.trim() : undefined,
         autoCreateEvents,
         autoCreateDaysAhead: autoCreateEvents ? parseInt(autoCreateDaysAhead) || 90 : undefined,
       }
@@ -95,87 +97,98 @@ export default function ServiceScheduleFormScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      <PageHeader title={schedule ? 'Editar Horário' : 'Novo Horário'} />
-      <ScrollView style={[styles.scrollView, styles.scrollViewWithHeader]}>
-        <View style={styles.section}>
-          <Text style={styles.label}>
-            Dia da Semana <Text style={styles.required}>*</Text>
-          </Text>
-          <View style={styles.pickerContainer}>
-            <Picker selectedValue={dayOfWeek} onValueChange={setDayOfWeek} style={styles.picker}>
-              {DAYS_OF_WEEK.map((day) => (
-                <Picker.Item key={day.value} label={day.label} value={day.value} />
-              ))}
-            </Picker>
+    <FormScreenLayout
+      headerProps={{ title: schedule ? 'Editar Horário' : 'Novo Horário' }}
+    >
+      <GlassCard opacity={0.4} blurIntensity={20} borderRadius={20} style={styles.section}>
+          <View style={styles.fieldContainer}>
+            <Text style={styles.label}>
+              Dia da Semana <Text style={styles.required}>*</Text>
+            </Text>
+            <View style={styles.inputWrapper}>
+              <ModalSelector
+                data={DAYS_OF_WEEK}
+                initValue={DAYS_OF_WEEK.find(d => d.value === String(dayOfWeek))?.label || 'Selecione o dia'}
+                onChange={(option) => {
+                  setDayOfWeek(parseInt(option.value as string, 10))
+                }}
+                style={styles.input}
+                initValueTextStyle={{ 
+                  color: dayOfWeek !== undefined ? colors.text.primary : colors.text.tertiary,
+                  padding: 16,
+                  fontSize: 16,
+                  fontWeight: '400',
+                }}
+                selectTextStyle={{ padding: 12 }}
+              >
+                <TextInput
+                  style={styles.input}
+                  editable={false}
+                  placeholder="Selecione o dia da semana"
+                  value={DAYS_OF_WEEK.find(d => d.value === String(dayOfWeek))?.label || ''}
+                  placeholderTextColor={colors.text.tertiary}
+                />
+              </ModalSelector>
+            </View>
           </View>
 
-          <Text style={styles.label}>
-            Horário <Text style={styles.required}>*</Text>
-          </Text>
-          <TextInput
-            style={styles.input}
-            placeholder="HH:mm"
-            value={time}
-            onChangeText={setTime}
-            keyboardType="numeric"
-            placeholderTextColor="#999"
-          />
+          <View style={styles.fieldContainer}>
+            <DateTimePickerComponent
+              label="Horário"
+              required
+              value={time}
+              onChange={(value) => setTime(typeof value === 'string' ? value : format(value, 'HH:mm'))}
+              mode="time"
+              placeholder="HH:mm"
+            />
+          </View>
 
-          <Text style={styles.label}>
-            Título <Text style={styles.required}>*</Text>
-          </Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Ex: Culto Dominical"
+          <TextInputField
+            fieldKey="title"
+            label="Título"
             value={title}
             onChangeText={setTitle}
-            placeholderTextColor="#999"
+            placeholder="Ex: Culto Dominical"
+            required
           />
 
-          <Text style={styles.label}>Descrição</Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            placeholder="Descrição opcional"
+          <TextInputField
+            fieldKey="description"
+            label="Descrição"
             value={description}
             onChangeText={setDescription}
+            placeholder="Descrição opcional"
             multiline
-            numberOfLines={3}
-            placeholderTextColor="#999"
-            textAlignVertical="top"
           />
 
-          <Text style={styles.label}>Localização</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Ex: Templo Principal"
+          <TextInputField
+            fieldKey="location"
+            label="Localização"
             value={location}
             onChangeText={setLocation}
-            placeholderTextColor="#999"
+            placeholder="Ex: Templo Principal"
           />
-
-          <View style={styles.switchRow}>
-            <Text style={styles.switchLabel}>Definir como horário padrão</Text>
-            <Switch value={isDefault} onValueChange={setIsDefault} />
-          </View>
 
           <View style={styles.switchRow}>
             <Text style={styles.switchLabel}>Criar eventos automaticamente</Text>
-            <Switch value={autoCreateEvents} onValueChange={setAutoCreateEvents} />
+            <Switch
+              value={autoCreateEvents}
+              onValueChange={setAutoCreateEvents}
+              trackColor={{ false: '#CBD5E1', true: colors.gradients.primary[1] }}
+              thumbColor={autoCreateEvents ? '#FFFFFF' : '#F1F5F9'}
+              ios_backgroundColor="#CBD5E1"
+            />
           </View>
 
           {autoCreateEvents && (
-            <>
-              <Text style={styles.label}>Dias à frente para criar eventos</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="90"
-                value={autoCreateDaysAhead}
-                onChangeText={setAutoCreateDaysAhead}
-                keyboardType="numeric"
-                placeholderTextColor="#999"
-              />
-            </>
+            <TextInputField
+              fieldKey="autoCreateDaysAhead"
+              label="Dias à frente para criar eventos"
+              value={autoCreateDaysAhead}
+              onChangeText={setAutoCreateDaysAhead}
+              placeholder="90"
+              keyboardType="numeric"
+            />
           )}
 
           <TouchableOpacity
@@ -185,85 +198,79 @@ export default function ServiceScheduleFormScreen() {
           >
             <Text style={styles.buttonText}>{saving ? 'Salvando...' : schedule ? 'Atualizar' : 'Criar'}</Text>
           </TouchableOpacity>
-        </View>
-      </ScrollView>
-    </View>
+        </GlassCard>
+    </FormScreenLayout>
   )
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollViewWithHeader: {
-    marginTop: 110, // Altura do header fixo
-  },
   section: {
-    backgroundColor: '#fff',
     margin: 16,
     padding: 16,
-    borderRadius: 8,
+  },
+  fieldContainer: {
+    marginBottom: 20,
   },
   label: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    lineHeight: 24,
+    color: colors.text.primary,
     marginBottom: 8,
-    marginTop: 12,
   },
   required: {
-    color: '#e74c3c',
+    color: colors.status.error,
     fontWeight: 'bold',
   },
+  inputWrapper: {
+    width: '100%',
+    backgroundColor: colors.glass.overlay,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.glass.border,
+    ...colors.shadow.glassLight,
+    marginBottom: 0,
+    padding: 0,
+  },
   input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    backgroundColor: '#fff',
+    borderWidth: 0,
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 0,
+    backgroundColor: 'transparent',
     fontSize: 16,
-  },
-  textArea: {
-    height: 80,
-    textAlignVertical: 'top',
-  },
-  pickerContainer: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    marginBottom: 12,
-  },
-  picker: {
-    height: 50,
+    fontWeight: '400',
+    color: colors.text.primary,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   },
   switchRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginVertical: 12,
+    paddingVertical: 8,
   },
   switchLabel: {
-    fontSize: 14,
-    color: '#333',
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text.primary,
     flex: 1,
   },
   button: {
-    backgroundColor: '#3366FF',
+    backgroundColor: colors.gradients.primary[1],
     padding: 14,
-    borderRadius: 8,
+    borderRadius: 18,
     alignItems: 'center',
     marginTop: 20,
+    ...colors.shadow.glassLight,
   },
   buttonDisabled: {
     opacity: 0.6,
   },
   buttonText: {
     color: '#fff',
-    fontWeight: 'bold',
+    fontWeight: '600',
     fontSize: 16,
   },
 })

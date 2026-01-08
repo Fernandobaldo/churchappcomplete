@@ -1,11 +1,15 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert } from 'react-native'
+import { LinearGradient } from 'expo-linear-gradient'
 import { useNavigation } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
 import api from '../api/api'
 import Toast from 'react-native-toast-message'
 import { useAuthStore } from '../stores/authStore'
-import PageHeader from '../components/PageHeader'
+import ViewScreenLayout from '../components/layouts/ViewScreenLayout'
+import GlassCard from '../components/GlassCard'
+import TextInputField from '../components/TextInputField'
+import { colors } from '../theme/colors'
 
 interface Position {
   id: string
@@ -22,6 +26,7 @@ export default function PositionsScreen() {
   const { user } = useAuthStore()
   const [positions, setPositions] = useState<Position[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState('')
@@ -29,11 +34,7 @@ export default function PositionsScreen() {
 
   const isAdmin = user?.role === 'ADMINGERAL'
 
-  useEffect(() => {
-    loadPositions()
-  }, [])
-
-  const loadPositions = async () => {
+  const loadPositions = useCallback(async () => {
     try {
       setLoading(true)
       const response = await api.get('/positions')
@@ -42,8 +43,18 @@ export default function PositionsScreen() {
       Toast.show({ type: 'error', text1: 'Erro ao carregar cargos' })
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    loadPositions()
+  }, [loadPositions])
+
+  const handleRefresh = useCallback(() => {
+    setRefreshing(true)
+    loadPositions()
+  }, [loadPositions])
 
   const handleCreate = async () => {
     if (!isAdmin) {
@@ -128,66 +139,67 @@ export default function PositionsScreen() {
     )
   }
 
-  if (loading) {
-    return (
-      <View style={styles.container}>
-        <PageHeader title="Cargos da Igreja" />
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#3366FF" />
-        </View>
-      </View>
-    )
-  }
-
   return (
-    <View style={styles.container}>
-      <PageHeader title="Cargos da Igreja" />
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+    <ViewScreenLayout
+      headerProps={{
+        title: "Cargos da Igreja",
+      }}
+      refreshing={refreshing}
+      onRefresh={handleRefresh}
+    >
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <Text style={styles.subtitle}>
           {isAdmin ? 'Gerencie os cargos disponíveis para os membros' : 'Visualize os cargos disponíveis'}
         </Text>
 
         {isAdmin && (
-          <View style={styles.card}>
+          <GlassCard opacity={0.4} blurIntensity={20} borderRadius={20} style={styles.card}>
             <View style={styles.cardHeader}>
-              <Ionicons name="shield" size={20} color="#3366FF" />
+              <Ionicons name="shield" size={20} color={colors.gradients.primary[1]} />
               <Text style={styles.cardTitle}>Criar Novo Cargo</Text>
             </View>
             <View style={styles.form}>
-              <Text style={styles.label}>Nome do Cargo</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Ex: Diácono, Músico, etc."
+              <TextInputField
+                fieldKey="newPositionName"
+                label="Nome do Cargo"
                 value={newPositionName}
                 onChangeText={setNewPositionName}
-                onSubmitEditing={handleCreate}
+                placeholder="Ex: Diácono, Músico, etc."
               />
               <TouchableOpacity
-                style={[styles.button, saving && styles.buttonDisabled]}
+                style={styles.button}
                 onPress={handleCreate}
                 disabled={saving}
+                activeOpacity={0.8}
               >
-                <Ionicons name="add-circle" size={20} color="#fff" />
-                <Text style={styles.buttonText}>{saving ? 'Criando...' : 'Criar Cargo'}</Text>
+                <LinearGradient
+                  colors={saving ? ['#94A3B8', '#94A3B8'] : colors.gradients.primary as [string, string]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.buttonGradient}
+                >
+                  <Ionicons name="add-circle" size={20} color="#fff" />
+                  <Text style={styles.buttonText}>{saving ? 'Criando...' : 'Criar Cargo'}</Text>
+                </LinearGradient>
               </TouchableOpacity>
             </View>
-          </View>
+          </GlassCard>
         )}
 
         {!isAdmin && (
-          <View style={styles.card}>
+          <GlassCard opacity={0.4} blurIntensity={20} borderRadius={20} style={styles.card}>
             <Text style={styles.infoText}>Apenas administradores podem gerenciar cargos.</Text>
-          </View>
+          </GlassCard>
         )}
 
-        <View style={styles.card}>
+        <GlassCard opacity={0.4} blurIntensity={20} borderRadius={20} style={styles.card}>
           <Text style={styles.cardTitle}>Cargos Existentes</Text>
           {positions.length === 0 ? (
             <Text style={styles.emptyText}>Nenhum cargo cadastrado ainda.</Text>
           ) : (
             <View style={styles.positionsList}>
               {positions.map((position) => (
-                <View key={position.id} style={styles.positionItem}>
+                <GlassCard key={position.id} opacity={0.35} blurIntensity={20} borderRadius={16} style={styles.positionItem}>
                   <View style={styles.positionInfo}>
                     {editingId === position.id ? (
                       <View style={styles.editContainer}>
@@ -248,108 +260,104 @@ export default function PositionsScreen() {
                       </TouchableOpacity>
                     </View>
                   )}
-                </View>
+                </GlassCard>
               ))}
             </View>
           )}
-        </View>
+        </GlassCard>
       </ScrollView>
-    </View>
+    </ViewScreenLayout>
   )
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   scrollContent: {
     padding: 16,
+    paddingBottom: 100,
   },
   subtitle: {
     fontSize: 14,
-    color: '#6b7280',
+    fontWeight: '400',
+    lineHeight: 20,
+    color: '#475569',
     marginBottom: 16,
   },
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 16,
+    padding: 20,
     marginBottom: 16,
   },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 16,
-    gap: 8,
+    gap: 12,
   },
   cardTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#111827',
+    lineHeight: 24,
+    color: '#0F172A',
   },
   form: {
     gap: 12,
   },
   label: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#374151',
-    marginBottom: 4,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    padding: 12,
-    backgroundColor: '#fff',
     fontSize: 16,
+    fontWeight: '600',
+    lineHeight: 24,
+    color: '#0F172A',
+    marginBottom: 4,
   },
   editInput: {
     flex: 1,
     borderWidth: 1,
-    borderColor: '#2563eb',
-    borderRadius: 6,
-    padding: 8,
+    borderColor: colors.gradients.primary[1],
+    borderRadius: 12,
+    padding: 12,
     fontSize: 16,
+    fontWeight: '400',
+    backgroundColor: colors.glass.overlay,
+    color: colors.text.primary,
   },
   button: {
+    borderRadius: 18,
+    overflow: 'hidden',
+    marginTop: 8,
+  },
+  buttonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#3366FF',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
     gap: 8,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
+    minHeight: 56,
   },
   buttonText: {
-    color: '#fff',
-    fontWeight: '600',
+    color: '#FFFFFF',
     fontSize: 16,
+    fontWeight: '600',
+    lineHeight: 24,
   },
   infoText: {
     fontSize: 14,
-    color: '#6b7280',
+    fontWeight: '400',
+    lineHeight: 20,
+    color: '#475569',
     textAlign: 'center',
     padding: 16,
   },
   emptyText: {
     fontSize: 14,
-    color: '#9ca3af',
+    fontWeight: '400',
+    lineHeight: 20,
+    color: '#64748B',
     textAlign: 'center',
     padding: 16,
   },
   positionsList: {
     gap: 12,
+    marginTop: 12,
   },
   positionItem: {
     flexDirection: 'row',
@@ -357,9 +365,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 8,
-    backgroundColor: '#fff',
+    borderColor: colors.glass.border,
   },
   positionInfo: {
     flex: 1,
@@ -373,25 +379,31 @@ const styles = StyleSheet.create({
   positionName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#111827',
+    lineHeight: 24,
+    color: '#0F172A',
   },
   defaultBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#dbeafe',
-    paddingHorizontal: 8,
+    backgroundColor: colors.gradients.primary[0],
+    paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 4,
+    borderRadius: 12,
     gap: 4,
+    borderWidth: 1,
+    borderColor: colors.glass.border,
   },
   defaultBadgeText: {
     fontSize: 12,
-    color: '#2563eb',
     fontWeight: '600',
+    lineHeight: 18,
+    color: colors.gradients.primary[1],
   },
   memberCount: {
     fontSize: 14,
-    color: '#6b7280',
+    fontWeight: '400',
+    lineHeight: 20,
+    color: '#475569',
     marginTop: 4,
   },
   positionActions: {

@@ -1,7 +1,11 @@
 import React, { useState } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, Modal, Platform } from 'react-native'
+import { LinearGradient } from 'expo-linear-gradient'
 import DateTimePicker from '@react-native-community/datetimepicker'
 import { format } from 'date-fns'
+import GlassCard from './GlassCard'
+import { colors } from '../theme/colors'
+import { typography } from '../theme/typography'
 
 interface TimePickerProps {
   value?: string // Formato HH:mm
@@ -45,7 +49,7 @@ export default function TimePicker({ value, onChange, placeholder = 'Selecionar 
 
   if (Platform.OS === 'android') {
     return (
-      <View>
+      <View style={styles.inputWrapper}>
         <TouchableOpacity style={styles.input} onPress={() => setShowPicker(true)}>
           <Text style={[styles.inputText, !value && styles.placeholderText]}>{displayValue}</Text>
         </TouchableOpacity>
@@ -56,6 +60,8 @@ export default function TimePicker({ value, onChange, placeholder = 'Selecionar 
             is24Hour={true}
             display="default"
             onChange={handleConfirm}
+            textColor={colors.text.primary}
+            themeVariant="light"
           />
         )}
       </View>
@@ -64,7 +70,7 @@ export default function TimePicker({ value, onChange, placeholder = 'Selecionar 
 
   // iOS
   return (
-    <View>
+    <View style={styles.inputWrapper}>
       <TouchableOpacity style={styles.input} onPress={() => setShowPicker(true)}>
         <Text style={[styles.inputText, !value && styles.placeholderText]}>{displayValue}</Text>
       </TouchableOpacity>
@@ -75,29 +81,33 @@ export default function TimePicker({ value, onChange, placeholder = 'Selecionar 
         onRequestClose={() => setShowPicker(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <GlassCard opacity={0.45} blurIntensity={25} borderRadius={20} style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <TouchableOpacity onPress={() => setShowPicker(false)}>
+              <TouchableOpacity onPress={() => setShowPicker(false)} activeOpacity={0.7}>
                 <Text style={styles.cancelButton}>Cancelar</Text>
               </TouchableOpacity>
               <Text style={styles.modalTitle}>Selecionar Horário</Text>
-              <TouchableOpacity onPress={handleIOSConfirm}>
+              <TouchableOpacity onPress={handleIOSConfirm} activeOpacity={0.7}>
                 <Text style={styles.confirmButton}>Confirmar</Text>
               </TouchableOpacity>
             </View>
-            <DateTimePicker
-              value={tempTime}
-              mode="time"
-              is24Hour={true}
-              display="spinner"
-              onChange={(event, selectedTime) => {
-                if (selectedTime) {
-                  setTempTime(selectedTime)
-                }
-              }}
-              style={styles.picker}
-            />
-          </View>
+            <View style={styles.pickerContainer}>
+              <DateTimePicker
+                value={tempTime}
+                mode="time"
+                is24Hour={true}
+                display="spinner"
+                onChange={(event, selectedTime) => {
+                  if (selectedTime) {
+                    setTempTime(selectedTime)
+                  }
+                }}
+                style={styles.picker}
+                textColor={colors.text.primary}
+                themeVariant="light"
+              />
+            </View>
+          </GlassCard>
         </View>
       </Modal>
     </View>
@@ -105,19 +115,36 @@ export default function TimePicker({ value, onChange, placeholder = 'Selecionar 
 }
 
 const styles = StyleSheet.create({
-  input: {
+  inputWrapper: {
+    width: '100%',
+    backgroundColor: colors.glass.background,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    padding: 12,
-    backgroundColor: '#fff',
+    borderColor: colors.glass.border,
+    ...colors.shadow.glassLight,
+    marginBottom: 0,
+    padding: 0,
+  },
+  input: {
+    borderWidth: 0,
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 0,
+    backgroundColor: 'transparent',
   },
   inputText: {
-    fontSize: 16,
-    color: '#333',
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.regular,
+    lineHeight: typography.lineHeight.normal * typography.fontSize.base,
+    color: colors.text.primary,
+    includeFontPadding: false,
   },
   placeholderText: {
-    color: '#999',
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.regular,
+    lineHeight: typography.lineHeight.normal * typography.fontSize.base,
+    color: colors.text.tertiary,
+    includeFontPadding: false,
   },
   modalOverlay: {
     flex: 1,
@@ -125,32 +152,46 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingBottom: 20,
+    padding: 24,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+    marginHorizontal: 0,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    maxHeight: '50%',
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    paddingBottom: 16,
+    marginBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: colors.glass.border,
   },
   modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
+    fontSize: typography.fontSize.xl,
+    fontWeight: typography.fontWeight.semiBold,
+    lineHeight: typography.lineHeight.normal * typography.fontSize.xl,
+    color: colors.text.primary,
   },
   cancelButton: {
-    fontSize: 16,
-    color: '#666',
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.medium,
+    lineHeight: typography.lineHeight.normal * typography.fontSize.base,
+    color: colors.text.secondary,
   },
   confirmButton: {
-    fontSize: 16,
-    color: '#3366FF',
-    fontWeight: '600',
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semiBold,
+    lineHeight: typography.lineHeight.normal * typography.fontSize.base,
+    color: colors.gradients.primary[1],
+  },
+  pickerContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.6)',
+    borderRadius: 16,
+    padding: 8,
   },
   picker: {
     width: '100%',

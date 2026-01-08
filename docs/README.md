@@ -13,6 +13,7 @@ Esta pasta consolida a documentação “pública” do repositório: **API HTTP
 - **Mobile (Expo/React Native)**
   - `docs/mobile-api.md`: `axios` client, store e módulos de API
   - `docs/mobile-components.md`: componentes em `mobile/src/components`
+  - `docs/mobile-layouts.md`: layouts padronizados (ViewScreenLayout, DetailScreenLayout, FormScreenLayout)
 - **Web Admin (Vite/React)**
   - `docs/web-admin.md`: API admin, store, utilitários e componentes principais
 

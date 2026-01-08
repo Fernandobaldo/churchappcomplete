@@ -122,11 +122,6 @@ export default function TransactionDetails() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Título</label>
-            <p data-testid="transaction-title" className="text-gray-900 font-medium">{transaction.title}</p>
-          </div>
-
-          <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Valor</label>
             <p data-testid="transaction-amount" className={`text-2xl font-bold ${transaction.type === 'ENTRY' ? 'text-green-600' : 'text-red-600'}`}>
               {transaction.type === 'ENTRY' ? '+' : '-'}R${' '}
@@ -146,11 +141,6 @@ export default function TransactionDetails() {
             >
               {transaction.type === 'ENTRY' ? 'Entrada' : 'Saída'}
             </span>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
-            <p data-testid="transaction-category" className="text-gray-900">{transaction.category || 'Sem categoria'}</p>
           </div>
 
           {transaction.type === 'ENTRY' && transaction.entryType && (
@@ -238,7 +228,6 @@ export default function TransactionDetails() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Criado por</label>
               <p className="text-gray-900">{transaction.CreatedByUser.name}</p>
-              <p className="text-sm text-gray-600">{transaction.CreatedByUser.email}</p>
             </div>
           )}
         </div>

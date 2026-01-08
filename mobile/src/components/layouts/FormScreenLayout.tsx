@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   View,
   StyleSheet,
@@ -7,38 +7,64 @@ import {
   Platform,
   TouchableWithoutFeedback,
   Keyboard,
+  ViewStyle,
+  InteractionManager,
 } from 'react-native'
 import PageHeader, { PageHeaderProps } from '../PageHeader'
+import GlassBackground from '../GlassBackground'
 
 type FormScreenLayoutProps = {
   headerProps: PageHeaderProps
   children: React.ReactNode
   backgroundColor?: string
+  contentContainerStyle?: ViewStyle
+  backgroundImageUri?: string
 }
 
 export default function FormScreenLayout({
   headerProps,
   children,
-  backgroundColor = '#fff',
+  backgroundColor,
+  contentContainerStyle,
+  backgroundImageUri,
 }: FormScreenLayoutProps) {
+  const [isReady, setIsReady] = useState(false)
+
+  useEffect(() => {
+    const interaction = InteractionManager.runAfterInteractions(() => {
+      setIsReady(true)
+    })
+    return () => interaction.cancel()
+  }, [])
+
   return (
-    <View style={[styles.container, { backgroundColor }]}>
+    <GlassBackground
+      imageUri={backgroundImageUri}
+      overlayOpacity={0.35}
+      blurIntensity={15}
+      style={styles.container}
+    >
       <PageHeader {...headerProps} />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.keyboardView}
       >
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        {isReady ? (
           <ScrollView
-            contentContainerStyle={styles.scrollContent}
             style={styles.scrollView}
+            contentContainerStyle={[styles.scrollContent, contentContainerStyle]}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="none"
+            showsVerticalScrollIndicator={false}
+            nestedScrollEnabled
           >
             {children}
           </ScrollView>
-        </TouchableWithoutFeedback>
+        ) : (
+          <View style={styles.scrollView} />
+        )}
       </KeyboardAvoidingView>
-    </View>
+    </GlassBackground>
   )
 }
 
@@ -54,8 +80,8 @@ const styles = StyleSheet.create({
     marginTop: 110, // Altura do header fixo
   },
   scrollContent: {
-    flexGrow: 1,
-    paddingBottom: 20,
+    padding: 16, // Padding aumentado para sensação premium
+    paddingBottom: 40,
   },
 })
 

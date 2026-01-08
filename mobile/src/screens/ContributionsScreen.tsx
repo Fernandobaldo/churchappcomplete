@@ -1,33 +1,62 @@
-import React, { useCallback, useEffect, useState } from 'react'
-import {View, Text, TouchableOpacity, FlatList, StyleSheet, ActivityIndicator} from 'react-native'
+import React, { useCallback, useEffect, useState, useMemo } from 'react'
+import {View, Text, TouchableOpacity, FlatList, StyleSheet, ActivityIndicator, RefreshControl} from 'react-native'
+import { LinearGradient } from 'expo-linear-gradient'
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5'
 import { Ionicons } from '@expo/vector-icons'
 import api from '../api/api'
 import { useNavigation } from '@react-navigation/native'
 import { useAuthStore } from '../stores/authStore'
+import ViewScreenLayout from '../components/layouts/ViewScreenLayout'
+import GlassCard from '../components/GlassCard'
+import Tabs from '../components/Tabs'
+import { colors } from '../theme/colors'
+import { typography } from '../theme/typography'
+import { useBackToDashboard } from '../hooks/useBackToDashboard'
+import EmptyState from '../components/EmptyState'
 
 export default function ContributionsScreen() {
-    const [contributions, setContributions] = useState([])
+    const [allContributions, setAllContributions] = useState([])
+    const [tab, setTab] = useState<'ativas' | 'desativadas'>('ativas')
     const navigation = useNavigation()
     const user = useAuthStore((s) => s.user)
     const permissions = user?.permissions?.map((p) => p.type) || []
+    
+    // Intercepta gesto de voltar para navegar ao Dashboard quando não há página anterior
+    useBackToDashboard()
 
     const [loading, setLoading] = useState(true)
     const [refreshing, setRefreshing] = useState(false)
+    const [page, setPage] = useState(1)
+    const [loadingMore, setLoadingMore] = useState(false)
+    const ITEMS_PER_PAGE = 10
 
     const fetchContributions = useCallback(async () => {
         try {
             const res = await api.get('/contributions')
-            // Filtrar apenas contribuições ativas
-            const activeContributions = (res.data || []).filter((c: any) => c.isActive)
-            setContributions(activeContributions)
+            // Armazena todas as contribuições sem filtrar
+            setAllContributions(res.data || [])
         } catch (error) {
             console.error('Erro ao carregar contribuições:', error)
         }
     }, [])
 
+    // Filtra contribuições baseado na tab selecionada
+    const contributions = useMemo(() => {
+        return (allContributions || []).filter((c: any) => {
+            if (tab === 'ativas') {
+                // Contribuições ativas: isActive === true ou undefined/null (padrão do backend)
+                if (c.isActive === undefined || c.isActive === null) {
+                    return true
+                }
+                return c.isActive === true
+            } else {
+                // Contribuições desativadas: isActive === false explicitamente
+                return c.isActive === false
+            }
+        })
+    }, [allContributions, tab])
+
     useEffect(() => {
-        fetchContributions()
         const loadContributions = async () => {
             setLoading(true)
             await fetchContributions()
@@ -36,42 +65,123 @@ export default function ContributionsScreen() {
         loadContributions()
     }, [fetchContributions])
 
-    const handleRefresh = async () => {
+    // Quando a tab muda, reseta a paginação
+    useEffect(() => {
+        setPage(1)
+    }, [tab])
+
+    const handleRefresh = useCallback(async () => {
         setRefreshing(true)
+        setPage(1)
+        setLoadingMore(false)
         await fetchContributions()
         setRefreshing(false)
-    }
-
-    if (loading) {
-        return (
-            <View style={styles.centered}>
-                <ActivityIndicator size="large" color="#3366FF" />
-            </View>
-        )
-    }
+    }, [fetchContributions])
+    
+    // Paginação: mostra apenas os primeiros N itens
+    const paginatedContributions = useMemo(() => 
+        contributions.slice(0, page * ITEMS_PER_PAGE),
+        [contributions, page]
+    )
+    
+    const loadMore = useCallback(() => {
+        if (!loadingMore && paginatedContributions.length < contributions.length) {
+            setLoadingMore(true)
+            setTimeout(() => {
+                setPage(prev => prev + 1)
+                setLoadingMore(false)
+            }, 300)
+        }
+    }, [loadingMore, paginatedContributions.length, contributions.length])
 
     const canManageContributions =
         user.role === 'ADMINGERAL' ||
         user.role === 'ADMINFILIAL' ||
         user.permissions?.some((p: any) => p.type === 'contributions_manage')
 
+    if (loading) {
+        return (
+            <ViewScreenLayout
+                headerProps={{
+                    title: "Contribuir",
+                    Icon: FontAwesome5,
+                    iconName: "hand-holding-heart",
+                }}
+                scrollable={false}
+            >
+                <View style={styles.centered}>
+                    <ActivityIndicator size="large" color={colors.gradients.primary[1]} />
+                </View>
+            </ViewScreenLayout>
+        )
+    }
 
     return (
-        <View style={styles.container}>
-            <View style={styles.header}>
-                <FontAwesome5 name="hand-holding-heart" size={22} color="white" style={{ marginRight: 8 }} />
-                <Text style={styles.headerTitle}>Contribuir</Text>
-            </View>
-
+        <ViewScreenLayout
+            headerProps={{
+                title: "Contribuir",
+                Icon: FontAwesome5,
+                iconName: "hand-holding-heart",
+                rightButtonIcon: canManageContributions ? <Ionicons name="add" size={24} color="white" /> : undefined,
+                onRightButtonPress: canManageContributions ? () => navigation.navigate('AddContributions') : undefined,
+            }}
+            scrollable={false}
+            contentContainerStyle={styles.viewContent}
+        >
             <Text style={styles.subtitle}>Escolha abaixo as oportunidades para contribuir:</Text>
 
+            <Tabs
+                tabs={[
+                    { key: 'ativas', label: 'Ativas' },
+                    { key: 'desativadas', label: 'Desativadas' },
+                ]}
+                activeTab={tab}
+                onTabChange={(key) => setTab(key as 'ativas' | 'desativadas')}
+            />
+
             <FlatList
-                data={contributions}
+                data={paginatedContributions}
                 keyExtractor={(item) => item.id}
+                contentContainerStyle={styles.listContent}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={handleRefresh}
+                        colors={colors.gradients.primary}
+                        tintColor={colors.gradients.primary[1]}
+                    />
+                }
+                onEndReached={loadMore}
+                onEndReachedThreshold={0.5}
+                ListFooterComponent={
+                    loadingMore ? (
+                        <View style={styles.loadingMore}>
+                            <ActivityIndicator size="small" color={colors.gradients.primary[1]} />
+                        </View>
+                    ) : null
+                }
                 renderItem={({ item }) => (
-                    <View style={styles.card}>
+                    <GlassCard
+                        opacity={0.4}
+                        blurIntensity={20}
+                        borderRadius={20}
+                        style={styles.card}
+                    >
                         <View style={{ flex: 1 }}>
-                            <Text style={styles.title}>{item.title}</Text>
+                            <View style={styles.titleRow}>
+                                <Text style={styles.title}>{item.title}</Text>
+                                <View style={[
+                                    styles.statusBadge,
+                                    item.isActive !== false ? styles.statusBadgeActive : styles.statusBadgeInactive
+                                ]}>
+                                    <Text style={[
+                                        styles.statusText,
+                                        item.isActive !== false ? styles.statusTextActive : styles.statusTextInactive
+                                    ]}>
+                                        {item.isActive !== false ? 'Ativa' : 'Inativa'}
+                                    </Text>
+                                </View>
+                            </View>
                             {item.description && (
                                 <Text style={styles.description}>{item.description}</Text>
                             )}
@@ -86,111 +196,142 @@ export default function ContributionsScreen() {
                                 </Text>
                             )}
                         </View>
-                        <TouchableOpacity style={styles.contributeButton} onPress={() => navigation.navigate('ContributionDetail', { contribution: item })}>
-                            <Text style={styles.buttonText}>Contribuir</Text>
+                        <TouchableOpacity
+                            style={styles.contributeButton}
+                            onPress={() => navigation.navigate('ContributionDetail', { contribution: item })}
+                            activeOpacity={0.8}
+                        >
+                            <LinearGradient
+                                colors={colors.gradients.secondary as [string, string]}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 0 }}
+                                style={styles.contributeButtonGradient}
+                            >
+                                <Text style={styles.buttonText}>Contribuir</Text>
+                            </LinearGradient>
                         </TouchableOpacity>
-                    </View>
+                    </GlassCard>
                 )}
-                contentContainerStyle={{ paddingBottom: 80 }}
-                refreshing={refreshing}
-                onRefresh={handleRefresh}
                 ListEmptyComponent={
-                    <View style={styles.centered}>
-                        <Text style={styles.emptyText}>Nenhuma contribuição encontrada 🙏</Text>
-                    </View>
+                    <EmptyState
+                        icon="heart-outline"
+                        message="Nenhuma contribuição encontrada 🙏"
+                    />
                 }
-
             />
-
-            {canManageContributions && (
-                <TouchableOpacity style={styles.fab} onPress={() => navigation.navigate('AddContributions')}>
-                    <Ionicons name="add" size={24} color="white" />
-                    <Text style={styles.fabText}>Adicionar</Text>
-                </TouchableOpacity>
-            )}
-        </View>
+        </ViewScreenLayout>
     )
 }
 
 const styles = StyleSheet.create({
-    centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    emptyText: { fontSize: 16, color: '#666', marginBottom: 20, marginTop: 50 },
-    container: { flex: 1, backgroundColor: '#fff' },
-    header: {
-        backgroundColor: '#3366FF',
-        flexDirection: 'row',
+    centered: {
+        flex: 1,
+        justifyContent: 'center',
         alignItems: 'center',
-        paddingTop: 50,
-        paddingHorizontal: 20,
-        paddingBottom: 20,
     },
-    headerTitle: {
-        color: 'white',
-        fontSize: 18,
-        fontWeight: 'bold',
+    viewContent: {
+        flex: 1,
+        padding: 0,
+    },
+    listContent: {
+        padding: 16,
+        paddingBottom: 100,
+    },
+    loadingMore: {
+        paddingVertical: 16,
+        alignItems: 'center',
     },
     subtitle: {
         padding: 20,
-        color: '#444',
-        fontSize: 15,
+        paddingBottom: 12,
+        fontSize: 16,
+        fontWeight: '400',
+        lineHeight: 24,
+        color: colors.text.secondary,
     },
     card: {
-        backgroundColor: '#f9f9f9',
-        marginHorizontal: 20,
+        padding: 20,
         marginBottom: 16,
-        padding: 16,
-        borderRadius: 10,
         flexDirection: 'row',
         alignItems: 'center',
     },
+    titleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 8,
+        gap: 12,
+    },
     title: {
-        fontSize: 16,
-        fontWeight: 'bold',
+        fontSize: 20,
+        fontWeight: '600',
+        lineHeight: 28,
+        color: colors.text.primary,
+        flex: 1,
+    },
+    statusBadge: {
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 12,
+        borderWidth: 1,
+    },
+    statusBadgeActive: {
+        backgroundColor: 'rgba(34, 197, 94, 0.15)',
+        borderColor: colors.status.success,
+    },
+    statusBadgeInactive: {
+        backgroundColor: 'rgba(239, 68, 68, 0.15)',
+        borderColor: colors.status.error,
+    },
+    statusText: {
+        fontSize: 12,
+        fontWeight: '600',
+        lineHeight: 16,
+    },
+    statusTextActive: {
+        color: colors.status.success,
+    },
+    statusTextInactive: {
+        color: colors.status.error,
     },
     description: {
-        color: '#666',
+        fontSize: 14,
+        fontWeight: '400',
+        lineHeight: 20,
+        color: colors.text.secondary,
         marginTop: 4,
     },
     goalText: {
-        color: '#3366FF',
-        marginTop: 4,
+        fontSize: 14,
         fontWeight: '600',
+        lineHeight: 20,
+        color: colors.gradients.primary[1],
+        marginTop: 8,
     },
     raisedText: {
-        color: '#22c55e',
-        marginTop: 2,
+        fontSize: 14,
         fontWeight: '600',
+        lineHeight: 20,
+        color: colors.status.success,
+        marginTop: 4,
     },
     contributeButton: {
-        backgroundColor: '#D6E4FF',
-        paddingVertical: 8,
-        paddingHorizontal: 14,
-        borderRadius: 6,
         marginLeft: 12,
+        borderRadius: 16,
+        overflow: 'hidden',
+    },
+    contributeButtonGradient: {
+        width: '100%',
+        minHeight: 44,
+        paddingVertical: 12,
+        paddingHorizontal: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     buttonText: {
-        color: '#3366FF',
+        fontSize: 14,
         fontWeight: '600',
-    },
-    fab: {
-        position: 'absolute',
-        right: 20,
-        bottom: 20,
-        backgroundColor: '#3366FF',
-        paddingVertical: 12,
-        paddingHorizontal: 18,
-        borderRadius: 30,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        shadowColor: '#000',
-        shadowOpacity: 0.2,
-        shadowOffset: { width: 0, height: 2 },
-        shadowRadius: 4,
-        elevation: 6,
-    },
-    fabText: {
-        color: '#fff',
-        fontWeight: 'bold',
+        color: '#FFFFFF',
+        textAlign: 'center',
     },
 })

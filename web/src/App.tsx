@@ -19,6 +19,7 @@ import AddEvent from './pages/Events/AddEvent'
 import EditEvent from './pages/Events/EditEvent'
 import Contributions from './pages/Contributions'
 import AddContribution from './pages/Contributions/AddContribution'
+import EditContribution from './pages/Contributions/EditContribution'
 import ContributionDetails from './pages/Contributions/ContributionDetails'
 import Devotionals from './pages/Devotionals'
 import DevotionalDetails from './pages/Devotionals/DevotionalDetails'
@@ -125,6 +126,7 @@ function App() {
           <Route path="contributions" element={<Contributions />} />
           <Route path="contributions/new" element={<PermissionProtectedRoute permission="contributions_manage"><AddContribution /></PermissionProtectedRoute>} />
           <Route path="contributions/:id" element={<ContributionDetails />} />
+          <Route path="contributions/:id/edit" element={<PermissionProtectedRoute permission="contributions_manage"><EditContribution /></PermissionProtectedRoute>} />
           <Route path="devotionals" element={<Devotionals />} />
           <Route path="devotionals/new" element={<PermissionProtectedRoute permission="devotional_manage"><AddDevotional /></PermissionProtectedRoute>} />
           <Route path="devotionals/:id" element={<DevotionalDetails />} />

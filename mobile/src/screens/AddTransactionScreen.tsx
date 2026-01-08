@@ -1,23 +1,30 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import {
     View,
     Text,
     TextInput,
     Button,
     StyleSheet,
-    ScrollView,
     Switch,
     TouchableOpacity,
-    KeyboardAvoidingView,
-    Platform,
-    TouchableWithoutFeedback,
-    Keyboard,
     Alert,
+    ActivityIndicator,
+    Modal,
+    Platform,
 } from 'react-native'
+import { LinearGradient } from 'expo-linear-gradient'
 import ModalSelector from 'react-native-modal-selector'
+import DateTimePicker from '@react-native-community/datetimepicker'
+import { Ionicons } from '@expo/vector-icons'
 import api from '../api/api'
 import Toast from 'react-native-toast-message'
 import MemberSearch from '../components/MemberSearch'
+import FormScreenLayout from '../components/layouts/FormScreenLayout'
+import GlassCard from '../components/GlassCard'
+import TextInputField from '../components/TextInputField'
+import { colors } from '../theme/colors'
+import { format } from 'date-fns'
+import ptBR from 'date-fns/locale/pt-BR'
 
 interface Contribution {
   id: string
@@ -26,13 +33,14 @@ interface Contribution {
 }
 
 export default function AddTransactionScreen({ navigation }: any) {
-    const [title, setTitle] = useState('')
     const [amount, setAmount] = useState('')
     const [type, setType] = useState<'ENTRY' | 'EXIT'>('ENTRY')
     const [entryType, setEntryType] = useState<'OFERTA' | 'DIZIMO' | 'CONTRIBUICAO' | ''>('')
     const [exitType, setExitType] = useState<'ALUGUEL' | 'ENERGIA' | 'AGUA' | 'INTERNET' | 'OUTROS' | ''>('')
     const [exitTypeOther, setExitTypeOther] = useState('')
-    const [category, setCategory] = useState('')
+    const [date, setDate] = useState<Date | null>(null)
+    const [showDatePicker, setShowDatePicker] = useState(false)
+    const [tempDate, setTempDate] = useState(new Date())
     const [isTithePayerMember, setIsTithePayerMember] = useState(true)
     const [tithePayerMemberId, setTithePayerMemberId] = useState<string | null>(null)
     const [tithePayerName, setTithePayerName] = useState('')
@@ -62,9 +70,28 @@ export default function AddTransactionScreen({ navigation }: any) {
         }
     }
 
+    // Validação: verifica se todos os campos obrigatórios estão preenchidos
+    const isFormValid = useMemo(() => {
+        if (!amount) return false
+        
+        if (type === 'ENTRY' && !entryType) return false
+        if (type === 'EXIT' && !exitType) return false
+        
+        if (exitType === 'OUTROS' && !exitTypeOther.trim()) return false
+        
+        if (entryType === 'DIZIMO') {
+            if (isTithePayerMember && !tithePayerMemberId) return false
+            if (!isTithePayerMember && !tithePayerName.trim()) return false
+        }
+        
+        if (entryType === 'CONTRIBUICAO' && !contributionId) return false
+        
+        return true
+    }, [amount, type, entryType, exitType, exitTypeOther, isTithePayerMember, tithePayerMemberId, tithePayerName, contributionId])
+
     const handleSubmit = async () => {
-        if (!title || !amount) {
-            Alert.alert('Erro', 'Preencha título e valor')
+        if (!amount) {
+            Alert.alert('Erro', 'Preencha o valor')
             return
         }
 
@@ -102,10 +129,12 @@ export default function AddTransactionScreen({ navigation }: any) {
         setLoading(true)
         try {
             const payload: any = {
-                title,
                 amount: parseFloat(amount),
                 type,
-                category: category || undefined,
+            }
+
+            if (date) {
+                payload.date = date.toISOString()
             }
 
             if (type === 'ENTRY') {
@@ -175,35 +204,13 @@ export default function AddTransactionScreen({ navigation }: any) {
     }
 
     return (
-        <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            style={styles.container}
+        <FormScreenLayout
+            headerProps={{
+                title: "Nova Transação",
+                Icon: Ionicons,
+                iconName: "add-circle-outline",
+            }}
         >
-            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-                <ScrollView contentContainerStyle={styles.scrollContent}>
-                    <Text style={styles.label}>
-                        Título <Text style={styles.required}>*</Text>
-                    </Text>
-                    <TextInput
-                        style={styles.input}
-                        value={title}
-                        onChangeText={setTitle}
-                        placeholder="Ex: Pagamento de aluguel"
-                        placeholderTextColor="#999"
-                    />
-
-                    <Text style={styles.label}>
-                        Valor <Text style={styles.required}>*</Text>
-                    </Text>
-                    <TextInput
-                        style={styles.input}
-                        keyboardType="numeric"
-                        value={amount}
-                        onChangeText={setAmount}
-                        placeholder="R$ 0,00"
-                        placeholderTextColor="#999"
-                    />
-
                     <Text style={styles.label}>
                         Tipo <Text style={styles.required}>*</Text>
                     </Text>
@@ -226,7 +233,7 @@ export default function AddTransactionScreen({ navigation }: any) {
                         </TouchableOpacity>
                     </View>
 
-                    {type === 'ENTRY' && (
+                            {type === 'ENTRY' && (
                         <>
                             <Text style={styles.label}>
                                 Tipo de Entrada <Text style={styles.required}>*</Text>
@@ -247,6 +254,29 @@ export default function AddTransactionScreen({ navigation }: any) {
                                     value={entryType === 'OFERTA' ? 'Ofertas' : entryType === 'DIZIMO' ? 'Dízimo' : entryType === 'CONTRIBUICAO' ? 'Contribuição' : ''}
                                 />
                             </ModalSelector>
+
+                            <TextInputField
+                                fieldKey="amount"
+                                label="Valor"
+                                value={amount}
+                                onChangeText={setAmount}
+                                placeholder="R$ 0,00"
+                                keyboardType="numeric"
+                                required
+                            />
+
+                            <Text style={styles.label}>Data</Text>
+                            <TouchableOpacity
+                                style={styles.input}
+                                onPress={() => {
+                                    setTempDate(date || new Date())
+                                    setShowDatePicker(true)
+                                }}
+                            >
+                                <Text style={[styles.dateText, !date && styles.datePlaceholder]}>
+                                    {date ? format(date, "dd/MM/yyyy", { locale: ptBR }) : 'Selecione a data (opcional)'}
+                                </Text>
+                            </TouchableOpacity>
 
                             {entryType === 'CONTRIBUICAO' && (
                                 <>
@@ -339,14 +369,13 @@ export default function AddTransactionScreen({ navigation }: any) {
                                         </>
                                     ) : (
                                         <>
-                                            <Text style={styles.label}>
-                                                Nome do Dizimista <Text style={styles.required}>*</Text>
-                                            </Text>
-                                            <TextInput
-                                                style={styles.input}
+                                            <TextInputField
+                                                fieldKey="tithePayerName"
+                                                label="Nome do Dizimista"
                                                 value={tithePayerName}
                                                 onChangeText={setTithePayerName}
                                                 placeholder="Digite o nome do dizimista"
+                                                required
                                             />
                                         </>
                                     )}
@@ -385,55 +414,133 @@ export default function AddTransactionScreen({ navigation }: any) {
                                 />
                             </ModalSelector>
 
+                            <TextInputField
+                                fieldKey="amount"
+                                label="Valor"
+                                value={amount}
+                                onChangeText={setAmount}
+                                placeholder="R$ 0,00"
+                                keyboardType="numeric"
+                                required
+                            />
+
+                            <Text style={styles.label}>Data</Text>
+                            <TouchableOpacity
+                                style={styles.input}
+                                onPress={() => {
+                                    setTempDate(date || new Date())
+                                    setShowDatePicker(true)
+                                }}
+                            >
+                                <Text style={[styles.dateText, !date && styles.datePlaceholder]}>
+                                    {date ? format(date, "dd/MM/yyyy", { locale: ptBR }) : 'Selecione a data (opcional)'}
+                                </Text>
+                            </TouchableOpacity>
+
                             {exitType === 'OUTROS' && (
                                 <>
-                                    <Text style={styles.label}>
-                                        Descrição <Text style={styles.required}>*</Text>
-                                    </Text>
-                                    <TextInput
-                                        style={styles.input}
+                                    <TextInputField
+                                        fieldKey="exitTypeOther"
+                                        label="Descrição"
                                         value={exitTypeOther}
                                         onChangeText={setExitTypeOther}
                                         placeholder="Digite a descrição do tipo de saída"
+                                        required
                                     />
                                 </>
                             )}
                         </>
                     )}
 
-                    <Text style={styles.label}>Categoria</Text>
-                    <TextInput
-                        style={styles.input}
-                        value={category}
-                        onChangeText={setCategory}
-                        placeholder="Ex: Aluguel, Salário, Material, etc."
-                        placeholderTextColor="#999"
-                    />
-                    <Text style={styles.hint}>Opcional - Categoria da transação</Text>
+                    <Modal
+                        visible={showDatePicker}
+                        transparent
+                        animationType="slide"
+                    >
+                        <View style={styles.modalOverlay}>
+                            <GlassCard opacity={0.45} blurIntensity={25} borderRadius={20} style={styles.modalContent}>
+                                <View style={styles.datePickerContainer}>
+                                    <DateTimePicker
+                                        value={tempDate}
+                                        mode="date"
+                                        display="spinner"
+                                        onChange={(event, selectedDate) => {
+                                            if (selectedDate) {
+                                                setTempDate(selectedDate)
+                                            }
+                                        }}
+                                        style={styles.datePicker}
+                                        textColor={colors.text.primary}
+                                        themeVariant="light"
+                                    />
+                                </View>
+                                <View style={styles.modalButtons}>
+                                    <TouchableOpacity
+                                        style={styles.modalCancelButton}
+                                        onPress={() => {
+                                            setShowDatePicker(false)
+                                            setDate(null)
+                                        }}
+                                    >
+                                        <Text style={styles.modalCancelText}>Remover</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={styles.modalCancelButton}
+                                        onPress={() => setShowDatePicker(false)}
+                                    >
+                                        <Text style={styles.modalCancelText}>Cancelar</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={styles.modalSaveButton}
+                                        onPress={() => {
+                                            setDate(tempDate)
+                                            setShowDatePicker(false)
+                                        }}
+                                    >
+                                        <LinearGradient
+                                            colors={colors.gradients.primary as [string, string]}
+                                            start={{ x: 0, y: 0 }}
+                                            end={{ x: 1, y: 1 }}
+                                            style={styles.modalSaveButtonGradient}
+                                        >
+                                            <Text style={styles.modalSaveText}>Confirmar</Text>
+                                        </LinearGradient>
+                                    </TouchableOpacity>
+                                </View>
+                            </GlassCard>
+                        </View>
+                    </Modal>
 
                     <TouchableOpacity
-                        style={[styles.submitButton, loading && styles.submitButtonDisabled]}
+                        style={styles.submitButton}
                         onPress={handleSubmit}
-                        disabled={loading}
+                        disabled={loading || !isFormValid}
+                        activeOpacity={0.8}
                     >
-                        <Text style={styles.submitButtonText}>
-                            {loading ? 'Salvando...' : 'Salvar Transação'}
-                        </Text>
+                        <LinearGradient
+                            colors={
+                                isFormValid && !loading
+                                    ? colors.gradients.primary as [string, string]
+                                    : ['#94A3B8', '#94A3B8'] // Cinza quando desativado
+                            }
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={styles.submitButtonGradient}
+                        >
+                            {loading ? (
+                                <ActivityIndicator color="#fff" />
+                            ) : (
+                                <Text style={styles.submitButtonText}>
+                                    Salvar Transação
+                                </Text>
+                            )}
+                        </LinearGradient>
                     </TouchableOpacity>
-                </ScrollView>
-            </TouchableWithoutFeedback>
-        </KeyboardAvoidingView>
+        </FormScreenLayout>
     )
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#fff',
-    },
-    scrollContent: {
-        padding: 20,
-    },
     label: {
         fontSize: 16,
         fontWeight: '600',
@@ -493,16 +600,75 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     submitButton: {
-        backgroundColor: '#4F46E5',
-        padding: 16,
-        borderRadius: 8,
-        alignItems: 'center',
-        marginTop: 8,
+        borderRadius: 18,
+        overflow: 'hidden',
+        marginTop: 20,
     },
-    submitButtonDisabled: {
-        backgroundColor: '#999',
+    submitButtonGradient: {
+        padding: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: 56,
     },
     submitButtonText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '600',
+        lineHeight: 24,
+    },
+    dateText: {
+        fontSize: 16,
+        color: '#333',
+    },
+    datePlaceholder: {
+        color: '#999',
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    modalContent: {
+        width: '90%',
+        maxWidth: 400,
+        padding: 20,
+    },
+    datePickerContainer: {
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+    datePicker: {
+        width: '100%',
+    },
+    modalButtons: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        gap: 10,
+    },
+    modalCancelButton: {
+        flex: 1,
+        padding: 12,
+        borderRadius: 8,
+        backgroundColor: '#f5f5f5',
+        alignItems: 'center',
+    },
+    modalCancelText: {
+        color: '#666',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    modalSaveButton: {
+        flex: 1,
+        borderRadius: 8,
+        overflow: 'hidden',
+    },
+    modalSaveButtonGradient: {
+        padding: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    modalSaveText: {
         color: '#fff',
         fontSize: 16,
         fontWeight: '600',

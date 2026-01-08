@@ -100,11 +100,12 @@ export default function ChurchScreen() {
         // @ts-ignore
         navigation.navigate('SettingsOnboarding')
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const apiError = error as { response?: { data?: { message?: string } } }
       Toast.show({
         type: 'error',
         text1: 'Erro ao salvar igreja',
-        text2: error.response?.data?.message || 'Tente novamente',
+        text2: apiError.response?.data?.message || 'Tente novamente',
       })
     } finally {
       setLoading(false)

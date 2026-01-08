@@ -1,21 +1,19 @@
-import React, { useEffect, useState } from 'react'
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert, Image } from 'react-native'
-import { useNavigation } from '@react-navigation/native'
+import React, { useEffect, useState, useCallback } from 'react'
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Image } from 'react-native'
+import { useNavigation, useFocusEffect } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import api from '../api/api'
 import { useAuthStore } from '../stores/authStore'
 import { hasAccess } from '../utils/authUtils'
 import { serviceScheduleApi, ServiceSchedule } from '../api/serviceScheduleApi'
+import ServiceScheduleList from '../components/ServiceScheduleList'
 import Toast from 'react-native-toast-message'
-import PageHeader from '../components/PageHeader'
-
-interface Church {
-  id: string
-  name: string
-  logoUrl?: string
-  avatarUrl?: string | null
-}
+import ViewScreenLayout from '../components/layouts/ViewScreenLayout'
+import { Church } from '../types'
+import { colors } from '../theme/colors'
+import GlassCard from '../components/GlassCard'
+import TextInputField from '../components/TextInputField'
 
 export default function ChurchSettingsScreen() {
   const navigation = useNavigation()
@@ -29,8 +27,21 @@ export default function ChurchSettingsScreen() {
   const [avatarUri, setAvatarUri] = useState<string | null>(null)
   const [currentAvatarUrl, setCurrentAvatarUrl] = useState<string | null>(null)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  const [schedulesExpanded, setSchedulesExpanded] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
 
   const canManageChurch = hasAccess(user, 'church_manage')
+
+  const fetchSchedules = useCallback(async () => {
+    if (!user?.branchId) return
+
+    try {
+      const data = await serviceScheduleApi.getByBranch(user.branchId)
+      setSchedules(data)
+    } catch (error: unknown) {
+      console.error('Erro ao carregar horários:', error)
+    }
+  }, [user?.branchId])
 
   useEffect(() => {
     if (!canManageChurch) {
@@ -41,9 +52,9 @@ export default function ChurchSettingsScreen() {
 
     fetchChurchData()
     fetchSchedules()
-  }, [canManageChurch, user?.branchId])
+  }, [canManageChurch, user?.branchId, navigation, fetchSchedules])
 
-  const fetchChurchData = async () => {
+  const fetchChurchData = useCallback(async () => {
     try {
       if (!user?.branchId) {
         Toast.show({ type: 'error', text1: 'Usuário não está associado a uma filial.' })
@@ -75,24 +86,31 @@ export default function ChurchSettingsScreen() {
         setLogoUrl(userChurch.logoUrl || '')
         setCurrentAvatarUrl(userChurch.avatarUrl || null)
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao carregar dados da igreja:', error)
       Toast.show({ type: 'error', text1: 'Erro ao carregar dados da igreja' })
     } finally {
       setLoading(false)
     }
-  }
+  }, [user?.branchId])
 
-  const fetchSchedules = async () => {
-    if (!user?.branchId) return
+  // Recarrega dados quando a tela recebe foco (após editar/criar horário)
+  useFocusEffect(
+    useCallback(() => {
+      if (canManageChurch) {
+        fetchSchedules()
+      }
+    }, [canManageChurch, fetchSchedules])
+  )
 
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true)
     try {
-      const data = await serviceScheduleApi.getByBranch(user.branchId)
-      setSchedules(data)
-    } catch (error: any) {
-      console.error('Erro ao carregar horários:', error)
+      await Promise.all([fetchChurchData(), fetchSchedules()])
+    } finally {
+      setRefreshing(false)
     }
-  }
+  }, [fetchChurchData, fetchSchedules])
 
   const handlePickImage = async () => {
     try {
@@ -147,7 +165,7 @@ export default function ChurchSettingsScreen() {
         uri: avatarUri,
         name: filename,
         type,
-      } as any)
+      } as unknown as Blob)
 
       const response = await api.post('/upload/church-avatar', formData, {
         headers: {
@@ -156,16 +174,17 @@ export default function ChurchSettingsScreen() {
       })
 
       return response.data.url
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao fazer upload do avatar:', error)
-      Toast.show({ type: 'error', text1: error.response?.data?.error || 'Erro ao fazer upload do avatar' })
+      const apiError = error as { response?: { data?: { error?: string } } }
+      Toast.show({ type: 'error', text1: apiError.response?.data?.error || 'Erro ao fazer upload do avatar' })
       throw error
     } finally {
       setUploadingAvatar(false)
     }
   }
 
-  const handleSaveChurch = async () => {
+  const handleSaveChurch = useCallback(async () => {
     if (!church) return
 
     setSaving(true)
@@ -196,130 +215,33 @@ export default function ChurchSettingsScreen() {
       Toast.show({ type: 'success', text1: 'Configurações atualizadas com sucesso!' })
       setAvatarUri(null)
       fetchChurchData()
-    } catch (error: any) {
-      Toast.show({ type: 'error', text1: error.response?.data?.message || 'Erro ao atualizar configurações' })
+    } catch (error: unknown) {
+      const apiError = error as { response?: { data?: { message?: string } } }
+      Toast.show({ type: 'error', text1: apiError.response?.data?.message || 'Erro ao atualizar configurações' })
     } finally {
       setSaving(false)
     }
-  }
+  }, [church, avatarUri, currentAvatarUrl, churchName, logoUrl, fetchChurchData])
 
-  const handleSetDefault = async (id: string) => {
-    try {
-      await serviceScheduleApi.setDefault(id)
-      Toast.show({ type: 'success', text1: 'Horário definido como padrão!' })
-      fetchSchedules()
-    } catch (error: any) {
-      Toast.show({ type: 'error', text1: error.response?.data?.message || 'Erro ao definir horário como padrão' })
-    }
-  }
+  const handleEditSchedule = useCallback((schedule: ServiceSchedule) => {
+    (navigation as any).navigate('ServiceScheduleForm', { schedule })
+  }, [navigation])
 
-  const handleCreateEvents = (schedule: ServiceSchedule) => {
-    Alert.alert(
-      'Criar Eventos',
-      `Criar eventos a partir do horário "${schedule.title}"?`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Criar',
-          onPress: async () => {
-            try {
-              const result = await serviceScheduleApi.createEvents(schedule.id)
-              Toast.show({
-                type: 'success',
-                text1: `${result.created} eventos criados com sucesso!`,
-              })
-              fetchSchedules()
-            } catch (error: any) {
-              Toast.show({ type: 'error', text1: error.response?.data?.message || 'Erro ao criar eventos' })
-            }
-          },
-        },
-      ]
-    )
-  }
-
-  const handleDeleteSchedule = async (id: string) => {
-    try {
-      // Conta eventos relacionados antes de mostrar a confirmação
-      const { count, scheduleTitle } = await serviceScheduleApi.getRelatedEventsCount(id)
-      
-      let message = `Tem certeza que deseja deletar o horário "${scheduleTitle}"?`
-      if (count > 0) {
-        message += `\n\n⚠️ ATENÇÃO: Ao deletar este horário de culto, ${count} evento(s) criado(s) a partir dele também serão deletados.`
-      }
-      
-      Alert.alert('Confirmar Deleção', message, [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Deletar',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              // Se houver eventos, pergunta se deve deletá-los também
-              let deleteEvents = false
-              if (count > 0) {
-                Alert.alert(
-                  'Deletar Eventos?',
-                  `Deseja deletar os ${count} evento(s) relacionados junto com o horário?`,
-                  [
-                    { text: 'Cancelar', style: 'cancel' },
-                    {
-                      text: 'Deletar apenas o horário',
-                      onPress: async () => {
-                        try {
-                          const result = await serviceScheduleApi.delete(id, false)
-                          Toast.show({ 
-                            type: 'success', 
-                            text1: 'Horário deletado com sucesso!',
-                            text2: `${result.relatedEventsCount} evento(s) permaneceram no calendário.`
-                          })
-                          fetchSchedules()
-                        } catch (error: any) {
-                          Toast.show({ type: 'error', text1: error.response?.data?.message || 'Erro ao deletar horário' })
-                        }
-                      },
-                    },
-                    {
-                      text: 'Deletar horário e eventos',
-                      style: 'destructive',
-                      onPress: async () => {
-                        try {
-                          const result = await serviceScheduleApi.delete(id, true)
-                          let successMessage = 'Horário deletado com sucesso!'
-                          if (result.deletedEventsCount > 0) {
-                            successMessage += ` ${result.deletedEventsCount} evento(s) também foram deletado(s).`
-                          }
-                          Toast.show({ type: 'success', text1: successMessage })
-                          fetchSchedules()
-                        } catch (error: any) {
-                          Toast.show({ type: 'error', text1: error.response?.data?.message || 'Erro ao deletar horário' })
-                        }
-                      },
-                    },
-                  ]
-                )
-              } else {
-                // Não há eventos, pode deletar diretamente
-                await serviceScheduleApi.delete(id, false)
-                Toast.show({ type: 'success', text1: 'Horário deletado com sucesso!' })
-                fetchSchedules()
-              }
-            } catch (error: any) {
-              Toast.show({ type: 'error', text1: error.response?.data?.message || 'Erro ao deletar horário' })
-            }
-          },
-        },
-      ])
-    } catch (error: any) {
-      Toast.show({ type: 'error', text1: 'Erro ao verificar eventos relacionados' })
-    }
-  }
+  const handleDeleteSchedule = useCallback(async (id: string, deleteEvents: boolean) => {
+    await fetchSchedules()
+  }, [fetchSchedules])
 
   if (loading) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#3366FF" />
-      </View>
+      <ViewScreenLayout
+        headerProps={{ title: "Configurações da Igreja" }}
+        refreshing={refreshing}
+        onRefresh={handleRefresh}
+      >
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color={colors.gradients.primary[1]} />
+        </View>
+      </ViewScreenLayout>
     )
   }
 
@@ -327,17 +249,17 @@ export default function ChurchSettingsScreen() {
     return null
   }
 
-  const DAYS_OF_WEEK = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
-
   return (
-    <View style={styles.container}>
-      <PageHeader title="Configurações da Igreja" />
-      <ScrollView style={styles.scrollView}>
-        <View style={styles.section}>
+      <ViewScreenLayout
+      headerProps={{ title: "Configurações da Igreja" }}
+      refreshing={refreshing}
+      onRefresh={handleRefresh}
+    >
+        <GlassCard opacity={0.4} blurIntensity={20} borderRadius={20} style={styles.section}>
           <Text style={styles.sectionTitle}>Informações da Igreja</Text>
           
           {/* Avatar Section */}
-          <View style={styles.avatarSection}>
+          <GlassCard opacity={0.4} blurIntensity={20} borderRadius={20} style={styles.avatarSection}>
             <View style={styles.avatarContainer}>
               {(avatarUri || currentAvatarUrl) ? (
                 <View style={styles.avatarPreview}>
@@ -349,12 +271,12 @@ export default function ChurchSettingsScreen() {
                     style={styles.removeAvatarButton}
                     onPress={handleRemoveAvatar}
                   >
-                    <Ionicons name="close-circle" size={24} color="#dc2626" />
+                    <Ionicons name="close-circle" size={24} color={colors.status.error} />
                   </TouchableOpacity>
                 </View>
               ) : (
                 <View style={styles.avatarPlaceholder}>
-                  <Ionicons name="church" size={32} color="#3366FF" />
+                  <Ionicons name="business-outline" size={32} color={colors.gradients.primary[1]} />
                 </View>
               )}
             </View>
@@ -363,7 +285,7 @@ export default function ChurchSettingsScreen() {
               onPress={handlePickImage}
               disabled={uploadingAvatar}
             >
-              <Ionicons name="camera-outline" size={20} color="#3366FF" />
+              <Ionicons name="camera-outline" size={20} color={colors.gradients.primary[1]} />
               <Text style={styles.avatarButtonText}>
                 {avatarUri || currentAvatarUrl ? 'Alterar Avatar' : 'Selecionar Avatar'}
               </Text>
@@ -371,19 +293,21 @@ export default function ChurchSettingsScreen() {
             <Text style={styles.avatarHint}>
               O avatar da igreja será usado como padrão para todos os membros que não tiverem avatar próprio.
             </Text>
-          </View>
+          </GlassCard>
 
-          <TextInput
-            style={styles.input}
-            placeholder="Nome da Igreja"
+          <TextInputField
+            fieldKey="churchName"
+            label="Nome da Igreja"
             value={churchName}
             onChangeText={setChurchName}
+            placeholder="Nome da Igreja"
           />
-          <TextInput
-            style={styles.input}
-            placeholder="URL do Logo (opcional)"
+          <TextInputField
+            fieldKey="logoUrl"
+            label="URL do Logo (opcional)"
             value={logoUrl}
             onChangeText={setLogoUrl}
+            placeholder="URL do Logo (opcional)"
             keyboardType="url"
           />
           <TouchableOpacity
@@ -395,128 +319,97 @@ export default function ChurchSettingsScreen() {
               {(saving || uploadingAvatar) ? 'Salvando...' : 'Salvar Alterações'}
             </Text>
           </TouchableOpacity>
-        </View>
+        </GlassCard>
 
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
+        <GlassCard opacity={0.4} blurIntensity={20} borderRadius={20} style={styles.section}>
+          <TouchableOpacity
+            style={[styles.sectionHeader, schedulesExpanded && styles.sectionHeaderExpanded]}
+            onPress={() => setSchedulesExpanded(!schedulesExpanded)}
+            activeOpacity={0.7}
+          >
             <Text style={styles.sectionTitle}>Horários de Culto</Text>
-            <TouchableOpacity
-              onPress={() => navigation.navigate('ServiceScheduleForm' as never, { schedule: null })}
-              style={styles.addButton}
-            >
-              <Ionicons name="add-circle" size={24} color="#3366FF" />
-            </TouchableOpacity>
-          </View>
+            <Ionicons
+              name={schedulesExpanded ? 'chevron-up' : 'chevron-down'}
+              size={24}
+              color={colors.gradients.primary[1]}
+            />
+          </TouchableOpacity>
 
-          {schedules.length === 0 ? (
-            <Text style={styles.emptyText}>Nenhum horário cadastrado.</Text>
-          ) : (
-            schedules.map((schedule) => (
-              <View key={schedule.id} style={styles.scheduleCard}>
-                <View style={styles.scheduleHeader}>
-                  <Text style={styles.scheduleTitle}>{schedule.title}</Text>
-                  {schedule.isDefault && (
-                    <View style={styles.defaultBadge}>
-                      <Ionicons name="star" size={16} color="#FFD700" />
-                      <Text style={styles.defaultText}>Padrão</Text>
-                    </View>
-                  )}
-                </View>
-                <Text style={styles.scheduleInfo}>
-                  {DAYS_OF_WEEK[schedule.dayOfWeek]} às {schedule.time}
-                </Text>
-                {schedule.location && <Text style={styles.scheduleInfo}>{schedule.location}</Text>}
-                {schedule.autoCreateEvents && (
-                  <Text style={styles.scheduleInfo}>
-                    Auto-criar eventos ({schedule.autoCreateDaysAhead || 90} dias)
-                  </Text>
-                )}
-                {schedule.description && (
-                  <Text style={styles.scheduleDescription}>{schedule.description}</Text>
-                )}
-                <View style={styles.scheduleActions}>
-                  {!schedule.isDefault && (
-                    <TouchableOpacity
-                      onPress={() => handleSetDefault(schedule.id)}
-                      style={styles.actionButton}
-                      title="Definir como padrão"
-                    >
-                      <Ionicons name="star-outline" size={20} color="#FFD700" />
-                    </TouchableOpacity>
-                  )}
-                  <TouchableOpacity
-                    onPress={() => handleCreateEvents(schedule)}
-                    style={styles.actionButton}
-                    title="Criar eventos a partir deste horário"
-                  >
-                    <Ionicons name="calendar-outline" size={20} color="#16a34a" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => navigation.navigate('ServiceScheduleForm' as never, { schedule })}
-                    style={styles.actionButton}
-                  >
-                    <Ionicons name="pencil" size={20} color="#3366FF" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => handleDeleteSchedule(schedule.id)}
-                    style={styles.actionButton}
-                  >
-                    <Ionicons name="trash" size={20} color="#FF3B30" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))
+          {schedulesExpanded && (
+            <View style={styles.schedulesContent}>
+              <ServiceScheduleList
+                schedules={schedules}
+                onEdit={handleEditSchedule}
+                onDelete={handleDeleteSchedule}
+                onRefresh={fetchSchedules}
+              />
+              <TouchableOpacity
+                onPress={() => (navigation as any).navigate('ServiceScheduleForm', { schedule: null })}
+                style={styles.addScheduleButton}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="add-circle" size={20} color={colors.gradients.primary[1]} />
+                <Text style={styles.addScheduleButtonText}>Adicionar Horário</Text>
+              </TouchableOpacity>
+            </View>
           )}
-        </View>
-      </ScrollView>
-    </View>
+        </GlassCard>
+    </ViewScreenLayout>
   )
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  scrollView: {
-    flex: 1,
-  },
   section: {
-    backgroundColor: '#fff',
     margin: 16,
     padding: 16,
-    borderRadius: 8,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingVertical: 4,
+  },
+  sectionHeaderExpanded: {
     marginBottom: 16,
+  },
+  schedulesContent: {
+    marginTop: 8,
+  },
+  addScheduleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: colors.gradients.primary[1],
+    borderRadius: 16,
+    backgroundColor: colors.glass.overlay,
+    gap: 8,
+  },
+  addScheduleButtonText: {
+    color: colors.gradients.primary[1],
+    fontWeight: '600',
+    fontSize: 14,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: '600',
+    color: colors.text.primary,
     marginBottom: 16,
   },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
-    backgroundColor: '#fff',
-  },
   button: {
-    backgroundColor: '#3366FF',
+    backgroundColor: colors.gradients.primary[1],
     padding: 14,
-    borderRadius: 8,
+    borderRadius: 18,
     alignItems: 'center',
+    ...colors.shadow.glassLight,
   },
   buttonDisabled: {
     opacity: 0.6,
@@ -530,64 +423,14 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   emptyText: {
-    color: '#999',
+    color: colors.text.secondary,
     textAlign: 'center',
     padding: 20,
   },
-  scheduleCard: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
-  },
-  scheduleHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  scheduleTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  defaultBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFF9E6',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-  },
-  defaultText: {
-    fontSize: 12,
-    color: '#FFD700',
-    marginLeft: 4,
-    fontWeight: '600',
-  },
-  scheduleInfo: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
-  },
-  scheduleActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: 8,
-    gap: 12,
-  },
-  actionButton: {
-    padding: 8,
-  },
-  scheduleDescription: {
-    fontSize: 13,
-    color: '#666',
-    marginTop: 4,
-    fontStyle: 'italic',
-  },
   avatarSection: {
     marginBottom: 16,
+    padding: 16,
+    alignItems: 'center',
   },
   avatarContainer: {
     alignItems: 'center',
@@ -600,21 +443,27 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 8,
+    borderWidth: 2,
+    borderColor: colors.gradients.primary[1],
   },
   removeAvatarButton: {
     position: 'absolute',
     top: -8,
     right: -8,
-    backgroundColor: '#fff',
+    backgroundColor: colors.glass.overlay,
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.glass.border,
   },
   avatarPlaceholder: {
     width: 80,
     height: 80,
     borderRadius: 8,
-    backgroundColor: '#e0e7ff',
+    backgroundColor: colors.glass.overlay,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.glass.border,
   },
   avatarButton: {
     flexDirection: 'row',
@@ -623,19 +472,20 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 16,
     borderWidth: 1,
-    borderColor: '#3366FF',
-    borderRadius: 8,
+    borderColor: colors.gradients.primary[1],
+    borderRadius: 16,
     gap: 8,
     marginBottom: 8,
+    backgroundColor: colors.glass.overlay,
   },
   avatarButtonText: {
-    color: '#3366FF',
-    fontWeight: '500',
+    color: colors.gradients.primary[1],
+    fontWeight: '600',
     fontSize: 14,
   },
   avatarHint: {
     fontSize: 12,
-    color: '#6b7280',
+    color: colors.text.secondary,
     textAlign: 'center',
   },
 })

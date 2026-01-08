@@ -1,24 +1,29 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import {
   View,
   Text,
   TextInput,
   StyleSheet,
-  ScrollView,
   Switch,
   TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
-  TouchableWithoutFeedback,
-  Keyboard,
   Alert,
   ActivityIndicator,
+  Modal,
 } from 'react-native'
+import { LinearGradient } from 'expo-linear-gradient'
 import { useNavigation, useRoute } from '@react-navigation/native'
 import ModalSelector from 'react-native-modal-selector'
+import DateTimePicker from '@react-native-community/datetimepicker'
+import { Ionicons } from '@expo/vector-icons'
 import api from '../api/api'
 import Toast from 'react-native-toast-message'
 import MemberSearch from '../components/MemberSearch'
+import FormScreenLayout from '../components/layouts/FormScreenLayout'
+import GlassCard from '../components/GlassCard'
+import TextInputField from '../components/TextInputField'
+import { colors } from '../theme/colors'
+import { format } from 'date-fns'
+import ptBR from 'date-fns/locale/pt-BR'
 
 interface Member {
   id: string
@@ -37,13 +42,14 @@ export default function EditTransactionScreen() {
   const route = useRoute()
   const { id } = route.params as { id: string }
   
-  const [title, setTitle] = useState('')
   const [amount, setAmount] = useState('')
   const [type, setType] = useState<'ENTRY' | 'EXIT'>('ENTRY')
   const [entryType, setEntryType] = useState<'OFERTA' | 'DIZIMO' | 'CONTRIBUICAO' | ''>('')
   const [exitType, setExitType] = useState<'ALUGUEL' | 'ENERGIA' | 'AGUA' | 'INTERNET' | 'OUTROS' | ''>('')
   const [exitTypeOther, setExitTypeOther] = useState('')
-  const [category, setCategory] = useState('')
+  const [date, setDate] = useState<Date | null>(null)
+  const [showDatePicker, setShowDatePicker] = useState(false)
+  const [tempDate, setTempDate] = useState(new Date())
   const [isTithePayerMember, setIsTithePayerMember] = useState(true)
   const [tithePayerMemberId, setTithePayerMemberId] = useState<string | null>(null)
   const [tithePayerName, setTithePayerName] = useState('')
@@ -72,10 +78,13 @@ export default function EditTransactionScreen() {
       const response = await api.get(`/finances/${id}`)
       const transaction = response.data
       
-      setTitle(transaction.title)
       setAmount(transaction.amount.toString())
       setType(transaction.type)
-      setCategory(transaction.category || '')
+      
+      // Configurar data se existir
+      if (transaction.date) {
+        setDate(new Date(transaction.date))
+      }
       
       if (transaction.type === 'ENTRY') {
         setEntryType(transaction.entryType || '')
@@ -123,9 +132,28 @@ export default function EditTransactionScreen() {
     }
   }
 
+  // Validação: verifica se todos os campos obrigatórios estão preenchidos
+  const isFormValid = useMemo(() => {
+    if (!amount) return false
+    
+    if (type === 'ENTRY' && !entryType) return false
+    if (type === 'EXIT' && !exitType) return false
+    
+    if (exitType === 'OUTROS' && !exitTypeOther.trim()) return false
+    
+    if (entryType === 'DIZIMO') {
+      if (isTithePayerMember && !tithePayerMemberId) return false
+      if (!isTithePayerMember && !tithePayerName.trim()) return false
+    }
+    
+    if (entryType === 'CONTRIBUICAO' && !contributionId) return false
+    
+    return true
+  }, [amount, type, entryType, exitType, exitTypeOther, isTithePayerMember, tithePayerMemberId, tithePayerName, contributionId])
+
   const handleSubmit = async () => {
-    if (!title || !amount) {
-      Alert.alert('Erro', 'Preencha título e valor')
+    if (!amount) {
+      Alert.alert('Erro', 'Preencha o valor')
       return
     }
 
@@ -163,10 +191,12 @@ export default function EditTransactionScreen() {
     setLoading(true)
     try {
       const payload: any = {
-        title,
         amount: parseFloat(amount),
         type,
-        category: category || undefined,
+      }
+
+      if (date) {
+        payload.date = date.toISOString()
       }
 
       if (type === 'ENTRY') {
@@ -223,91 +253,110 @@ export default function EditTransactionScreen() {
 
   if (initialLoading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4F46E5" />
-        <Text style={styles.loadingText}>Carregando...</Text>
-      </View>
+      <FormScreenLayout
+        headerProps={{
+          title: "Editar Transação",
+          Icon: Ionicons,
+          iconName: "create-outline",
+        }}
+      >
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.gradients.primary[1]} />
+          <Text style={styles.loadingText}>Carregando...</Text>
+        </View>
+      </FormScreenLayout>
     )
   }
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={styles.container}
+    <FormScreenLayout
+      headerProps={{
+        title: "Editar Transação",
+        Icon: Ionicons,
+        iconName: "create-outline",
+      }}
     >
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          <Text style={styles.label}>Título *</Text>
-          <TextInput
-            style={styles.input}
-            value={title}
-            onChangeText={setTitle}
-            placeholder="Ex: Pagamento de aluguel"
-          />
+      <Text style={styles.label}>
+        Tipo <Text style={styles.required}>*</Text>
+      </Text>
+      <View style={styles.typeButtons}>
+        <TouchableOpacity
+          style={[styles.typeButton, type === 'ENTRY' && styles.typeButtonActive]}
+          onPress={() => handleTypeChange('ENTRY')}
+        >
+          <Text style={[styles.typeButtonText, type === 'ENTRY' && styles.typeButtonTextActive]}>
+            Entrada
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.typeButton, type === 'EXIT' && styles.typeButtonActive]}
+          onPress={() => handleTypeChange('EXIT')}
+        >
+          <Text style={[styles.typeButtonText, type === 'EXIT' && styles.typeButtonTextActive]}>
+            Saída
+          </Text>
+        </TouchableOpacity>
+      </View>
 
-          <Text style={styles.label}>Valor *</Text>
-          <TextInput
-            style={styles.input}
-            keyboardType="numeric"
+      {type === 'ENTRY' && (
+        <>
+          <Text style={styles.label}>
+            Tipo de Entrada <Text style={styles.required}>*</Text>
+          </Text>
+          <ModalSelector
+            data={[
+              { key: 'OFERTA', label: 'Ofertas' },
+              { key: 'DIZIMO', label: 'Dízimo' },
+              { key: 'CONTRIBUICAO', label: 'Contribuição' },
+            ]}
+            initValue={entryType === 'OFERTA' ? 'Ofertas' : entryType === 'DIZIMO' ? 'Dízimo' : entryType === 'CONTRIBUICAO' ? 'Contribuição' : 'Selecione...'}
+            onChange={(option) => {
+              const newEntryType = option.key as 'OFERTA' | 'DIZIMO' | 'CONTRIBUICAO'
+              setEntryType(newEntryType)
+              if (newEntryType === 'OFERTA' || newEntryType === 'CONTRIBUICAO') {
+                setIsTithePayerMember(true)
+                setTithePayerMemberId(null)
+                setTithePayerName('')
+              }
+              if (newEntryType === 'CONTRIBUICAO') {
+                setContributionMemberId(null)
+                setContributionMemberName('')
+                setIsContributionMember(true)
+              }
+            }}
+          >
+            <TextInput
+              style={styles.input}
+              editable={false}
+              placeholder="Selecione o tipo de entrada"
+              value={entryType === 'OFERTA' ? 'Ofertas' : entryType === 'DIZIMO' ? 'Dízimo' : entryType === 'CONTRIBUICAO' ? 'Contribuição' : ''}
+            />
+          </ModalSelector>
+
+          <TextInputField
+            fieldKey="amount"
+            label="Valor"
             value={amount}
             onChangeText={setAmount}
-            placeholder="0.00"
+            placeholder="R$ 0,00"
+            keyboardType="numeric"
+            required
           />
 
-          <Text style={styles.label}>Tipo *</Text>
-          <View style={styles.typeButtons}>
-            <TouchableOpacity
-              style={[styles.typeButton, type === 'ENTRY' && styles.typeButtonActive]}
-              onPress={() => handleTypeChange('ENTRY')}
-            >
-              <Text style={[styles.typeButtonText, type === 'ENTRY' && styles.typeButtonTextActive]}>
-                Entrada
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.typeButton, type === 'EXIT' && styles.typeButtonActive]}
-              onPress={() => handleTypeChange('EXIT')}
-            >
-              <Text style={[styles.typeButtonText, type === 'EXIT' && styles.typeButtonTextActive]}>
-                Saída
-              </Text>
-            </TouchableOpacity>
-          </View>
+          <Text style={styles.label}>Data</Text>
+          <TouchableOpacity
+            style={styles.input}
+            onPress={() => {
+              setTempDate(date || new Date())
+              setShowDatePicker(true)
+            }}
+          >
+            <Text style={[styles.dateText, !date && styles.datePlaceholder]}>
+              {date ? format(date, "dd/MM/yyyy", { locale: ptBR }) : 'Selecione a data (opcional)'}
+            </Text>
+          </TouchableOpacity>
 
-          {type === 'ENTRY' && (
-            <>
-              <Text style={styles.label}>Tipo de Entrada *</Text>
-              <ModalSelector
-                data={[
-                  { key: 'OFERTA', label: 'Ofertas' },
-                  { key: 'DIZIMO', label: 'Dízimo' },
-                  { key: 'CONTRIBUICAO', label: 'Contribuição' },
-                ]}
-                initValue={entryType === 'OFERTA' ? 'Ofertas' : entryType === 'DIZIMO' ? 'Dízimo' : entryType === 'CONTRIBUICAO' ? 'Contribuição' : 'Selecione...'}
-                onChange={(option) => {
-                  const newEntryType = option.key as 'OFERTA' | 'DIZIMO' | 'CONTRIBUICAO'
-                  setEntryType(newEntryType)
-                  if (newEntryType === 'OFERTA' || newEntryType === 'CONTRIBUICAO') {
-                    setIsTithePayerMember(true)
-                    setTithePayerMemberId(null)
-                    setTithePayerName('')
-                  }
-                  if (newEntryType === 'CONTRIBUICAO') {
-                    setContributionMemberId(null)
-                    setContributionMemberName('')
-                    setIsContributionMember(true)
-                  }
-                }}
-              >
-                <TextInput
-                  style={styles.input}
-                  editable={false}
-                  placeholder="Selecione o tipo de entrada"
-                  value={entryType === 'OFERTA' ? 'Ofertas' : entryType === 'DIZIMO' ? 'Dízimo' : entryType === 'CONTRIBUICAO' ? 'Contribuição' : ''}
-                />
-              </ModalSelector>
-
-              {entryType === 'CONTRIBUICAO' && (
+          {entryType === 'CONTRIBUICAO' && (
                 <>
                   <Text style={styles.label}>Contribuição *</Text>
                   <ModalSelector
@@ -352,9 +401,9 @@ export default function EditTransactionScreen() {
                     </>
                   ) : (
                     <>
-                      <Text style={styles.label}>Nome do Contribuinte</Text>
-                      <TextInput
-                        style={styles.input}
+                      <TextInputField
+                        fieldKey="contributionMemberName"
+                        label="Nome do Contribuinte"
                         value={contributionMemberName}
                         onChangeText={setContributionMemberName}
                         placeholder="Digite o nome do contribuinte"
@@ -394,12 +443,13 @@ export default function EditTransactionScreen() {
                     </>
                   ) : (
                     <>
-                      <Text style={styles.label}>Nome do Dizimista *</Text>
-                      <TextInput
-                        style={styles.input}
+                      <TextInputField
+                        fieldKey="tithePayerName"
+                        label="Nome do Dizimista"
                         value={tithePayerName}
                         onChangeText={setTithePayerName}
                         placeholder="Digite o nome do dizimista"
+                        required
                       />
                     </>
                   )}
@@ -408,95 +458,187 @@ export default function EditTransactionScreen() {
             </>
           )}
 
-          {type === 'EXIT' && (
-            <>
-              <Text style={styles.label}>Tipo de Saída *</Text>
-              <ModalSelector
-                data={[
-                  { key: 'ALUGUEL', label: 'Aluguel' },
-                  { key: 'ENERGIA', label: 'Energia' },
-                  { key: 'AGUA', label: 'Água' },
-                  { key: 'INTERNET', label: 'Internet' },
-                  { key: 'OUTROS', label: 'Outros' },
-                ]}
-                initValue={exitType === 'ALUGUEL' ? 'Aluguel' : exitType === 'ENERGIA' ? 'Energia' : exitType === 'AGUA' ? 'Água' : exitType === 'INTERNET' ? 'Internet' : exitType === 'OUTROS' ? 'Outros' : 'Selecione...'}
-                onChange={(option) => {
-                  const newExitType = option.key as 'ALUGUEL' | 'ENERGIA' | 'AGUA' | 'INTERNET' | 'OUTROS'
-                  setExitType(newExitType)
-                  if (newExitType !== 'OUTROS') {
-                    setExitTypeOther('')
-                  }
-                }}
-              >
-                <TextInput
-                  style={styles.input}
-                  editable={false}
-                  placeholder="Selecione o tipo de saída"
-                  value={exitType === 'ALUGUEL' ? 'Aluguel' : exitType === 'ENERGIA' ? 'Energia' : exitType === 'AGUA' ? 'Água' : exitType === 'INTERNET' ? 'Internet' : exitType === 'OUTROS' ? 'Outros' : ''}
-                />
-              </ModalSelector>
+      {type === 'EXIT' && (
+        <>
+          <Text style={styles.label}>
+            Tipo de Saída <Text style={styles.required}>*</Text>
+          </Text>
+          <ModalSelector
+            data={[
+              { key: 'ALUGUEL', label: 'Aluguel' },
+              { key: 'ENERGIA', label: 'Energia' },
+              { key: 'AGUA', label: 'Água' },
+              { key: 'INTERNET', label: 'Internet' },
+              { key: 'OUTROS', label: 'Outros' },
+            ]}
+            initValue={exitType === 'ALUGUEL' ? 'Aluguel' : exitType === 'ENERGIA' ? 'Energia' : exitType === 'AGUA' ? 'Água' : exitType === 'INTERNET' ? 'Internet' : exitType === 'OUTROS' ? 'Outros' : 'Selecione...'}
+            onChange={(option) => {
+              const newExitType = option.key as 'ALUGUEL' | 'ENERGIA' | 'AGUA' | 'INTERNET' | 'OUTROS'
+              setExitType(newExitType)
+              if (newExitType !== 'OUTROS') {
+                setExitTypeOther('')
+              }
+            }}
+          >
+            <TextInput
+              style={styles.input}
+              editable={false}
+              placeholder="Selecione o tipo de saída"
+              value={exitType === 'ALUGUEL' ? 'Aluguel' : exitType === 'ENERGIA' ? 'Energia' : exitType === 'AGUA' ? 'Água' : exitType === 'INTERNET' ? 'Internet' : exitType === 'OUTROS' ? 'Outros' : ''}
+            />
+          </ModalSelector>
 
-              {exitType === 'OUTROS' && (
-                <>
-                  <Text style={styles.label}>Descrição *</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={exitTypeOther}
-                    onChangeText={setExitTypeOther}
-                    placeholder="Digite a descrição do tipo de saída"
-                  />
-                </>
-              )}
-            </>
-          )}
-
-          <Text style={styles.label}>Categoria</Text>
+          <Text style={styles.label}>
+            Valor <Text style={styles.required}>*</Text>
+          </Text>
           <TextInput
             style={styles.input}
-            value={category}
-            onChangeText={setCategory}
-            placeholder="Ex: Aluguel, Salário, Material, etc."
+            keyboardType="numeric"
+            value={amount}
+            onChangeText={setAmount}
+            placeholder="R$ 0,00"
+            placeholderTextColor="#999"
           />
-          <Text style={styles.hint}>Opcional - Categoria da transação</Text>
 
+          <Text style={styles.label}>Data</Text>
           <TouchableOpacity
-            style={[styles.submitButton, loading && styles.submitButtonDisabled]}
-            onPress={handleSubmit}
-            disabled={loading}
+            style={styles.input}
+            onPress={() => {
+              setTempDate(date || new Date())
+              setShowDatePicker(true)
+            }}
           >
-            <Text style={styles.submitButtonText}>
-              {loading ? 'Atualizando...' : 'Atualizar Transação'}
+            <Text style={[styles.dateText, !date && styles.datePlaceholder]}>
+              {date ? format(date, "dd/MM/yyyy", { locale: ptBR }) : 'Selecione a data (opcional)'}
             </Text>
           </TouchableOpacity>
-        </ScrollView>
-      </TouchableWithoutFeedback>
-    </KeyboardAvoidingView>
+
+          {exitType === 'OUTROS' && (
+            <>
+              <TextInputField
+                fieldKey="exitTypeOther"
+                label="Descrição"
+                value={exitTypeOther}
+                onChangeText={setExitTypeOther}
+                placeholder="Digite a descrição do tipo de saída"
+                required
+              />
+            </>
+          )}
+        </>
+      )}
+
+      <Modal
+        visible={showDatePicker}
+        transparent
+        animationType="slide"
+      >
+        <View style={styles.modalOverlay}>
+          <GlassCard opacity={0.45} blurIntensity={25} borderRadius={20} style={styles.modalContent}>
+            <View style={styles.datePickerContainer}>
+              <DateTimePicker
+                value={tempDate}
+                mode="date"
+                display="spinner"
+                onChange={(event, selectedDate) => {
+                  if (selectedDate) {
+                    setTempDate(selectedDate)
+                  }
+                }}
+                style={styles.datePicker}
+                textColor={colors.text.primary}
+                themeVariant="light"
+              />
+            </View>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalCancelButton}
+                onPress={() => {
+                  setShowDatePicker(false)
+                  setDate(null)
+                }}
+              >
+                <Text style={styles.modalCancelText}>Remover</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalCancelButton}
+                onPress={() => setShowDatePicker(false)}
+              >
+                <Text style={styles.modalCancelText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalSaveButton}
+                onPress={() => {
+                  setDate(tempDate)
+                  setShowDatePicker(false)
+                }}
+              >
+                <LinearGradient
+                  colors={colors.gradients.primary as [string, string]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.modalSaveButtonGradient}
+                >
+                  <Text style={styles.modalSaveText}>Confirmar</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </GlassCard>
+        </View>
+      </Modal>
+
+      <TouchableOpacity
+        style={styles.submitButton}
+        onPress={handleSubmit}
+        disabled={loading || !isFormValid}
+        activeOpacity={0.8}
+      >
+        <LinearGradient
+          colors={
+            isFormValid && !loading
+              ? colors.gradients.primary as [string, string]
+              : ['#94A3B8', '#94A3B8'] // Cinza quando desativado
+          }
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.submitButtonGradient}
+        >
+          {loading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.submitButtonText}>
+              Atualizar Transação
+            </Text>
+          )}
+        </LinearGradient>
+      </TouchableOpacity>
+    </FormScreenLayout>
   )
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  scrollContent: {
-    padding: 20,
-  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    marginTop: 110,
   },
   loadingText: {
     marginTop: 12,
-    color: '#666',
     fontSize: 16,
+    fontWeight: '400',
+    lineHeight: 24,
+    color: '#475569',
   },
   label: {
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 8,
     color: '#333',
+  },
+  required: {
+    color: '#e74c3c',
+    fontWeight: 'bold',
   },
   input: {
     borderWidth: 1,
@@ -540,26 +682,79 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     paddingVertical: 8,
   },
-  hint: {
-    fontSize: 12,
+  dateText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  datePlaceholder: {
+    color: '#999',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    width: '90%',
+    maxWidth: 400,
+    padding: 20,
+  },
+  datePickerContainer: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  datePicker: {
+    width: '100%',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  modalCancelButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: '#f5f5f5',
+    alignItems: 'center',
+  },
+  modalCancelText: {
     color: '#666',
-    marginTop: -12,
-    marginBottom: 16,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalSaveButton: {
+    flex: 1,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  modalSaveButtonGradient: {
+    padding: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalSaveText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   submitButton: {
-    backgroundColor: '#4F46E5',
-    padding: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 8,
+    borderRadius: 18,
+    overflow: 'hidden',
+    marginTop: 20,
   },
-  submitButtonDisabled: {
-    backgroundColor: '#999',
+  submitButtonGradient: {
+    padding: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 56,
   },
   submitButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+    lineHeight: 24,
   },
 })
 

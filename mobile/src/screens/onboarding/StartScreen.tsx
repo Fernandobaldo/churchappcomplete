@@ -44,7 +44,7 @@ export default function StartScreen() {
             onPress={() => setSelectedStructure('simple')}
           >
             <Ionicons
-              name="church"
+              name="business-outline"
               size={32}
               color={selectedStructure === 'simple' ? '#3b82f6' : '#666'}
             />

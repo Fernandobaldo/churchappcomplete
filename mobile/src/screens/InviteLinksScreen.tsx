@@ -10,15 +10,18 @@ import {
   Share,
   RefreshControl,
 } from 'react-native'
+import { LinearGradient } from 'expo-linear-gradient'
 import { useNavigation } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
 import api from '../api/api'
 import { useAuthStore } from '../stores/authStore'
 import Toast from 'react-native-toast-message'
-import PageHeader from '../components/PageHeader'
+import ViewScreenLayout from '../components/layouts/ViewScreenLayout'
+import GlassCard from '../components/GlassCard'
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5'
 import PlanUpgradeModal from '../components/PlanUpgradeModal'
 import Tabs from '../components/Tabs'
+import { colors } from '../theme/colors'
 
 interface InviteLink {
   id: string
@@ -225,22 +228,16 @@ export default function InviteLinksScreen() {
     activeTab === 'active' ? link.isActive : !link.isActive
   )
 
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#3366FF" />
-      </View>
-    )
-  }
-
   return (
-    <View style={styles.container}>
-      <PageHeader
-        title="Links de Convite"
-        Icon={FontAwesome5}
-        iconName="link"
-      />
-      
+    <>
+    <ViewScreenLayout
+      headerProps={{
+        title: "Links de Convite",
+        Icon: FontAwesome5,
+        iconName: "link",
+      }}
+      scrollable={false}
+    >
       {/* Tabs */}
       <Tabs
         tabs={[
@@ -261,7 +258,7 @@ export default function InviteLinksScreen() {
         ]}
         activeTab={activeTab}
         onTabChange={(key) => setActiveTab(key as 'active' | 'inactive')}
-        style={styles.tabsContainerWithHeader}
+        style={styles.tabsContainer}
       />
 
       <FlatList
@@ -270,15 +267,19 @@ export default function InviteLinksScreen() {
         contentContainerStyle={styles.listContent}
         style={styles.list}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={colors.gradients.primary}
+            tintColor={colors.gradients.primary[1]}
+          />
         }
         renderItem={({ item: link }) => (
-          <View
-            style={[
-              styles.linkCard,
-              (!link.isActive || isExpired(link.expiresAt) || isLimitReached(link)) &&
-                styles.linkCardInactive,
-            ]}
+          <GlassCard
+            opacity={(!link.isActive || isExpired(link.expiresAt) || isLimitReached(link)) ? 0.3 : 0.4}
+            blurIntensity={20}
+            borderRadius={20}
+            style={styles.linkCard}
           >
             <View style={styles.linkHeader}>
               <Text style={styles.linkTitle}>Link de Convite</Text>
@@ -325,7 +326,7 @@ export default function InviteLinksScreen() {
                 style={styles.actionButton}
                 onPress={() => handleShareLink(link.token)}
               >
-                <Ionicons name="share-outline" size={20} color="#3366FF" />
+                <Ionicons name="share-outline" size={20} color={colors.gradients.primary[1]} />
                 <Text style={styles.actionButtonText}>Compartilhar</Text>
               </TouchableOpacity>
               {link.isActive && (
@@ -333,33 +334,42 @@ export default function InviteLinksScreen() {
                   style={[styles.actionButton, styles.actionButtonDanger]}
                   onPress={() => handleDeactivate(link.id)}
                 >
-                  <Ionicons name="close-circle-outline" size={20} color="#EF4444" />
+                  <Ionicons name="close-circle-outline" size={20} color={colors.status.error} />
                   <Text style={[styles.actionButtonText, styles.actionButtonTextDanger]}>
                     Desativar
                   </Text>
                 </TouchableOpacity>
               )}
             </View>
-          </View>
+          </GlassCard>
         )}
         ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Ionicons name="link-outline" size={64} color="#ccc" />
+          <GlassCard opacity={0.4} blurIntensity={20} borderRadius={20} style={styles.emptyContainer}>
+            <Ionicons name="link-outline" size={64} color={colors.text.tertiary} />
             <Text style={styles.emptyText}>
               {activeTab === 'active' 
                 ? 'Nenhum link ativo' 
                 : 'Nenhum link desativado'}
             </Text>
-          </View>
+          </GlassCard>
         }
       />
 
       <TouchableOpacity
         style={styles.fab}
         onPress={() => setShowCreateModal(true)}
+        activeOpacity={0.8}
       >
-        <Ionicons name="add" size={24} color="white" />
+        <LinearGradient
+          colors={colors.gradients.primary as [string, string]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.fabGradient}
+        >
+          <Ionicons name="add" size={24} color="white" />
+        </LinearGradient>
       </TouchableOpacity>
+    </ViewScreenLayout>
 
       {/* Modal de Criação */}
       {showCreateModal && (
@@ -434,43 +444,26 @@ export default function InviteLinksScreen() {
         onClose={() => setShowUpgradeModal(false)}
         currentPlan={currentPlan}
       />
-    </View>
+    </>
   )
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+  tabsContainer: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 8,
   },
   list: {
-    marginTop: 0,
-  },
-  tabsContainerWithHeader: {
-    marginTop: 110, // Altura do header fixo
+    flex: 1,
   },
   listContent: {
     padding: 16,
+    paddingBottom: 100,
   },
   linkCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
+    padding: 20,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  linkCardInactive: {
-    opacity: 0.6,
-    backgroundColor: '#f9fafb',
   },
   linkHeader: {
     flexDirection: 'row',
@@ -481,7 +474,8 @@ const styles = StyleSheet.create({
   linkTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
+    lineHeight: 24,
+    color: '#0F172A',
   },
   badgesContainer: {
     flexDirection: 'row',
@@ -506,12 +500,14 @@ const styles = StyleSheet.create({
   },
   linkInfo: {
     fontSize: 14,
-    color: '#6b7280',
+    fontWeight: '400',
+    lineHeight: 20,
+    color: '#475569',
     marginBottom: 4,
   },
   linkInfoBold: {
     fontWeight: '600',
-    color: '#111827',
+    color: '#0F172A',
   },
   actionsContainer: {
     flexDirection: 'row',
@@ -543,31 +539,35 @@ const styles = StyleSheet.create({
     color: '#EF4444',
   },
   emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
+    padding: 48,
     alignItems: 'center',
-    paddingVertical: 64,
+    justifyContent: 'center',
+    marginHorizontal: 16,
   },
   emptyText: {
     fontSize: 16,
-    color: '#999',
+    fontWeight: '400',
+    lineHeight: 24,
+    color: '#475569',
     marginTop: 16,
+    textAlign: 'center',
   },
   fab: {
     position: 'absolute',
     right: 20,
     bottom: 20,
-    backgroundColor: '#3366FF',
     width: 56,
     height: 56,
     borderRadius: 28,
+    overflow: 'hidden',
+    ...colors.shadow.glassHeavy,
+  },
+  fabGradient: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 8,
   },
   modalOverlay: {
     position: 'absolute',

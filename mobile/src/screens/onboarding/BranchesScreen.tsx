@@ -39,7 +39,7 @@ export default function BranchesScreen() {
           // Carrega filiais existentes
           if (churches[0].Branch && Array.isArray(churches[0].Branch)) {
             setBranches(
-              churches[0].Branch.map((b: any) => ({
+              churches[0].Branch.map((b: Branch) => ({
                 id: b.id,
                 name: b.name,
                 city: b.city || '',
@@ -111,11 +111,12 @@ export default function BranchesScreen() {
       Toast.show({ type: 'success', text1: 'Filiais salvas!' })
       // @ts-ignore
       navigation.navigate('SettingsOnboarding')
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const apiError = error as { response?: { data?: { message?: string } } }
       Toast.show({
         type: 'error',
         text1: 'Erro ao salvar filiais',
-        text2: error.response?.data?.message || 'Tente novamente',
+        text2: apiError.response?.data?.message || 'Tente novamente',
       })
     } finally {
       setLoading(false)

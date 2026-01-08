@@ -4,12 +4,18 @@ import { Ionicons, FontAwesome5, Feather, MaterialIcons } from '@expo/vector-ico
 import { useNavigation } from '@react-navigation/native'
 import { useAuthStore } from '../stores/authStore'
 import { hasAccess } from '../utils/authUtils'
-import PageHeader from '../components/PageHeader'
+import ViewScreenLayout from '../components/layouts/ViewScreenLayout'
+import GlassCard from '../components/GlassCard'
+import { colors } from '../theme/colors'
+import { useBackToDashboard } from '../hooks/useBackToDashboard'
 
 export default function MoreScreen() {
     const navigation = useNavigation()
     const user = useAuthStore((s) => s.user)
     const permissions = user?.permissions?.map((p) => p.type) || []
+    
+    // Intercepta gesto de voltar para navegar ao Dashboard quando não há página anterior
+    useBackToDashboard()
 
     const generalOptions = [
         { label: 'Meu Perfil', icon: <Ionicons name="person-outline" size={20} />, screen: 'ProfileScreen' },
@@ -48,64 +54,91 @@ export default function MoreScreen() {
     }
 
     return (
-        <View style={styles.container}>
-            <PageHeader title="Mais" />
-            <ScrollView style={styles.scrollView}>
+        <ViewScreenLayout
+            headerProps={{
+                title: "Mais",
+            }}
+        >
+            <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
                 {generalOptions.map((item, idx) => (
-                    <TouchableOpacity key={idx} style={styles.row} onPress={() => handleNavigate(item.screen)}>
-                        <View style={styles.icon}>{item.icon}</View>
-                        <Text style={styles.label}>{item.label}</Text>
-                        <Ionicons name="chevron-forward" size={18} color="#ccc" />
-                    </TouchableOpacity>
+                    <GlassCard
+                        key={idx}
+                        onPress={() => handleNavigate(item.screen)}
+                        opacity={0.4}
+                        blurIntensity={20}
+                        borderRadius={20}
+                        style={styles.card}
+                    >
+                        <View style={styles.row}>
+                            <View style={styles.icon}>{item.icon}</View>
+                            <Text style={styles.label}>{item.label}</Text>
+                            <Ionicons name="chevron-forward" size={18} color={colors.text.tertiary} />
+                        </View>
+                    </GlassCard>
                 ))}
 
                 {filteredAdminOptions.length > 0 && (
                     <>
                         <Text style={styles.sectionHeader}>Para líderes e administradores</Text>
                         {filteredAdminOptions.map((item, idx) => (
-                            <TouchableOpacity key={idx} style={styles.row} onPress={() => handleNavigate(item.screen)}>
-                                <View style={styles.icon}>{item.icon}</View>
-                                <Text style={styles.label}>{item.label}</Text>
-                                <Ionicons name="chevron-forward" size={18} color="#ccc" />
-                            </TouchableOpacity>
+                            <GlassCard
+                                key={idx}
+                                onPress={() => handleNavigate(item.screen)}
+                                opacity={0.4}
+                                blurIntensity={20}
+                                borderRadius={20}
+                                style={styles.card}
+                            >
+                                <View style={styles.row}>
+                                    <View style={styles.icon}>{item.icon}</View>
+                                    <Text style={styles.label}>{item.label}</Text>
+                                    <Ionicons name="chevron-forward" size={18} color={colors.text.tertiary} />
+                                </View>
+                            </GlassCard>
                         ))}
                     </>
                 )}
 
-                <TouchableOpacity style={styles.logoutRow} onPress={() => navigation.navigate('Login' as never)}>
+                <GlassCard
+                    onPress={() => navigation.navigate('Login' as never)}
+                    opacity={0.4}
+                    blurIntensity={20}
+                    borderRadius={20}
+                    style={styles.logoutCard}
+                >
                     <Text style={styles.logoutText}>Sair da conta</Text>
-                </TouchableOpacity>
+                </GlassCard>
             </ScrollView>
-        </View>
+        </ViewScreenLayout>
     )
 }
 
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#f5f5f5',
-    },
     scrollView: {
         flex: 1,
-        backgroundColor: '#fff',
-        marginTop: 110, // Altura do header fixo
+        padding: 1,
+        paddingBottom: 100,
+    },
+    card: {
+        padding: 0,
+        marginBottom: 16,
     },
     sectionHeader: {
         fontSize: 13,
-        fontWeight: 'bold',
-        color: '#999',
-        paddingHorizontal: 20,
+        fontWeight: '600',
+        lineHeight: 18,
+        color: '#64748B',
+        paddingHorizontal: 4,
         paddingTop: 20,
         paddingBottom: 8,
+        marginBottom: 8,
     },
     row: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 14,
+        paddingVertical: 18,
         paddingHorizontal: 20,
-        borderBottomWidth: 1,
-        borderColor: '#f2f2f2',
     },
     icon: {
         width: 26,
@@ -115,16 +148,22 @@ const styles = StyleSheet.create({
     label: {
         flex: 1,
         fontSize: 16,
-        color: '#333',
+        fontWeight: '400',
+        lineHeight: 24,
+        color: '#0F172A',
     },
-    logoutRow: {
+    logoutCard: {
+        padding: 0,
         marginTop: 20,
-        paddingVertical: 14,
-        paddingHorizontal: 20,
+        marginBottom: 32,
     },
     logoutText: {
         fontSize: 16,
-        color: '#d00',
         fontWeight: '500',
+        lineHeight: 24,
+        color: '#EF4444',
+        paddingVertical: 18,
+        paddingHorizontal: 20,
+        textAlign: 'center',
     },
 })

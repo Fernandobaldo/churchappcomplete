@@ -1,27 +1,41 @@
-import React, { useEffect, useState } from 'react'
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator } from 'react-native'
+import React, { useEffect, useState, useCallback, useMemo } from 'react'
+import { View, Text, FlatList, StyleSheet, RefreshControl, ActivityIndicator } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
 import api from '../api/api'
-import PageHeader from '../components/PageHeader'
+import ViewScreenLayout from '../components/layouts/ViewScreenLayout'
+import GlassCard from '../components/GlassCard'
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5'
 import { useAuthStore } from '../stores/authStore'
 import { hasAccess } from '../utils/authUtils'
+import PermissionGuard from '../components/PermissionGuard'
+import Toast from 'react-native-toast-message'
 import { format } from 'date-fns'
-import ptBR from 'date-fns/locale/pt-BR'
+import { ptBR } from 'date-fns/locale/pt-BR'
 import Tabs from '../components/Tabs'
+import { Notice } from '../types'
+import { colors } from '../theme/colors'
+import { useBackToDashboard } from '../hooks/useBackToDashboard'
+import EmptyState from '../components/EmptyState'
 
 export default function NoticesScreen() {
-    const [notices, setNotices] = useState<any[]>([])
+    const [notices, setNotices] = useState<Notice[]>([])
     const [loading, setLoading] = useState(true)
     const [refreshing, setRefreshing] = useState(false)
     const [activeTab, setActiveTab] = useState<'unread' | 'read'>('unread')
+    const [page, setPage] = useState(1)
+    const [loadingMore, setLoadingMore] = useState(false)
+    const [hasMore, setHasMore] = useState(true)
     const navigation = useNavigation()
     const { user } = useAuthStore()
+    const ITEMS_PER_PAGE = 10
+    
+    // Intercepta gesto de voltar para navegar ao Dashboard quando não há página anterior
+    useBackToDashboard()
 
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         try {
-            const res = await api.get('/notices')
+            const res = await api.get<Notice[]>('/notices')
             setNotices(res.data || [])
         } catch (error) {
             console.error('Erro ao carregar avisos:', error)
@@ -29,63 +43,97 @@ export default function NoticesScreen() {
             setLoading(false)
             setRefreshing(false)
         }
-    }
+    }, [])
 
     useEffect(() => {
         fetchData()
-    }, [])
+    }, [fetchData])
 
-    const onRefresh = () => {
+    const onRefresh = useCallback(() => {
         setRefreshing(true)
         fetchData()
-    }
+    }, [fetchData])
 
-    const markAsRead = async (id: string) => {
+    const markAsRead = useCallback(async (id: string) => {
         try {
             await api.post(`/notices/${id}/read`)
-            fetchData()
-        } catch (error) {
+            // Atualiza o estado local imediatamente para melhor UX
+            setNotices(prevNotices =>
+                prevNotices.map(notice =>
+                    notice.id === id ? { ...notice, read: true } : notice
+                )
+            )
+            Toast.show({ type: 'success', text1: 'Aviso marcado como lido' })
+        } catch (error: unknown) {
             console.error('Erro ao marcar aviso como lido:', error)
+            const apiError = error as { response?: { data?: { message?: string } } }
+            Toast.show({ 
+                type: 'error', 
+                text1: 'Erro ao marcar aviso como lido',
+                text2: apiError.response?.data?.message || 'Tente novamente'
+            })
         }
-    }
+    }, [])
 
-    const canManageNotices = hasAccess(user, 'notice_manage')
-
-    if (loading) {
-        return (
-            <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#3366FF" />
-            </View>
-        )
-    }
+    const canManageNotices = useMemo(() => hasAccess(user, 'notice_manage'), [user])
+    
+    const unreadCount = useMemo(() => notices.filter(n => !n.read).length, [notices])
+    const filteredNotices = useMemo(() => 
+        notices.filter(item => 
+            activeTab === 'unread' ? !item.read : item.read
+        ),
+        [notices, activeTab]
+    )
+    
+    // Paginação: mostra apenas os primeiros N itens
+    const paginatedNotices = useMemo(() => 
+        filteredNotices.slice(0, page * ITEMS_PER_PAGE),
+        [filteredNotices, page]
+    )
+    
+    const loadMore = useCallback(() => {
+        if (!loadingMore && hasMore && paginatedNotices.length < filteredNotices.length) {
+            setLoadingMore(true)
+            setTimeout(() => {
+                setPage(prev => prev + 1)
+                setLoadingMore(false)
+            }, 300)
+        }
+    }, [loadingMore, hasMore, paginatedNotices.length, filteredNotices.length])
+    
+    // Reset paginação quando muda tab
+    useEffect(() => {
+        setPage(1)
+        setHasMore(true)
+    }, [activeTab])
 
     return (
-        <View style={styles.container}>
-            <PageHeader
-                title="Avisos e Comunicados"
-                Icon={FontAwesome5}
-                iconName="bell"
-                rightButtonIcon={
+        <ViewScreenLayout
+            headerProps={{
+                title: "Avisos e Comunicados",
+                Icon: FontAwesome5,
+                iconName: "bell",
+                rightButtonIcon:
                     canManageNotices ? (
                         <Ionicons name="add" size={24} color="white" />
-                    ) : undefined
-                }
-                onRightButtonPress={
+                    ) : undefined,
+                onRightButtonPress:
                     canManageNotices
                         ? () => navigation.navigate('AddNotice' as never)
-                        : undefined
-                }
-            />
-
+                        : undefined,
+            }}
+            scrollable={false}
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            contentContainerStyle={styles.viewContent}
+        >
             {/* Tabs */}
             <Tabs
                 tabs={[
                     {
                         key: 'unread',
                         label: 'Não Lidos',
-                        badge: notices.filter(n => !n.read).length > 0 
-                            ? notices.filter(n => !n.read).length 
-                            : undefined,
+                        badge: unreadCount > 0 ? unreadCount : undefined,
                     },
                     {
                         key: 'read',
@@ -94,111 +142,110 @@ export default function NoticesScreen() {
                 ]}
                 activeTab={activeTab}
                 onTabChange={(key) => setActiveTab(key as 'unread' | 'read')}
-                style={styles.tabsContainerWithHeader}
             />
 
             <FlatList
-                data={notices.filter(item => 
-                    activeTab === 'unread' ? !item.read : item.read
-                )}
+                data={paginatedNotices}
                 keyExtractor={(item) => item.id}
                 contentContainerStyle={styles.listContent}
                 style={styles.list}
                 refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                    <RefreshControl 
+                        refreshing={refreshing} 
+                        onRefresh={() => {
+                            setPage(1)
+                            setHasMore(true)
+                            onRefresh()
+                        }}
+                        colors={colors.gradients.primary}
+                        tintColor={colors.gradients.primary[1]}
+                    />
+                }
+                onEndReached={loadMore}
+                onEndReachedThreshold={0.5}
+                ListFooterComponent={
+                    loadingMore ? (
+                        <View style={styles.loadingMore}>
+                            <ActivityIndicator size="small" color={colors.gradients.primary[1]} />
+                        </View>
+                    ) : null
                 }
                 renderItem={({ item }) => (
-                    <TouchableOpacity
-                        style={[styles.card, !item.read && styles.unreadCard]}
+                    <GlassCard
                         onPress={() => {
                             if (!item.read) {
                                 markAsRead(item.id)
                             }
                         }}
+                        opacity={!item.read ? 0.45 : 0.4}
+                        blurIntensity={20}
+                        borderRadius={20}
+                        style={!item.read ? styles.cardUnread : styles.card}
                     >
-                        <View style={styles.cardHeader}>
-                            <View style={styles.cardHeaderLeft}>
-                                {!item.read && <View style={styles.unreadIndicator} />}
-                                <Text style={[styles.noticeTitle, !item.read && styles.unreadTitle]}>
-                                    {item.title}
-                                </Text>
-                            </View>
-                            {!item.read && (
-                                <View style={styles.unreadBadge}>
-                                    <Text style={styles.unreadBadgeText}>Novo</Text>
+                            <View style={styles.cardHeader}>
+                                <View style={styles.cardHeaderLeft}>
+                                    {!item.read && <View style={styles.unreadIndicator} />}
+                                    <Text style={[styles.noticeTitle, !item.read && styles.unreadTitle]}>
+                                        {item.title}
+                                    </Text>
                                 </View>
-                            )}
-                        </View>
-                        <Text style={styles.noticeMessage}>{item.message}</Text>
-                        <Text style={styles.date}>
-                            {format(new Date(item.createdAt), "dd 'de' MMMM 'de' yyyy 'às' HH:mm", { locale: ptBR })}
-                        </Text>
-                    </TouchableOpacity>
+                                {!item.read && (
+                                    <View style={styles.unreadBadge}>
+                                        <Text style={styles.unreadBadgeText}>Novo</Text>
+                                    </View>
+                                )}
+                            </View>
+                            <Text style={styles.noticeMessage}>{item.message}</Text>
+                            <Text style={styles.date}>
+                                {format(new Date(item.createdAt), "dd 'de' MMMM 'de' yyyy 'às' HH:mm", { locale: ptBR })}
+                            </Text>
+                        </GlassCard>
                 )}
                 ListEmptyComponent={
-                    <View style={styles.emptyContainer}>
-                        <Ionicons name="notifications-outline" size={64} color="#ccc" />
-                        <Text style={styles.emptyText}>
-                            {activeTab === 'unread' 
-                                ? 'Nenhum aviso não lido' 
-                                : 'Nenhum aviso lido'}
-                        </Text>
-                    </View>
+                    <EmptyState
+                        icon="notifications-outline"
+                        message={activeTab === 'unread' 
+                            ? 'Nenhum aviso não lido' 
+                            : 'Nenhum aviso lido'}
+                    />
                 }
             />
 
-            {canManageNotices && (
-                <TouchableOpacity
-                    style={styles.fab}
-                    onPress={() => navigation.navigate('AddNotice' as never)}
-                >
-                    <Ionicons name="add" size={24} color="white" />
-                </TouchableOpacity>
-            )}
-        </View>
+        </ViewScreenLayout>
     )
 }
 
 const styles = StyleSheet.create({
-    container: {
+    viewContent: {
         flex: 1,
-        backgroundColor: '#f5f5f5',
+        padding: 0,
     },
     list: {
-        marginTop: 0, // Removido porque tabsContainer já tem o espaçamento
-    },
-    tabsContainerWithHeader: {
-        marginTop: 110, // Altura do header fixo
-    },
-    loadingContainer: {
         flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
     },
     listContent: {
         padding: 16,
+        paddingBottom: 100,
     },
     card: {
-        backgroundColor: '#fff',
-        borderRadius: 12,
-        padding: 16,
-        marginBottom: 12,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
+        padding: 20,
+        marginBottom: 16,
     },
     unreadCard: {
         borderLeftWidth: 4,
-        borderLeftColor: '#3366FF',
-        backgroundColor: '#F0F4FF',
+        borderLeftColor: colors.gradients.primary[1],
+    },
+    cardUnread: {
+        padding: 20,
+        marginBottom: 16,
+        borderLeftWidth: 4,
+        borderLeftColor: colors.gradients.primary[1],
     },
     cardHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 8,
+        marginBottom: 12,
     },
     cardHeaderLeft: {
         flexDirection: 'row',
@@ -209,64 +256,46 @@ const styles = StyleSheet.create({
         width: 8,
         height: 8,
         borderRadius: 4,
-        backgroundColor: '#3366FF',
-        marginRight: 8,
+        backgroundColor: colors.gradients.primary[1],
+        marginRight: 12,
     },
     noticeTitle: {
         fontSize: 18,
         fontWeight: '600',
-        color: '#333',
+        lineHeight: 24,
+        color: '#0F172A',
         flex: 1,
     },
     unreadTitle: {
-        fontWeight: 'bold',
+        fontWeight: '700',
     },
     unreadBadge: {
-        backgroundColor: '#3366FF',
-        paddingHorizontal: 8,
+        backgroundColor: colors.gradients.primary[1],
+        paddingHorizontal: 10,
         paddingVertical: 4,
         borderRadius: 12,
     },
     unreadBadgeText: {
-        color: '#fff',
+        color: '#FFFFFF',
         fontSize: 12,
         fontWeight: '600',
+        lineHeight: 18,
     },
     noticeMessage: {
         fontSize: 16,
-        color: '#666',
+        fontWeight: '400',
         lineHeight: 24,
+        color: '#475569',
         marginBottom: 12,
     },
     date: {
         fontSize: 12,
-        color: '#999',
+        fontWeight: '400',
+        lineHeight: 18,
+        color: '#64748B',
     },
-    emptyContainer: {
-        flex: 1,
-        justifyContent: 'center',
+    loadingMore: {
+        paddingVertical: 16,
         alignItems: 'center',
-        paddingVertical: 64,
-    },
-    emptyText: {
-        fontSize: 16,
-        color: '#999',
-        marginTop: 16,
-    },
-    fab: {
-        position: 'absolute',
-        right: 20,
-        bottom: 20,
-        backgroundColor: '#3366FF',
-        width: 56,
-        height: 56,
-        borderRadius: 28,
-        justifyContent: 'center',
-        alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 4,
-        elevation: 8,
     },
 })

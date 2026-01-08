@@ -1,9 +1,8 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
@@ -16,7 +15,10 @@ import { Picker } from '@react-native-picker/picker'
 import api from '../api/api'
 import Toast from 'react-native-toast-message'
 import { useAuthStore } from '../stores/authStore'
-import PageHeader from '../components/PageHeader'
+import ViewScreenLayout from '../components/layouts/ViewScreenLayout'
+import GlassCard from '../components/GlassCard'
+import TextInputField from '../components/TextInputField'
+import { colors } from '../theme/colors'
 
 interface Member {
   id: string
@@ -50,14 +52,11 @@ export default function PermissionsScreen() {
   const [members, setMembers] = useState<Member[]>([])
   const [selectedMember, setSelectedMember] = useState<Member | null>(null)
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [updating, setUpdating] = useState(false)
 
-  useEffect(() => {
-    fetchMembers()
-  }, [])
-
-  const fetchMembers = async () => {
+  const fetchMembers = useCallback(async () => {
     try {
       setLoading(true)
       const response = await api.get('/members')
@@ -71,8 +70,18 @@ export default function PermissionsScreen() {
       Toast.show({ type: 'error', text1: 'Erro ao carregar membros' })
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    fetchMembers()
+  }, [fetchMembers])
+
+  const handleRefresh = useCallback(() => {
+    setRefreshing(true)
+    fetchMembers()
+  }, [fetchMembers])
 
   const fetchMemberDetails = async (id: string) => {
     try {
@@ -172,8 +181,8 @@ export default function PermissionsScreen() {
       ))
 
       const removedPermissions = originalPermissions
-        .map((p: any) => typeof p === 'string' ? p : p?.type)
-        .filter((perm: string) => !(updatedMember.permissions || []).some((p: any) =>
+        .map((p) => typeof p === 'string' ? p : p?.type)
+        .filter((perm: string) => !(updatedMember.permissions || []).some((p) =>
           (typeof p === 'string' ? p : p?.type) === perm
         ))
 
@@ -189,7 +198,8 @@ export default function PermissionsScreen() {
           text1: `Role alterada para ${ROLE_LABELS[newRole] || newRole}`,
         })
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const apiError = error as { response?: { data?: { error?: string } } }
       setSelectedMember({
         ...selectedMember,
         role: originalRole,
@@ -197,7 +207,7 @@ export default function PermissionsScreen() {
       })
       Toast.show({
         type: 'error',
-        text1: error.response?.data?.error || 'Erro ao alterar role do membro',
+        text1: apiError.response?.data?.error || 'Erro ao alterar role do membro',
       })
     } finally {
       setUpdating(false)
@@ -226,7 +236,7 @@ export default function PermissionsScreen() {
     }
 
     const originalPermissions = [...(selectedMember.permissions || [])]
-    const currentPermissions = (selectedMember.permissions || []).map((p: any) =>
+    const currentPermissions = (selectedMember.permissions || []).map((p) =>
       typeof p === 'string' ? p : p?.type
     ).filter(Boolean)
 
@@ -263,14 +273,15 @@ export default function PermissionsScreen() {
         type: 'success',
         text1: hasPermission ? 'Permissão removida com sucesso!' : 'Permissão adicionada com sucesso!',
       })
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const apiError = error as { response?: { data?: { message?: string } } }
       setSelectedMember({
         ...selectedMember,
         permissions: originalPermissions,
       })
       Toast.show({
         type: 'error',
-        text1: error.response?.data?.message || 'Erro ao atualizar permissão',
+        text1: apiError.response?.data?.message || 'Erro ao atualizar permissão',
       })
     } finally {
       setUpdating(false)
@@ -279,35 +290,39 @@ export default function PermissionsScreen() {
 
   if (loading) {
     return (
-      <View style={styles.container}>
-        <PageHeader title="Permissões" />
+      <ViewScreenLayout
+        headerProps={{ title: "Permissões" }}
+        refreshing={refreshing}
+        onRefresh={handleRefresh}
+      >
         <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#3366FF" />
+          <ActivityIndicator size="large" color={colors.gradients.primary[1]} />
         </View>
-      </View>
+      </ViewScreenLayout>
     )
   }
 
   return (
-    <View style={styles.container}>
-      <PageHeader title="Permissões" />
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-      >
+    <ViewScreenLayout
+      headerProps={{ title: "Permissões" }}
+      refreshing={refreshing}
+      onRefresh={handleRefresh}
+    >
         <Text style={styles.subtitle}>Gerencie as permissões dos membros</Text>
 
         {/* Busca */}
-        <View style={styles.searchContainer}>
-          <Ionicons name="search-outline" size={20} color="#9ca3af" style={styles.searchIcon} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Buscar por nome..."
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholderTextColor="#9ca3af"
-          />
-        </View>
+        <GlassCard opacity={0.4} blurIntensity={20} borderRadius={20} style={styles.searchCard}>
+          <View style={styles.searchContainer}>
+            <Ionicons name="search-outline" size={20} color={colors.text.tertiary} style={styles.searchIcon} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Buscar por nome..."
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholderTextColor={colors.text.tertiary}
+            />
+          </View>
+        </GlassCard>
 
         {/* Lista de Membros */}
         <View style={styles.membersSection}>
@@ -323,9 +338,12 @@ export default function PermissionsScreen() {
               {filteredMembers.map((member) => {
                 const isSelected = selectedMember?.id === member.id
                 return (
-                  <TouchableOpacity
+                  <GlassCard
                     key={member.id}
                     onPress={() => handleMemberSelect(member)}
+                    opacity={isSelected ? 0.5 : 0.4}
+                    blurIntensity={20}
+                    borderRadius={20}
                     style={[styles.memberCard, isSelected && styles.memberCardSelected]}
                   >
                     <View style={styles.memberInfo}>
@@ -359,7 +377,7 @@ export default function PermissionsScreen() {
                         </View>
                       </View>
                     </View>
-                  </TouchableOpacity>
+                  </GlassCard>
                 )
               })}
             </View>
@@ -368,7 +386,7 @@ export default function PermissionsScreen() {
 
         {/* Detalhes do Membro Selecionado */}
         {selectedMember && (
-          <View style={styles.detailsSection}>
+          <GlassCard opacity={0.4} blurIntensity={20} borderRadius={20} style={styles.detailsSection}>
             <View style={styles.detailsHeader}>
               <View style={styles.detailsMemberInfo}>
                 {selectedMember.avatarUrl && typeof selectedMember.avatarUrl === 'string' && selectedMember.avatarUrl.trim().length > 0 ? (
@@ -523,59 +541,55 @@ export default function PermissionsScreen() {
                 })}
               </View>
             </View>
-          </View>
+          </GlassCard>
         )}
 
         {!selectedMember && (
-          <View style={styles.noSelectionContainer}>
-            <Ionicons name="shield-outline" size={64} color="#9ca3af" />
+          <GlassCard opacity={0.4} blurIntensity={20} borderRadius={20} style={styles.noSelectionContainer}>
+            <Ionicons name="shield-outline" size={64} color={colors.text.tertiary} />
             <Text style={styles.noSelectionText}>Selecione um membro para gerenciar permissões</Text>
-          </View>
+          </GlassCard>
         )}
-      </ScrollView>
-    </View>
+    </ViewScreenLayout>
   )
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 16,
-  },
   subtitle: {
     fontSize: 14,
-    color: '#6b7280',
+    fontWeight: '400',
+    lineHeight: 20,
+    color: '#475569',
     marginBottom: 16,
+    paddingHorizontal: 16,
+  },
+  searchCard: {
+    padding: 0,
+    marginBottom: 16,
+    marginHorizontal: 16,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
   searchIcon: {
-    marginRight: 8,
+    marginRight: 12,
   },
   searchInput: {
     flex: 1,
-    paddingVertical: 12,
     fontSize: 16,
-    color: '#111827',
+    fontWeight: '400',
+    lineHeight: 24,
+    color: colors.text.primary,
+    backgroundColor: 'transparent',
+    includeFontPadding: false,
   },
   membersSection: {
     marginBottom: 24,
@@ -583,30 +597,32 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#111827',
+    lineHeight: 24,
+    color: '#0F172A',
     marginBottom: 12,
+    paddingHorizontal: 16,
   },
   emptyContainer: {
     padding: 32,
     alignItems: 'center',
   },
   emptyText: {
-    color: '#9ca3af',
     fontSize: 14,
+    fontWeight: '400',
+    lineHeight: 20,
+    color: '#64748B',
   },
   membersList: {
-    gap: 8,
+    gap: 12,
+    paddingHorizontal: 16,
   },
   memberCard: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 12,
+    padding: 16,
     borderWidth: 2,
-    borderColor: '#e5e7eb',
+    borderColor: colors.glass.border,
   },
   memberCardSelected: {
-    borderColor: '#3366FF',
-    backgroundColor: '#eff6ff',
+    borderColor: colors.gradients.primary[1],
   },
   memberInfo: {
     flexDirection: 'row',
@@ -641,40 +657,45 @@ const styles = StyleSheet.create({
   memberName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#111827',
+    lineHeight: 24,
+    color: '#0F172A',
     marginBottom: 2,
   },
   memberNameSelected: {
-    color: '#3366FF',
+    color: colors.gradients.primary[1],
   },
   memberEmail: {
     fontSize: 14,
-    color: '#6b7280',
+    fontWeight: '400',
+    lineHeight: 20,
+    color: '#475569',
     marginBottom: 4,
   },
   memberEmailSelected: {
-    color: '#60a5fa',
+    color: colors.gradients.primary[0],
   },
   memberRoleBadge: {
     alignSelf: 'flex-start',
-    backgroundColor: '#f3f4f6',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
+    backgroundColor: colors.glass.overlay,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.glass.border,
   },
   memberRoleText: {
     fontSize: 12,
     fontWeight: '500',
-    color: '#6b7280',
+    lineHeight: 18,
+    color: '#475569',
   },
   memberRoleTextSelected: {
-    color: '#2563eb',
+    color: colors.gradients.primary[1],
   },
   detailsSection: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 16,
+    padding: 20,
     marginBottom: 24,
+    marginHorizontal: 16,
   },
   detailsHeader: {
     marginBottom: 16,
@@ -707,12 +728,15 @@ const styles = StyleSheet.create({
   detailsTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#111827',
+    lineHeight: 24,
+    color: '#0F172A',
     marginBottom: 4,
   },
   detailsEmail: {
     fontSize: 14,
-    color: '#6b7280',
+    fontWeight: '400',
+    lineHeight: 20,
+    color: '#475569',
   },
   roleSection: {
     flexDirection: 'row',
@@ -723,14 +747,15 @@ const styles = StyleSheet.create({
   roleLabel: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#374151',
+    lineHeight: 24,
+    color: '#0F172A',
   },
   rolePickerContainer: {
     flex: 1,
     borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    backgroundColor: '#fff',
+    borderColor: colors.glass.border,
+    borderRadius: 16,
+    backgroundColor: colors.glass.overlay,
   },
   rolePicker: {
     height: 50,
@@ -806,14 +831,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
-    backgroundColor: '#fff',
-    borderRadius: 8,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: colors.glass.border,
+    backgroundColor: 'transparent',
   },
   permissionItemActive: {
-    backgroundColor: '#dcfce7',
-    borderColor: '#86efac',
+    borderColor: colors.status.success,
   },
   permissionItemDisabled: {
     opacity: 0.6,
@@ -830,15 +854,18 @@ const styles = StyleSheet.create({
   permissionLabel: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#111827',
+    lineHeight: 24,
+    color: '#0F172A',
     marginBottom: 2,
   },
   permissionLabelActive: {
-    color: '#16a34a',
+    color: colors.status.success,
   },
   permissionType: {
     fontSize: 12,
-    color: '#6b7280',
+    fontWeight: '400',
+    lineHeight: 18,
+    color: '#64748B',
   },
   permissionWarning: {
     marginTop: 8,
@@ -860,11 +887,14 @@ const styles = StyleSheet.create({
     padding: 48,
     alignItems: 'center',
     justifyContent: 'center',
+    marginHorizontal: 16,
   },
   noSelectionText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#6b7280',
+    fontWeight: '400',
+    lineHeight: 24,
+    color: '#475569',
     textAlign: 'center',
   },
 })

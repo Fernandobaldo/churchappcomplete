@@ -1,10 +1,13 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native'
+import { LinearGradient } from 'expo-linear-gradient'
 import { useNavigation } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
 import { subscriptionApi } from '../api/api'
 import Toast from 'react-native-toast-message'
-import PageHeader from '../components/PageHeader'
+import ViewScreenLayout from '../components/layouts/ViewScreenLayout'
+import GlassCard from '../components/GlassCard'
+import { colors } from '../theme/colors'
 import { Linking } from 'react-native'
 
 interface Subscription {
@@ -76,13 +79,10 @@ export default function SubscriptionScreen() {
   const navigation = useNavigation()
   const [subscription, setSubscription] = useState<Subscription | null>(null)
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
 
-  useEffect(() => {
-    loadSubscription()
-  }, [])
-
-  const loadSubscription = async () => {
+  const loadSubscription = useCallback(async () => {
     try {
       setLoading(true)
       const response = await subscriptionApi.getMySubscription()
@@ -96,8 +96,18 @@ export default function SubscriptionScreen() {
       }
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    loadSubscription()
+  }, [loadSubscription])
+
+  const handleRefresh = useCallback(() => {
+    setRefreshing(true)
+    loadSubscription()
+  }, [loadSubscription])
 
   const handleCancel = () => {
     Alert.alert(
@@ -165,22 +175,28 @@ export default function SubscriptionScreen() {
 
   if (loading) {
     return (
-      <View style={styles.container}>
-        <PageHeader title="Minha Assinatura" />
+      <ViewScreenLayout
+        headerProps={{ title: "Minha Assinatura" }}
+        refreshing={refreshing}
+        onRefresh={handleRefresh}
+      >
         <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#3366FF" />
+          <ActivityIndicator size="large" color={colors.gradients.primary[1]} />
         </View>
-      </View>
+      </ViewScreenLayout>
     )
   }
 
   if (!subscription) {
     return (
-      <View style={styles.container}>
-        <PageHeader title="Minha Assinatura" />
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          <View style={styles.emptyCard}>
-            <Ionicons name="card-outline" size={64} color="#9ca3af" />
+      <ViewScreenLayout
+        headerProps={{ title: "Minha Assinatura" }}
+        refreshing={refreshing}
+        onRefresh={handleRefresh}
+      >
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          <GlassCard opacity={0.4} blurIntensity={20} borderRadius={20} style={styles.emptyCard}>
+            <Ionicons name="card-outline" size={64} color={colors.text.tertiary} />
             <Text style={styles.emptyTitle}>Nenhuma Assinatura Ativa</Text>
             <Text style={styles.emptyText}>
               Você ainda não possui uma assinatura ativa. Escolha um plano para começar.
@@ -188,25 +204,36 @@ export default function SubscriptionScreen() {
             <TouchableOpacity
               style={styles.button}
               onPress={() => navigation.navigate('Dashboard' as never)}
+              activeOpacity={0.8}
             >
-              <Text style={styles.buttonText}>Ver Planos</Text>
+              <LinearGradient
+                colors={colors.gradients.primary as [string, string]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.buttonGradient}
+              >
+                <Text style={styles.buttonText}>Ver Planos</Text>
+              </LinearGradient>
             </TouchableOpacity>
-          </View>
+          </GlassCard>
         </ScrollView>
-      </View>
+      </ViewScreenLayout>
     )
   }
 
   const statusInfo = statusConfig[subscription.status]
 
   return (
-    <View style={styles.container}>
-      <PageHeader title="Minha Assinatura" />
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+    <ViewScreenLayout
+      headerProps={{ title: "Minha Assinatura" }}
+      refreshing={refreshing}
+      onRefresh={handleRefresh}
+    >
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <Text style={styles.subtitle}>Gerencie sua assinatura e visualize o histórico de pagamentos</Text>
 
         {/* Status Card */}
-        <View style={[styles.statusCard, { borderColor: statusInfo.borderColor, backgroundColor: statusInfo.bgColor }]}>
+        <GlassCard opacity={0.45} blurIntensity={20} borderRadius={20} style={[styles.statusCard, { borderColor: statusInfo.borderColor }]}>
           <View style={styles.statusHeader}>
             <View style={styles.statusInfo}>
               <View style={[styles.statusIconContainer, { backgroundColor: statusInfo.bgColor }]}>
@@ -221,24 +248,40 @@ export default function SubscriptionScreen() {
             </View>
             {subscription.status === 'canceled' && !subscription.cancelAtPeriodEnd && (
               <TouchableOpacity
-                style={[styles.actionButton, styles.resumeButton]}
+                style={styles.actionButton}
                 onPress={handleResume}
                 disabled={actionLoading}
+                activeOpacity={0.8}
               >
-                <Text style={styles.actionButtonText}>
-                  {actionLoading ? 'Processando...' : 'Retomar'}
-                </Text>
+                <LinearGradient
+                  colors={actionLoading ? ['#94A3B8', '#94A3B8'] : [colors.status.success, '#16a34a'] as [string, string]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.actionButtonGradient}
+                >
+                  <Text style={styles.actionButtonText}>
+                    {actionLoading ? 'Processando...' : 'Retomar'}
+                  </Text>
+                </LinearGradient>
               </TouchableOpacity>
             )}
             {subscription.status === 'active' && !subscription.cancelAtPeriodEnd && (
               <TouchableOpacity
-                style={[styles.actionButton, styles.cancelButton]}
+                style={styles.actionButton}
                 onPress={handleCancel}
                 disabled={actionLoading}
+                activeOpacity={0.8}
               >
-                <Text style={styles.actionButtonText}>
-                  {actionLoading ? 'Processando...' : 'Cancelar'}
-                </Text>
+                <LinearGradient
+                  colors={actionLoading ? ['#94A3B8', '#94A3B8'] : [colors.status.error, '#DC2626'] as [string, string]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.actionButtonGradient}
+                >
+                  <Text style={styles.actionButtonText}>
+                    {actionLoading ? 'Processando...' : 'Cancelar'}
+                  </Text>
+                </LinearGradient>
               </TouchableOpacity>
             )}
           </View>
@@ -250,10 +293,10 @@ export default function SubscriptionScreen() {
               </Text>
             </View>
           )}
-        </View>
+        </GlassCard>
 
         {/* Plan Info */}
-        <View style={styles.card}>
+        <GlassCard opacity={0.4} blurIntensity={20} borderRadius={20} style={styles.card}>
           <Text style={styles.cardTitle}>Informações do Plano</Text>
           <View style={styles.infoGrid}>
             <View style={styles.infoItem}>
@@ -282,17 +325,17 @@ export default function SubscriptionScreen() {
               </Text>
             </View>
           </View>
-        </View>
+        </GlassCard>
 
         {/* Payment History */}
-        <View style={styles.card}>
+        <GlassCard opacity={0.4} blurIntensity={20} borderRadius={20} style={styles.card}>
           <Text style={styles.cardTitle}>Histórico de Pagamentos</Text>
           {subscription.paymentHistory.length === 0 ? (
             <Text style={styles.emptyPaymentText}>Nenhum pagamento registrado ainda</Text>
           ) : (
             <View style={styles.paymentList}>
               {subscription.paymentHistory.map((payment) => (
-                <View key={payment.id} style={styles.paymentItem}>
+                <GlassCard key={payment.id} opacity={0.35} blurIntensity={20} borderRadius={16} style={styles.paymentItem}>
                   <View style={styles.paymentInfo}>
                     <Ionicons name="card-outline" size={20} color="#9ca3af" />
                     <View style={styles.paymentDetails}>
@@ -320,69 +363,75 @@ export default function SubscriptionScreen() {
                         : 'Falhou'}
                     </Text>
                   </View>
-                </View>
+                </GlassCard>
               ))}
             </View>
           )}
-        </View>
+        </GlassCard>
       </ScrollView>
-    </View>
+    </ViewScreenLayout>
   )
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    marginTop: 110,
   },
   scrollContent: {
     padding: 16,
+    paddingBottom: 100,
   },
   subtitle: {
     fontSize: 14,
-    color: '#6b7280',
+    fontWeight: '400',
+    lineHeight: 20,
+    color: '#475569',
     marginBottom: 16,
   },
   emptyCard: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
     padding: 32,
     alignItems: 'center',
     marginTop: 32,
   },
   emptyTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
-    color: '#111827',
+    fontWeight: '700',
+    lineHeight: 28,
+    color: '#0F172A',
     marginTop: 16,
     marginBottom: 8,
   },
   emptyText: {
     fontSize: 14,
-    color: '#6b7280',
+    fontWeight: '400',
+    lineHeight: 20,
+    color: '#475569',
     textAlign: 'center',
     marginBottom: 24,
   },
   button: {
-    backgroundColor: '#3366FF',
-    paddingVertical: 12,
+    borderRadius: 18,
+    overflow: 'hidden',
+    marginTop: 8,
+  },
+  buttonGradient: {
+    paddingVertical: 16,
     paddingHorizontal: 24,
-    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 56,
   },
   buttonText: {
-    color: '#fff',
-    fontWeight: '600',
+    color: '#FFFFFF',
     fontSize: 16,
+    fontWeight: '600',
+    lineHeight: 24,
   },
   statusCard: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 16,
+    padding: 20,
     marginBottom: 16,
     borderWidth: 2,
   },
@@ -410,28 +459,31 @@ const styles = StyleSheet.create({
   statusTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#111827',
+    lineHeight: 24,
+    color: '#0F172A',
     marginBottom: 4,
   },
   statusLabel: {
     fontSize: 14,
     fontWeight: '500',
+    lineHeight: 20,
   },
   actionButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 6,
+    borderRadius: 16,
+    overflow: 'hidden',
   },
-  resumeButton: {
-    backgroundColor: '#16a34a',
-  },
-  cancelButton: {
-    backgroundColor: '#dc2626',
+  actionButtonGradient: {
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
   },
   actionButtonText: {
-    color: '#fff',
-    fontWeight: '600',
+    color: '#FFFFFF',
     fontSize: 14,
+    fontWeight: '600',
+    lineHeight: 20,
   },
   warningBox: {
     marginTop: 16,
@@ -446,15 +498,14 @@ const styles = StyleSheet.create({
     color: '#92400e',
   },
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 16,
+    padding: 20,
     marginBottom: 16,
   },
   cardTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#111827',
+    lineHeight: 24,
+    color: '#0F172A',
     marginBottom: 16,
   },
   infoGrid: {
@@ -465,21 +516,28 @@ const styles = StyleSheet.create({
   },
   infoLabel: {
     fontSize: 14,
-    color: '#6b7280',
+    fontWeight: '400',
+    lineHeight: 20,
+    color: '#475569',
     marginBottom: 4,
   },
   infoValue: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#111827',
+    lineHeight: 24,
+    color: '#0F172A',
   },
   emptyPaymentText: {
-    color: '#6b7280',
+    fontSize: 14,
+    fontWeight: '400',
+    lineHeight: 20,
+    color: '#64748B',
     textAlign: 'center',
     padding: 32,
   },
   paymentList: {
     gap: 12,
+    marginTop: 12,
   },
   paymentItem: {
     flexDirection: 'row',
@@ -487,8 +545,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 8,
+    borderColor: colors.glass.border,
   },
   paymentInfo: {
     flexDirection: 'row',
@@ -501,12 +558,15 @@ const styles = StyleSheet.create({
   paymentAmount: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#111827',
+    lineHeight: 24,
+    color: '#0F172A',
     marginBottom: 4,
   },
   paymentDate: {
     fontSize: 12,
-    color: '#6b7280',
+    fontWeight: '400',
+    lineHeight: 18,
+    color: '#64748B',
   },
   paymentStatusBadge: {
     paddingVertical: 4,

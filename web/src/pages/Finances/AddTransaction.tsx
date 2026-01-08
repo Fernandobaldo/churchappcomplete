@@ -7,10 +7,8 @@ import { useState, useEffect } from 'react'
 import MemberSearch from '../../components/MemberSearch'
 
 interface TransactionForm {
-  title: string
   amount: number
   type: 'ENTRY' | 'EXIT'
-  category: string
   entryType?: 'OFERTA' | 'DIZIMO' | 'CONTRIBUICAO'
   exitType?: 'ALUGUEL' | 'ENERGIA' | 'AGUA' | 'INTERNET' | 'OUTROS'
   exitTypeOther?: string
@@ -18,6 +16,7 @@ interface TransactionForm {
   tithePayerMemberId?: string
   tithePayerName?: string
   isTithePayerMember?: boolean
+  date?: string
 }
 
 interface Contribution {
@@ -32,7 +31,6 @@ export default function AddTransaction() {
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<TransactionForm>({
     defaultValues: {
       type: 'ENTRY',
-      category: '',
       entryType: undefined,
       isTithePayerMember: true,
     },
@@ -68,8 +66,13 @@ export default function AddTransaction() {
   const onSubmit = async (data: TransactionForm) => {
     try {
       const payload: any = {
-        ...data,
         amount: parseFloat(data.amount.toString()),
+        type: data.type,
+      }
+
+      // Adicionar date se fornecido
+      if (data.date) {
+        payload.date = data.date
       }
 
       // Limpar campos relacionados a dízimo se não for dízimo
@@ -95,10 +98,14 @@ export default function AddTransaction() {
         payload.exitType = undefined
         payload.exitTypeOther = undefined
       } else {
+        payload.exitType = data.exitType
         // Se exitType é OUTROS, garantir que exitTypeOther está presente
         if (data.exitType === 'OUTROS' && !data.exitTypeOther) {
           toast.error('Descrição é obrigatória quando selecionar "Outros"')
           return
+        }
+        if (data.exitType === 'OUTROS') {
+          payload.exitTypeOther = data.exitTypeOther
         }
       }
 
@@ -106,6 +113,11 @@ export default function AddTransaction() {
       if (data.type !== 'ENTRY') {
         payload.entryType = undefined
         payload.contributionId = undefined
+      } else {
+        payload.entryType = data.entryType
+        if (data.entryType === 'CONTRIBUICAO') {
+          payload.contributionId = data.contributionId
+        }
       }
 
       await api.post('/finances', payload)
@@ -139,68 +151,30 @@ export default function AddTransaction() {
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div>
-            <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-1">
-              Título *
+            <label htmlFor="type" className="block text-sm font-medium text-gray-700 mb-1">
+              Tipo *
             </label>
-            <input
-              id="title"
-              {...register('title', { required: 'Título é obrigatório' })}
+            <select
+              id="type"
+              {...register('type', { required: 'Tipo é obrigatório' })}
               className="input"
-              placeholder="Ex: Pagamento de aluguel"
-            />
-            {errors.title && (
-              <p className="mt-1 text-sm text-red-600">{errors.title.message}</p>
+              onChange={(e) => {
+                register('type').onChange(e)
+                // Limpar entryType quando mudar para EXIT
+                if (e.target.value === 'EXIT') {
+                  setValue('entryType', undefined)
+                  setValue('isTithePayerMember', true)
+                  setTithePayerMemberId(null)
+                  setValue('tithePayerName', undefined)
+                }
+              }}
+            >
+              <option value="ENTRY">Entrada</option>
+              <option value="EXIT">Saída</option>
+            </select>
+            {errors.type && (
+              <p className="mt-1 text-sm text-red-600">{errors.type.message}</p>
             )}
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="amount" className="block text-sm font-medium text-gray-700 mb-1">
-                Valor *
-              </label>
-              <input
-                id="amount"
-                type="number"
-                step="0.01"
-                min="0"
-                {...register('amount', {
-                  required: 'Valor é obrigatório',
-                  min: { value: 0.01, message: 'Valor deve ser maior que zero' },
-                })}
-                className="input"
-                placeholder="0.00"
-              />
-              {errors.amount && (
-                <p className="mt-1 text-sm text-red-600">{errors.amount.message}</p>
-              )}
-            </div>
-
-            <div>
-              <label htmlFor="type" className="block text-sm font-medium text-gray-700 mb-1">
-                Tipo *
-              </label>
-              <select
-                id="type"
-                {...register('type', { required: 'Tipo é obrigatório' })}
-                className="input"
-                onChange={(e) => {
-                  register('type').onChange(e)
-                  // Limpar entryType quando mudar para EXIT
-                  if (e.target.value === 'EXIT') {
-                    setValue('entryType', undefined)
-                    setValue('isTithePayerMember', true)
-                    setTithePayerMemberId(null)
-                    setValue('tithePayerName', undefined)
-                  }
-                }}
-              >
-                <option value="ENTRY">Entrada</option>
-                <option value="EXIT">Saída</option>
-              </select>
-              {errors.type && (
-                <p className="mt-1 text-sm text-red-600">{errors.type.message}</p>
-              )}
-            </div>
           </div>
 
           {type === 'ENTRY' && (
@@ -236,6 +210,44 @@ export default function AddTransaction() {
               {errors.entryType && (
                 <p className="mt-1 text-sm text-red-600">{errors.entryType.message}</p>
               )}
+            </div>
+          )}
+
+          {type === 'ENTRY' && (
+            <div>
+              <label htmlFor="amount" className="block text-sm font-medium text-gray-700 mb-1">
+                Valor *
+              </label>
+              <input
+                id="amount"
+                type="number"
+                step="0.01"
+                min="0"
+                {...register('amount', {
+                  required: 'Valor é obrigatório',
+                  min: { value: 0.01, message: 'Valor deve ser maior que zero' },
+                })}
+                className="input"
+                placeholder="0.00"
+              />
+              {errors.amount && (
+                <p className="mt-1 text-sm text-red-600">{errors.amount.message}</p>
+              )}
+            </div>
+          )}
+
+          {type === 'ENTRY' && (
+            <div>
+              <label htmlFor="date" className="block text-sm font-medium text-gray-700 mb-1">
+                Data
+              </label>
+              <input
+                id="date"
+                type="date"
+                {...register('date')}
+                className="input"
+              />
+              <p className="mt-1 text-xs text-gray-500">Opcional - Se não informado, será usada a data atual</p>
             </div>
           )}
 
@@ -418,6 +430,44 @@ export default function AddTransaction() {
             </div>
           )}
 
+          {type === 'EXIT' && (
+            <div>
+              <label htmlFor="amount" className="block text-sm font-medium text-gray-700 mb-1">
+                Valor *
+              </label>
+              <input
+                id="amount"
+                type="number"
+                step="0.01"
+                min="0"
+                {...register('amount', {
+                  required: 'Valor é obrigatório',
+                  min: { value: 0.01, message: 'Valor deve ser maior que zero' },
+                })}
+                className="input"
+                placeholder="0.00"
+              />
+              {errors.amount && (
+                <p className="mt-1 text-sm text-red-600">{errors.amount.message}</p>
+              )}
+            </div>
+          )}
+
+          {type === 'EXIT' && (
+            <div>
+              <label htmlFor="date" className="block text-sm font-medium text-gray-700 mb-1">
+                Data
+              </label>
+              <input
+                id="date"
+                type="date"
+                {...register('date')}
+                className="input"
+              />
+              <p className="mt-1 text-xs text-gray-500">Opcional - Se não informado, será usada a data atual</p>
+            </div>
+          )}
+
           {type === 'EXIT' && exitType === 'OUTROS' && (
             <div>
               <label htmlFor="exitTypeOther" className="block text-sm font-medium text-gray-700 mb-1">
@@ -436,19 +486,6 @@ export default function AddTransaction() {
               )}
             </div>
           )}
-
-          <div>
-            <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-1">
-              Categoria
-            </label>
-            <input
-              id="category"
-              {...register('category')}
-              className="input"
-              placeholder="Ex: Aluguel, Salário, Material, etc."
-            />
-            <p className="mt-1 text-xs text-gray-500">Opcional - Categoria da transação</p>
-          </div>
 
           <div className="flex gap-4 pt-4">
             <button id="submit-button" type="submit" className="btn-primary">

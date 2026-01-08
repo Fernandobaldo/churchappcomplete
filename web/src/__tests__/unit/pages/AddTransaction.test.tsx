@@ -62,8 +62,6 @@ describe('AddTransaction Page', () => {
 
     expect(screen.getByText('Nova Transação')).toBeInTheDocument()
     // Usar IDs em vez de labels para ser mais robusto
-    expect(document.getElementById('title')).toBeInTheDocument()
-    expect(document.getElementById('amount')).toBeInTheDocument()
     expect(document.getElementById('type')).toBeInTheDocument()
   })
 
@@ -79,7 +77,7 @@ describe('AddTransaction Page', () => {
     await user.click(submitButton)
 
     await waitFor(() => {
-      expect(screen.getByText(/título é obrigatório/i)).toBeInTheDocument()
+      expect(screen.getByText(/valor é obrigatório/i)).toBeInTheDocument()
     })
   })
 
@@ -88,11 +86,9 @@ describe('AddTransaction Page', () => {
     const mockResponse = {
       data: {
         id: 'trans-1',
-        title: 'Oferta',
         amount: 500.0,
         type: 'ENTRY',
         entryType: 'OFERTA',
-        category: 'Oferta',
       },
     }
 
@@ -104,15 +100,6 @@ describe('AddTransaction Page', () => {
         <AddTransaction />
       </MemoryRouter>
     )
-
-    // Preencher título usando ID
-    const titleInput = document.getElementById('title') as HTMLInputElement
-    await user.type(titleInput, 'Oferta')
-
-    // Preencher valor usando ID
-    const amountInput = document.getElementById('amount') as HTMLInputElement
-    await user.clear(amountInput)
-    fireEvent.change(amountInput, { target: { value: '500' } })
 
     // Selecionar tipo ENTRY usando ID
     const typeSelect = document.getElementById('type') as HTMLSelectElement
@@ -127,9 +114,15 @@ describe('AddTransaction Page', () => {
     const entryTypeSelect = document.getElementById('entryType') as HTMLSelectElement
     await user.selectOptions(entryTypeSelect, 'OFERTA')
 
-    // Preencher categoria usando ID
-    const categoryInput = document.getElementById('category') as HTMLInputElement
-    await user.type(categoryInput, 'Oferta')
+    // Aguardar campo amount aparecer
+    await waitFor(() => {
+      expect(document.getElementById('amount')).toBeInTheDocument()
+    })
+
+    // Preencher valor usando ID
+    const amountInput = document.getElementById('amount') as HTMLInputElement
+    await user.clear(amountInput)
+    fireEvent.change(amountInput, { target: { value: '500' } })
 
     // Submeter usando ID
     const submitButton = document.getElementById('submit-button') || screen.getByText('Salvar Transação')
@@ -142,11 +135,9 @@ describe('AddTransaction Page', () => {
 
     await waitFor(() => {
       expect(api.post).toHaveBeenCalledWith('/finances', expect.objectContaining({
-        title: 'Oferta',
         amount: 500,
         type: 'ENTRY',
         entryType: 'OFERTA',
-        category: 'Oferta',
       }))
     })
 
@@ -162,11 +153,9 @@ describe('AddTransaction Page', () => {
     const mockResponse = {
       data: {
         id: 'trans-1',
-        title: 'Pagamento',
         amount: 300.0,
         type: 'EXIT',
         exitType: 'ALUGUEL',
-        category: 'Despesas',
       },
     }
 
@@ -178,15 +167,6 @@ describe('AddTransaction Page', () => {
         <AddTransaction />
       </MemoryRouter>
     )
-
-    // Preencher título usando ID
-    const titleInput = document.getElementById('title') as HTMLInputElement
-    await user.type(titleInput, 'Pagamento')
-
-    // Preencher valor usando ID
-    const amountInput = document.getElementById('amount') as HTMLInputElement
-    await user.clear(amountInput)
-    fireEvent.change(amountInput, { target: { value: '300' } })
 
     // Selecionar tipo EXIT usando ID
     const typeSelect = document.getElementById('type') as HTMLSelectElement
@@ -202,9 +182,15 @@ describe('AddTransaction Page', () => {
     const exitTypeSelect = document.getElementById('exitType') as HTMLSelectElement
     await user.selectOptions(exitTypeSelect, 'ALUGUEL')
 
-    // Preencher categoria usando ID
-    const categoryInput = document.getElementById('category') as HTMLInputElement
-    await user.type(categoryInput, 'Despesas')
+    // Aguardar campo amount aparecer
+    await waitFor(() => {
+      expect(document.getElementById('amount')).toBeInTheDocument()
+    })
+
+    // Preencher valor usando ID
+    const amountInput = document.getElementById('amount') as HTMLInputElement
+    await user.clear(amountInput)
+    fireEvent.change(amountInput, { target: { value: '300' } })
 
     // Submeter usando ID
     const submitButton = document.getElementById('submit-button') || screen.getByText('Salvar Transação')
@@ -217,11 +203,9 @@ describe('AddTransaction Page', () => {
 
     await waitFor(() => {
       expect(api.post).toHaveBeenCalledWith('/finances', expect.objectContaining({
-        title: 'Pagamento',
         amount: 300,
         type: 'EXIT',
         exitType: 'ALUGUEL',
-        category: 'Despesas',
       }))
     })
 
@@ -376,14 +360,7 @@ describe('AddTransaction Page', () => {
       </MemoryRouter>
     )
 
-    // Preencher formulário usando IDs
-    const titleInput = document.getElementById('title') as HTMLInputElement
-    await user.type(titleInput, 'Transação')
-
-    const amountInput = document.getElementById('amount') as HTMLInputElement
-    await user.clear(amountInput)
-    fireEvent.change(amountInput, { target: { value: '100' } })
-
+    // Selecionar tipo ENTRY
     const typeSelect = document.getElementById('type') as HTMLSelectElement
     await user.selectOptions(typeSelect, 'ENTRY')
 
@@ -393,6 +370,14 @@ describe('AddTransaction Page', () => {
     })
     const entryTypeSelect = document.getElementById('entryType') as HTMLSelectElement
     await user.selectOptions(entryTypeSelect, 'OFERTA')
+
+    // Preencher valor
+    await waitFor(() => {
+      expect(document.getElementById('amount')).toBeInTheDocument()
+    })
+    const amountInput = document.getElementById('amount') as HTMLInputElement
+    await user.clear(amountInput)
+    fireEvent.change(amountInput, { target: { value: '100' } })
 
     // Submeter usando ID
     const submitButton = document.getElementById('submit-button') || screen.getByText('Salvar Transação')
@@ -455,11 +440,9 @@ describe('AddTransaction Page', () => {
     const mockResponse = {
       data: {
         id: 'trans-1',
-        title: 'Aluguel',
         amount: 1500.0,
         type: 'EXIT',
         exitType: 'ALUGUEL',
-        category: 'Despesas',
       },
     }
 
@@ -472,13 +455,6 @@ describe('AddTransaction Page', () => {
       </MemoryRouter>
     )
 
-    const titleInput = document.getElementById('title') as HTMLInputElement
-    await user.type(titleInput, 'Aluguel')
-
-    const amountInput = document.getElementById('amount') as HTMLInputElement
-    await user.clear(amountInput)
-    fireEvent.change(amountInput, { target: { value: '1500' } })
-
     const typeSelect = document.getElementById('type') as HTMLSelectElement
     await user.selectOptions(typeSelect, 'EXIT')
 
@@ -490,6 +466,14 @@ describe('AddTransaction Page', () => {
     const exitTypeSelect = document.getElementById('exitType') as HTMLSelectElement
     await user.selectOptions(exitTypeSelect, 'ALUGUEL')
 
+    await waitFor(() => {
+      expect(document.getElementById('amount')).toBeInTheDocument()
+    })
+
+    const amountInput = document.getElementById('amount') as HTMLInputElement
+    await user.clear(amountInput)
+    fireEvent.change(amountInput, { target: { value: '1500' } })
+
     const submitButton = document.getElementById('submit-button') || screen.getByText('Salvar Transação')
     const form = submitButton.closest('form')
     if (form) {
@@ -500,7 +484,6 @@ describe('AddTransaction Page', () => {
 
     await waitFor(() => {
       expect(api.post).toHaveBeenCalledWith('/finances', expect.objectContaining({
-        title: 'Aluguel',
         amount: 1500,
         type: 'EXIT',
         exitType: 'ALUGUEL',
@@ -555,7 +538,6 @@ describe('AddTransaction Page', () => {
     const mockResponse = {
       data: {
         id: 'trans-1',
-        title: 'Transação de Contribuição',
         amount: 500.0,
         type: 'ENTRY',
         entryType: 'CONTRIBUICAO',
@@ -571,13 +553,6 @@ describe('AddTransaction Page', () => {
         <AddTransaction />
       </MemoryRouter>
     )
-
-    const titleInput = document.getElementById('title') as HTMLInputElement
-    await user.type(titleInput, 'Transação de Contribuição')
-
-    const amountInput = document.getElementById('amount') as HTMLInputElement
-    await user.clear(amountInput)
-    fireEvent.change(amountInput, { target: { value: '500' } })
 
     const typeSelect = document.getElementById('type') as HTMLSelectElement
     await user.selectOptions(typeSelect, 'ENTRY')
@@ -598,6 +573,14 @@ describe('AddTransaction Page', () => {
     const contributionSelect = document.getElementById('contributionId') as HTMLSelectElement
     await user.selectOptions(contributionSelect, 'contrib-1')
 
+    await waitFor(() => {
+      expect(document.getElementById('amount')).toBeInTheDocument()
+    })
+
+    const amountInput = document.getElementById('amount') as HTMLInputElement
+    await user.clear(amountInput)
+    fireEvent.change(amountInput, { target: { value: '500' } })
+
     const submitButton = document.getElementById('submit-button') || screen.getByText('Salvar Transação')
     const form = submitButton.closest('form')
     if (form) {
@@ -608,7 +591,6 @@ describe('AddTransaction Page', () => {
 
     await waitFor(() => {
       expect(api.post).toHaveBeenCalledWith('/finances', expect.objectContaining({
-        title: 'Transação de Contribuição',
         amount: 500,
         type: 'ENTRY',
         entryType: 'CONTRIBUICAO',

@@ -1,22 +1,32 @@
-import React, { useEffect, useState } from 'react'
-import { View, Text, FlatList, ActivityIndicator, StyleSheet, TouchableOpacity } from 'react-native'
+import React, { useEffect, useState, useCallback, useMemo } from 'react'
+import { View, Text, FlatList, ActivityIndicator, StyleSheet } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
 import api from '../api/api'
 import DevotionalCard from '../components/DevotionalCard'
+import ViewScreenLayout from '../components/layouts/ViewScreenLayout'
 import FontAwesome5 from "@expo/vector-icons/FontAwesome5";
 import {useAuthStore} from "../stores/authStore";
+import { colors } from '../theme/colors'
+import { useBackToDashboard } from '../hooks/useBackToDashboard'
+import EmptyState from '../components/EmptyState'
 
 export default function FeedDevotionalsScreen() {
     const navigation = useNavigation()
     const user = useAuthStore((s) => s.user)
     const permissions = user?.permissions?.map((p) => p.type) || []
+    
+    // Intercepta gesto de voltar para navegar ao Dashboard quando não há página anterior
+    useBackToDashboard()
 
 
 
     const [devotionals, setDevotionals] = useState([])
     const [loading, setLoading] = useState(true)
     const [refreshing, setRefreshing] = useState(false)
+    const [page, setPage] = useState(1)
+    const [loadingMore, setLoadingMore] = useState(false)
+    const ITEMS_PER_PAGE = 10
 
     const fetchDevotionals = async () => {
         try {
@@ -38,111 +48,86 @@ export default function FeedDevotionalsScreen() {
 
     const handleRefresh = async () => {
         setRefreshing(true)
+        setPage(1)
         await fetchDevotionals()
         setRefreshing(false)
     }
+    
+    // Paginação: mostra apenas os primeiros N itens
+    const paginatedDevotionals = useMemo(() => 
+        devotionals.slice(0, page * ITEMS_PER_PAGE),
+        [devotionals, page]
+    )
+    
+    const loadMore = useCallback(() => {
+        if (!loadingMore && paginatedDevotionals.length < devotionals.length) {
+            setLoadingMore(true)
+            setTimeout(() => {
+                setPage(prev => prev + 1)
+                setLoadingMore(false)
+            }, 300)
+        }
+    }, [loadingMore, paginatedDevotionals.length, devotionals.length])
 
-    if (loading) {
-        return (
-            <View style={styles.centered}>
-                <ActivityIndicator size="large" color="#3366FF" />
-            </View>
-        )
-    }
     const canManageDevotionals =
         user.role === 'ADMINGERAL' ||
         user.role === 'ADMINFILIAL' ||
         user.permissions?.some((p: any) => p.type === 'devotional_manage')
 
-
-
     return (
-        <View style={styles.container}>
-            {/* Cabeçalho igual a Eventos */}
-            <View style={styles.headertop}>
-                <FontAwesome5 name="bible" size={24} color="white" style={{ marginRight: 8 }} />
-                <Text style={styles.headerTitletop}>Devocionais e Estudos</Text>
-            </View>
-
+        <ViewScreenLayout
+            headerProps={{
+                title: "Devocionais e Estudos",
+                Icon: FontAwesome5,
+                iconName: "bible",
+                rightButtonIcon: canManageDevotionals ? <Ionicons name="add" size={24} color="white" /> : undefined,
+                onRightButtonPress: canManageDevotionals ? () => navigation.navigate('AddDevotional') : undefined,
+            }}
+            scrollable={false}
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            contentContainerStyle={styles.viewContent}
+        >
             <FlatList
                 contentContainerStyle={styles.list}
-                data={devotionals}
+                data={paginatedDevotionals}
                 renderItem={({ item }) => (
                     <DevotionalCard devotional={item} refreshDevotionals={fetchDevotionals} />
                 )}
                 keyExtractor={(item) => item.id}
                 refreshing={refreshing}
                 onRefresh={handleRefresh}
+                onEndReached={loadMore}
+                onEndReachedThreshold={0.5}
+                ListFooterComponent={
+                    loadingMore ? (
+                        <View style={styles.loadingMore}>
+                            <ActivityIndicator size="small" color={colors.gradients.primary[1]} />
+                        </View>
+                    ) : null
+                }
                 ListEmptyComponent={
-                    <View style={styles.centered}>
-                        <Text style={styles.emptyText}>Nenhum devocional encontrado 🙏</Text>
-                    </View>
+                    <EmptyState
+                        icon="book-outline"
+                        message="Nenhum devocional encontrado 🙏"
+                    />
                 }
             />
-
-            {/* Botão Flutuante de Adicionar */}
-            {canManageDevotionals && (
-            <TouchableOpacity
-                style={styles.fab}
-                onPress={() => navigation.navigate('AddDevotional')}
-            >
-                <Ionicons name="add" size={24} color="white" />
-                <Text style={styles.fabText}>Adicionar</Text>
-            </TouchableOpacity>
-                )}
-        </View>
+        </ViewScreenLayout>
     )
 }
 
 const styles = StyleSheet.create({
-    centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    emptyText: { fontSize: 16, color: '#666', marginBottom: 20 },
-    header: {
-        backgroundColor: '#3366FF',
-        paddingTop: 60,
-        paddingBottom: 20,
-        paddingHorizontal: 20,
-        borderBottomLeftRadius: 20,
-        borderBottomRightRadius: 20,
+    viewContent: {
+        flex: 1,
+        padding: 0,
     },
-    headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#fff' },
-    list: { padding: 16, paddingBottom: 100 }, // espaço extra para botão flutuante
-    fab: {
-        position: 'absolute',
-        right: 20,
-        marginBottom: 50,
-        bottom: 20,
-        backgroundColor: '#3366FF',
-        paddingVertical: 12,
-        paddingHorizontal: 18,
-        borderRadius: 30,
-        flexDirection: 'row',
+    list: { 
+        padding: 16, 
+        paddingBottom: 100,
+    },
+    loadingMore: {
+        paddingVertical: 16,
         alignItems: 'center',
-        gap: 6,
-        shadowColor: '#000',
-        shadowOpacity: 0.2,
-        shadowOffset: { width: 0, height: 2 },
-        shadowRadius: 4,
-        elevation: 6,
     },
-    container: { flex: 1},
-    headertop: {
-        backgroundColor: '#3366FF',
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingTop: 50,
-        paddingHorizontal: 20,
-        paddingBottom: 20,
-        position: 'relative'
-    },
-    headerTitletop: {
-        color: 'white',
-        fontSize: 18,
-        fontWeight: 'bold',
-        flex: 1
-    },
-    fabText: {
-        color: '#fff',
-        fontWeight: 'bold',
-    },
-    })
+})

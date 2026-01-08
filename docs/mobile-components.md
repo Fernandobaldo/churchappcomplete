@@ -32,22 +32,41 @@ import PageHeader from '../components/PageHeader'
 
 ## Layouts
 
-### `FormScreenLayout`
+**📚 Documentação completa:** Consulte `docs/mobile-layouts.md` para guia detalhado sobre layouts padronizados.
 
-- Arquivo: `mobile/src/components/layouts/FormScreenLayout.tsx`
-- Props:
+Três layouts principais disponíveis:
+
+### `ViewScreenLayout`
+
+- Arquivo: `mobile/src/components/layouts/ViewScreenLayout.tsx`
+- Uso: Listas, dashboards, visualizações gerais
+- Props principais:
   - `headerProps: PageHeaderProps`
   - `children: React.ReactNode`
-  - `backgroundColor?: string` (default `#fff`)
+  - `refreshing?: boolean` (pull-to-refresh)
+  - `onRefresh?: () => void`
+  - `scrollable?: boolean` (default: `true`)
 
 ### `DetailScreenLayout`
 
 - Arquivo: `mobile/src/components/layouts/DetailScreenLayout.tsx`
-- Props:
+- Uso: Detalhes de um item específico
+- Props principais:
   - `headerProps: PageHeaderProps`
   - `children: React.ReactNode`
-  - `backgroundColor?: string` (default `#f5f5f5`)
-  - `imageUrl?: string | null`
+  - `imageUrl?: string | null` (banner/hero)
+  - `loading?: boolean`
+  - `refreshing?: boolean` (pull-to-refresh)
+  - `onRefresh?: () => void`
+
+### `FormScreenLayout`
+
+- Arquivo: `mobile/src/components/layouts/FormScreenLayout.tsx`
+- Uso: Formulários de criação/edição
+- Props principais:
+  - `headerProps: PageHeaderProps`
+  - `children: React.ReactNode`
+  - `contentContainerStyle?: ViewStyle`
 
 ## `Protected`
 

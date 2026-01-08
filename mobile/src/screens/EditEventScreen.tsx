@@ -18,9 +18,6 @@ export default function EditEventScreen() {
         time: '',
         description: '',
         location: '',
-        hasDonation: false,
-        donationReason: '',
-        donationLink: '',
         imageUrl: '',
     })
 
@@ -30,21 +27,6 @@ export default function EditEventScreen() {
         { key: 'time', label: 'Horário', type: 'time', placeholder: 'HH:mm' },
         { key: 'description', label: 'Descrição', type: 'string', placeholder: 'Descrição do evento' },
         { key: 'location', label: 'Localização', type: 'string', placeholder: 'Ex: Templo Principal' },
-        { key: 'hasDonation', label: 'Contribuição habilitada', type: 'toggle' },
-        {
-            key: 'donationReason',
-            label: 'Motivo da contribuição',
-            placeholder: 'Apoio Missionário',
-            type: 'string',
-            dependsOn: 'hasDonation',
-        },
-        {
-            key: 'donationLink',
-            label: 'Link do pagamento',
-            placeholder: 'https://exemplo.com/pagamento',
-            type: 'string',
-            dependsOn: 'hasDonation',
-        },
         {
             key: 'imageUrl',
             label: 'Banner do evento',
@@ -54,9 +36,25 @@ export default function EditEventScreen() {
 
     const convertToFormattedDate = (dateStr: string) => {
         if (!dateStr) return undefined
+
+        // Garante que está parseando no formato correto DD/MM/YYYY
         const parsedDate = parse(dateStr, 'dd/MM/yyyy', new Date())
-        if (!isValid(parsedDate)) return undefined
-        return format(parsedDate, 'dd-MM-yyyy')
+        if (!isValid(parsedDate)) {
+            console.error('Data inválida enviada:', dateStr)
+            return undefined
+        }
+
+        // Extrai os componentes da data para garantir que não há confusão
+        const day = parsedDate.getDate()
+        const month = parsedDate.getMonth() // getMonth() retorna 0-11
+        const year = parsedDate.getFullYear()
+
+        // Formata usando os componentes individuais para garantir formato correto
+        const formatted = `${String(day).padStart(2, '0')}-${String(month + 1).padStart(2, '0')}-${year}`
+        
+        console.log('Data original:', dateStr, '→ Parsed:', parsedDate, '→ Formatada:', formatted)
+        
+        return formatted
     }
 
     const fetchEvent = async () => {
@@ -74,16 +72,21 @@ export default function EditEventScreen() {
                 timeValue = `${hours}:${minutes}`
             }
 
+            // Constrói URL completa da imagem se necessário
+            let imageUrl = e.imageUrl || ''
+            if (imageUrl && !imageUrl.startsWith('http://') && !imageUrl.startsWith('https://')) {
+                // URL relativa, adicionar baseURL
+                const cleanUrl = imageUrl.startsWith('/') ? imageUrl.substring(1) : imageUrl
+                imageUrl = `${api.defaults.baseURL}/${cleanUrl}`
+            }
+
             setForm({
                 title: e.title || '',
                 startDate: e.startDate ? format(new Date(e.startDate), 'dd/MM/yyyy') : '',
                 time: timeValue,
                 description: e.description || '',
                 location: e.location || '',
-                hasDonation: e.hasDonation || false,
-                donationReason: e.donationReason || '',
-                donationLink: e.donationLink || '',
-                imageUrl: e.imageUrl || '',
+                imageUrl: imageUrl,
             })
         } catch (error) {
             Toast.show({

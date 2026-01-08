@@ -1,13 +1,15 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Image } from 'react-native'
-import { useNavigation, useRoute } from '@react-navigation/native'
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
 import api from '../api/api'
 import Toast from 'react-native-toast-message'
 import { useAuthStore } from '../stores/authStore'
 import { hasAccess } from '../utils/authUtils'
 import DetailScreenLayout from '../components/layouts/DetailScreenLayout'
+import GlassCard from '../components/GlassCard'
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5'
+import { colors } from '../theme/colors'
 
 interface Member {
   id: string
@@ -28,14 +30,9 @@ export default function MemberDetailsScreen() {
   const { user } = useAuthStore()
   const [member, setMember] = useState<Member | null>(null)
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
 
-  useEffect(() => {
-    if (id) {
-      fetchMember()
-    }
-  }, [id])
-
-  const fetchMember = async () => {
+  const fetchMember = useCallback(async () => {
     try {
       const response = await api.get(`/members/${id}`)
       setMember(response.data)
@@ -47,8 +44,29 @@ export default function MemberDetailsScreen() {
       navigation.goBack()
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
-  }
+  }, [id, navigation])
+
+  useEffect(() => {
+    if (id) {
+      fetchMember()
+    }
+  }, [id, fetchMember])
+
+  // Recarrega quando a tela recebe foco (após editar)
+  useFocusEffect(
+    useCallback(() => {
+      if (id) {
+        fetchMember()
+      }
+    }, [id, fetchMember])
+  )
+
+  const handleRefresh = useCallback(() => {
+    setRefreshing(true)
+    fetchMember()
+  }, [fetchMember])
 
   const getRoleLabel = (role: string) => {
     const labels: Record<string, string> = {
@@ -62,18 +80,34 @@ export default function MemberDetailsScreen() {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4F46E5" />
-        <Text style={styles.loadingText}>Carregando...</Text>
-      </View>
+      <DetailScreenLayout
+        headerProps={{
+          title: "Detalhes do Membro",
+          Icon: FontAwesome5,
+          iconName: "user",
+        }}
+      >
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.gradients.primary[1]} />
+          <Text style={styles.loadingText}>Carregando...</Text>
+        </View>
+      </DetailScreenLayout>
     )
   }
 
   if (!member) {
     return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.errorText}>Membro não encontrado</Text>
-      </View>
+      <DetailScreenLayout
+        headerProps={{
+          title: "Detalhes do Membro",
+          Icon: FontAwesome5,
+          iconName: "user",
+        }}
+      >
+        <View style={styles.loadingContainer}>
+          <Text style={styles.errorText}>Membro não encontrado</Text>
+        </View>
+      </DetailScreenLayout>
     )
   }
 
@@ -90,9 +124,11 @@ export default function MemberDetailsScreen() {
           <Ionicons name="shield-outline" size={24} color="white" />
         ) : undefined,
         onRightButtonPress: canManagePermissions
-          ? () => (navigation as any).navigate('Permissions')
+          ? () => navigation.navigate('Permissions' as never)
           : undefined,
       }}
+      refreshing={refreshing}
+      onRefresh={handleRefresh}
     >
         <View style={styles.profileSection}>
           {member.avatarUrl ? (
@@ -108,11 +144,11 @@ export default function MemberDetailsScreen() {
           </View>
         </View>
 
-        <View style={styles.card}>
+        <GlassCard opacity={0.4} blurIntensity={20} borderRadius={20} style={styles.card}>
           {canViewSensitiveData && (
             <>
               <View style={styles.infoRow}>
-                <Ionicons name="mail-outline" size={20} color="#666" />
+                <Ionicons name="mail-outline" size={20} color={colors.text.secondary} />
                 <View style={styles.infoContent}>
                   <Text style={styles.infoLabel}>Email</Text>
                   <Text style={styles.infoValue}>{member.email}</Text>
@@ -121,7 +157,7 @@ export default function MemberDetailsScreen() {
 
               {member.phone && (
                 <View style={styles.infoRow}>
-                  <Ionicons name="call-outline" size={20} color="#666" />
+                  <Ionicons name="call-outline" size={20} color={colors.text.secondary} />
                   <View style={styles.infoContent}>
                     <Text style={styles.infoLabel}>Telefone</Text>
                     <Text style={styles.infoValue}>{member.phone}</Text>
@@ -131,7 +167,7 @@ export default function MemberDetailsScreen() {
 
               {member.address && (
                 <View style={styles.infoRow}>
-                  <Ionicons name="location-outline" size={20} color="#666" />
+                  <Ionicons name="location-outline" size={20} color={colors.text.secondary} />
                   <View style={styles.infoContent}>
                     <Text style={styles.infoLabel}>Endereço</Text>
                     <Text style={styles.infoValue}>{member.address}</Text>
@@ -143,7 +179,7 @@ export default function MemberDetailsScreen() {
 
           {member.birthDate && (
             <View style={styles.infoRow}>
-              <Ionicons name="calendar-outline" size={20} color="#666" />
+              <Ionicons name="calendar-outline" size={20} color={colors.text.secondary} />
               <View style={styles.infoContent}>
                 <Text style={styles.infoLabel}>Data de Nascimento</Text>
                 <Text style={styles.infoValue}>
@@ -152,7 +188,7 @@ export default function MemberDetailsScreen() {
               </View>
             </View>
           )}
-        </View>
+        </GlassCard>
     </DetailScreenLayout>
   )
 }
@@ -162,15 +198,20 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    marginTop: 110,
   },
   loadingText: {
     marginTop: 12,
-    color: '#666',
     fontSize: 16,
+    fontWeight: '400',
+    lineHeight: 24,
+    color: '#475569',
   },
   errorText: {
     fontSize: 16,
-    color: '#999',
+    fontWeight: '400',
+    lineHeight: 24,
+    color: '#64748B',
   },
   profileSection: {
     alignItems: 'center',
@@ -187,43 +228,41 @@ const styles = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: '#E0E7FF',
+    backgroundColor: colors.gradients.primary[0],
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
   },
   avatarText: {
     fontSize: 36,
-    fontWeight: 'bold',
-    color: '#4F46E5',
+    fontWeight: '700',
+    lineHeight: 44,
+    color: colors.gradients.primary[1],
   },
   name: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: '700',
+    lineHeight: 32,
+    color: '#0F172A',
     marginBottom: 8,
   },
   roleBadge: {
-    backgroundColor: '#E0E7FF',
+    backgroundColor: colors.gradients.primary[0],
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.glass.border,
   },
   roleText: {
-    color: '#4F46E5',
+    color: colors.gradients.primary[1],
     fontSize: 14,
     fontWeight: '600',
+    lineHeight: 20,
   },
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
+    padding: 20,
     marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   infoRow: {
     flexDirection: 'row',
@@ -236,13 +275,16 @@ const styles = StyleSheet.create({
   },
   infoLabel: {
     fontSize: 14,
-    color: '#666',
+    fontWeight: '400',
+    lineHeight: 20,
+    color: '#475569',
     marginBottom: 4,
   },
   infoValue: {
     fontSize: 16,
-    color: '#333',
     fontWeight: '400',
+    lineHeight: 24,
+    color: '#0F172A',
   },
 })
 

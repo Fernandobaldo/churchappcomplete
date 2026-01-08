@@ -1,7 +1,11 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native'
-import { useNavigation, useRoute } from '@react-navigation/native'
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
+import DetailScreenLayout from '../components/layouts/DetailScreenLayout'
+import GlassCard from '../components/GlassCard'
+import FontAwesome5 from '@expo/vector-icons/FontAwesome5'
+import { colors } from '../theme/colors'
 import api from '../api/api'
 import Toast from 'react-native-toast-message'
 import { format } from 'date-fns'
@@ -47,14 +51,9 @@ export default function TransactionDetailsScreen() {
   const { id } = route.params as { id: string }
   const [transaction, setTransaction] = useState<Transaction | null>(null)
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
 
-  useEffect(() => {
-    if (id) {
-      fetchTransaction()
-    }
-  }, [id])
-
-  const fetchTransaction = async () => {
+  const fetchTransaction = useCallback(async () => {
     try {
       const response = await api.get(`/finances/${id}`)
       setTransaction(response.data)
@@ -68,8 +67,29 @@ export default function TransactionDetailsScreen() {
       navigation.goBack()
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
-  }
+  }, [id, navigation])
+
+  useEffect(() => {
+    if (id) {
+      fetchTransaction()
+    }
+  }, [id, fetchTransaction])
+
+  // Recarrega quando a tela recebe foco (após editar)
+  useFocusEffect(
+    useCallback(() => {
+      if (id) {
+        fetchTransaction()
+      }
+    }, [id, fetchTransaction])
+  )
+
+  const handleRefresh = useCallback(() => {
+    setRefreshing(true)
+    fetchTransaction()
+  }, [fetchTransaction])
 
   const getEntryTypeLabel = (type: string | null | undefined) => {
     const labels: Record<string, string> = {
@@ -93,43 +113,53 @@ export default function TransactionDetailsScreen() {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4F46E5" />
-        <Text style={styles.loadingText}>Carregando...</Text>
-      </View>
+      <DetailScreenLayout
+        headerProps={{
+          title: "Detalhes da Transação",
+          Icon: FontAwesome5,
+          iconName: "dollar-sign",
+        }}
+      >
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.gradients.primary[1]} />
+          <Text style={styles.loadingText}>Carregando...</Text>
+        </View>
+      </DetailScreenLayout>
     )
   }
 
   if (!transaction) {
     return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.errorText}>Transação não encontrada</Text>
-      </View>
+      <DetailScreenLayout
+        headerProps={{
+          title: "Detalhes da Transação",
+          Icon: FontAwesome5,
+          iconName: "dollar-sign",
+        }}
+      >
+        <View style={styles.loadingContainer}>
+          <Text style={styles.errorText}>Transação não encontrada</Text>
+        </View>
+      </DetailScreenLayout>
     )
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#333" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Detalhes da Transação</Text>
-        <TouchableOpacity
-          onPress={() => navigation.navigate('EditTransaction' as never, { id: transaction.id } as never)}
-          style={styles.editButton}
-        >
-          <Ionicons name="create-outline" size={24} color="#4F46E5" />
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.card}>
-          <View style={styles.row}>
-            <Text style={styles.label}>Título</Text>
-            <Text style={styles.value}>{transaction.title}</Text>
-          </View>
-
+    <DetailScreenLayout
+      headerProps={{
+        title: "Detalhes da Transação",
+        Icon: FontAwesome5,
+        iconName: "dollar-sign",
+        rightButtonIcon: (
+          <Ionicons name="create-outline" size={24} color="white" />
+        ),
+        onRightButtonPress: () => navigation.navigate('EditTransaction' as never, { id: transaction.id } as never),
+      }}
+      refreshing={refreshing}
+      onRefresh={handleRefresh}
+    >
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <GlassCard opacity={0.4} blurIntensity={20} borderRadius={20} style={styles.card}>
           <View style={styles.row}>
             <Text style={styles.label}>Valor</Text>
             <Text style={[styles.amount, transaction.type === 'ENTRY' ? styles.amountEntry : styles.amountExit]}>
@@ -145,11 +175,6 @@ export default function TransactionDetailsScreen() {
                 {transaction.type === 'ENTRY' ? 'Entrada' : 'Saída'}
               </Text>
             </View>
-          </View>
-
-          <View style={styles.row}>
-            <Text style={styles.label}>Categoria</Text>
-            <Text style={styles.value}>{transaction.category || 'Sem categoria'}</Text>
           </View>
 
           {transaction.type === 'ENTRY' && transaction.entryType && (
@@ -232,100 +257,75 @@ export default function TransactionDetailsScreen() {
           {transaction.CreatedByUser && (
             <View style={styles.row}>
               <Text style={styles.label}>Criado por</Text>
-              <View>
-                <Text style={styles.value}>{transaction.CreatedByUser.name}</Text>
-                <Text style={styles.subValue}>{transaction.CreatedByUser.email}</Text>
-              </View>
+              <Text style={styles.value}>{transaction.CreatedByUser.name}</Text>
             </View>
           )}
-        </View>
+        </GlassCard>
       </ScrollView>
-    </View>
+    </DetailScreenLayout>
   )
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  backButton: {
-    padding: 4,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    flex: 1,
-    textAlign: 'center',
-  },
-  editButton: {
-    padding: 4,
-  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    marginTop: 110,
   },
   loadingText: {
     marginTop: 12,
-    color: '#666',
     fontSize: 16,
+    fontWeight: '400',
+    lineHeight: 24,
+    color: '#475569',
   },
   errorText: {
     fontSize: 16,
-    color: '#999',
+    fontWeight: '400',
+    lineHeight: 24,
+    color: '#64748B',
   },
   content: {
     padding: 16,
+    paddingBottom: 100,
   },
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    padding: 20,
   },
   row: {
     marginBottom: 16,
   },
   label: {
     fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
     fontWeight: '500',
+    lineHeight: 20,
+    color: '#475569',
+    marginBottom: 4,
   },
   value: {
     fontSize: 16,
-    color: '#333',
     fontWeight: '400',
+    lineHeight: 24,
+    color: '#0F172A',
   },
   subValue: {
     fontSize: 14,
-    color: '#666',
+    fontWeight: '400',
+    lineHeight: 20,
+    color: '#475569',
     marginTop: 2,
   },
   amount: {
     fontSize: 24,
-    fontWeight: 'bold',
+    fontWeight: '700',
+    lineHeight: 32,
   },
   amountEntry: {
-    color: '#4CAF50',
+    color: colors.status.success,
   },
   amountExit: {
-    color: '#F44336',
+    color: colors.status.error,
   },
   badge: {
     paddingHorizontal: 12,
@@ -334,24 +334,29 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   badgeEntry: {
-    backgroundColor: '#E8F5E9',
+    backgroundColor: 'rgba(34, 197, 94, 0.2)',
+    borderWidth: 1,
+    borderColor: colors.status.success,
   },
   badgeExit: {
-    backgroundColor: '#FFEBEE',
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+    borderWidth: 1,
+    borderColor: colors.status.error,
   },
   badgeText: {
     fontSize: 14,
     fontWeight: '600',
+    lineHeight: 20,
   },
   badgeTextEntry: {
-    color: '#2E7D32',
+    color: colors.status.success,
   },
   badgeTextExit: {
-    color: '#C62828',
+    color: colors.status.error,
   },
   divider: {
     height: 1,
-    backgroundColor: '#e0e0e0',
+    backgroundColor: colors.glass.border,
     marginVertical: 16,
   },
 })

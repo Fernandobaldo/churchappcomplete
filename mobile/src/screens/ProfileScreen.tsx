@@ -1,9 +1,11 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback, useMemo } from 'react'
 
 import { View, Text, StyleSheet, Image, TouchableOpacity, ActivityIndicator, ScrollView, RefreshControl } from 'react-native'
 
 import {useNavigation, useRoute} from '@react-navigation/native'
+import { LinearGradient } from 'expo-linear-gradient'
 import DetailScreenLayout from '../components/layouts/DetailScreenLayout'
+import GlassCard from '../components/GlassCard'
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5'
 import { Ionicons } from '@expo/vector-icons'
 import api from '../api/api'
@@ -11,27 +13,29 @@ import api from '../api/api'
 import { useAuthStore } from '../stores/authStore'
 import { format, parse, isValid } from 'date-fns'
 import ptBR from 'date-fns/locale/pt-BR'
+import { Profile } from '../types'
+import { colors } from '../theme/colors'
 
 export default function ProfileScreen() {
     const route = useRoute()
-    const { memberId } = route.params || {}
+    const { memberId } = route.params as { memberId?: string } || {}
     const isOwnProfile = !memberId
     const [refreshing, setRefreshing] = useState(false)
     const user = useAuthStore((s) => s.user)
 
 
-    const [profile, setProfile] = useState<any>(null)
+    const [profile, setProfile] = useState<Profile | null>(null)
     const [loading, setLoading] = useState(true)
     const navigation = useNavigation()
 
-    const fetchProfile = async () => {
+    const fetchProfile = useCallback(async () => {
         try {
             setLoading(true)
             if (isOwnProfile) {
-                const res = await api.get('/members/me')
+                const res = await api.get<Profile>('/members/me')
                 setProfile(res.data)
-            } else {
-                const res = await api.get(`/members/${memberId}`)
+            } else if (memberId) {
+                const res = await api.get<Profile>(`/members/${memberId}`)
                 setProfile(res.data)
             }
         } catch (err) {
@@ -39,20 +43,23 @@ export default function ProfileScreen() {
         } finally {
             setLoading(false)
         }
-    }
+    }, [isOwnProfile, memberId])
 
     useEffect(() => {
         fetchProfile()
-    }, [memberId])
+    }, [fetchProfile])
 
-    const handleRefresh = async () => {
+    const handleRefresh = useCallback(async () => {
         setRefreshing(true)
-        await fetchProfile()
-        setRefreshing(false)
-    }
+        try {
+            await fetchProfile()
+        } finally {
+            setRefreshing(false)
+        }
+    }, [fetchProfile])
 
     // Função para formatar data de nascimento
-    const formatBirthDate = (dateString: string | null | undefined): string => {
+    const formatBirthDate = useCallback((dateString: string | null | undefined): string => {
         if (!dateString) return ''
         
         // Se já está no formato dd/MM/yyyy do backend, converter para exibição
@@ -92,32 +99,25 @@ export default function ProfileScreen() {
         }
         
         return dateString
-    }
+    }, [])
 
-
-    if (loading) {
-        return (
-            <View style={styles.centered}>
-                <ActivityIndicator size="large" color="#3366FF" />
-            </View>
-        )
-    }
-
-    const canManagePermissions =
+    const canManagePermissions = useMemo(() =>
         user?.role === 'ADMINGERAL' ||
         user?.role === 'ADMINFILIAL' ||
-        user?.permissions?.some((p: any) => p.type === 'permission_manage')
+        user?.permissions?.some((p) => p.type === 'permission_manage'),
+        [user]
+    )
 
-    const formatRole = (role: string) => {
+    const formatRole = useCallback((role: string) => {
         if (!role) return 'Nenhum'
         return role
             .replace('ADMINFILIAL', 'Admin Filial')
             .replace('ADMINGERAL', 'Admin Geral')
             .replace('COORDINATOR', 'Coordenador')
             .replace('MEMBER', 'Membro')
-    }
+    }, [])
 
-    const formatPermission = (permissions: { type: string }[] = []) => {
+    const formatPermission = useCallback((permissions: { type: string }[] = []) => {
         if (!permissions || !Array.isArray(permissions)) return 'Nenhuma'
 
         return Array.from(new Set(permissions.map((p) => p.type)))
@@ -129,10 +129,16 @@ export default function ProfileScreen() {
                     .replace('devotional_manage', 'Editar devocional')
                     .replace('members_view', 'Visualizar membros')
                     .replace('members_manage', 'Gerenciar membros')
-
-
             )
             .join(', ')
+    }, [])
+
+    if (loading || !profile) {
+        return (
+            <View style={styles.centered}>
+                <ActivityIndicator size="large" color="#3366FF" />
+            </View>
+        )
     }
 
     return (
@@ -150,20 +156,11 @@ export default function ProfileScreen() {
                     }
                     : undefined,
             }}
-            backgroundColor="#f2f2f2"
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
         >
-            <ScrollView
-                contentContainerStyle={styles.scrollContent}
-                refreshControl={
-                    <RefreshControl
-                        refreshing={refreshing}
-                        onRefresh={handleRefresh}
-                        colors={['#3366FF']}
-                        tintColor="#3366FF"
-                    />
-                }
-            >
-                <View style={styles.card}>
+            <View style={styles.scrollContent}>
+                <GlassCard opacity={0.4} blurIntensity={20} borderRadius={20} style={styles.card}>
                     {profile.avatarUrl && typeof profile.avatarUrl === 'string' && profile.avatarUrl.trim().length > 0 ? (
                         <Image
                             source={{
@@ -233,12 +230,20 @@ export default function ProfileScreen() {
                         <TouchableOpacity
                             style={styles.button}
                             onPress={() => navigation.navigate('Permissions' as never)}
+                            activeOpacity={0.8}
                         >
-                            <Text style={styles.buttonText}>Gerenciar Permissões</Text>
+                            <LinearGradient
+                                colors={colors.gradients.primary as [string, string]}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                                style={styles.buttonGradient}
+                            >
+                                <Text style={styles.buttonText}>Gerenciar Permissões</Text>
+                            </LinearGradient>
                         </TouchableOpacity>
                     )}
-                </View>
-            </ScrollView>
+                </GlassCard>
+            </View>
         </DetailScreenLayout>
     )
 }
@@ -251,16 +256,9 @@ const styles = StyleSheet.create({
         padding: 16,
     },
     card: {
-        backgroundColor: '#fff',
-        borderRadius: 16,
         padding: 24,
         width: '100%',
         alignItems: 'center',
-        shadowColor: '#000',
-        shadowOpacity: 0.1,
-        shadowRadius: 6,
-        shadowOffset: { width: 0, height: 3 },
-        elevation: 4,
     },
     avatar: {
         width: 100,
@@ -272,7 +270,7 @@ const styles = StyleSheet.create({
         width: 100,
         height: 100,
         borderRadius: 50,
-        backgroundColor: '#e0e7ff',
+        backgroundColor: colors.gradients.primary[0],
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 12,
@@ -280,16 +278,21 @@ const styles = StyleSheet.create({
     avatarPlaceholderText: {
         fontSize: 40,
         fontWeight: '600',
-        color: '#3366FF',
+        lineHeight: 48,
+        color: colors.gradients.primary[1],
     },
     name: {
         fontSize: 22,
-        fontWeight: 'bold',
+        fontWeight: '700',
+        lineHeight: 28,
+        color: '#0F172A',
         marginBottom: 4,
     },
     email: {
         fontSize: 16,
-        color: '#666',
+        fontWeight: '400',
+        lineHeight: 24,
+        color: '#475569',
     },
     centered: {
         flex: 1,
@@ -299,7 +302,7 @@ const styles = StyleSheet.create({
     divider: {
         width: '100%',
         height: 1,
-        backgroundColor: '#eee',
+        backgroundColor: colors.glass.border,
         marginVertical: 20,
     },
     infoRow: {
@@ -310,12 +313,15 @@ const styles = StyleSheet.create({
     },
     label: {
         fontSize: 16,
-        color: '#444',
+        fontWeight: '400',
+        lineHeight: 24,
+        color: '#475569',
     },
     value: {
         fontSize: 16,
-        fontWeight: 'bold',
-        color: '#222',
+        fontWeight: '600',
+        lineHeight: 24,
+        color: '#0F172A',
     },
     valuePermission: {
         marginLeft: 50,
@@ -323,18 +329,26 @@ const styles = StyleSheet.create({
         flexWrap: 'wrap',
         flex: 1,
         fontSize: 16,
-        fontWeight: 'bold',
-        color: '#222',
+        fontWeight: '600',
+        lineHeight: 24,
+        color: '#0F172A',
     },
     button: {
         marginTop: 20,
-        backgroundColor: '#3366FF',
-        paddingVertical: 12,
+        borderRadius: 18,
+        overflow: 'hidden',
+        width: '100%',
+    },
+    buttonGradient: {
+        paddingVertical: 16,
         paddingHorizontal: 20,
-        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     buttonText: {
-        color: '#fff',
-        fontWeight: 'bold',
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '600',
+        lineHeight: 24,
     },
 })

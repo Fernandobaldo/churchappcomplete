@@ -1,23 +1,61 @@
-import React, {useState} from 'react';
+import React, {useState, useCallback} from 'react';
 import {View, Text, ScrollView, StyleSheet, ImageBackground, TouchableOpacity, Share} from 'react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { BibleText } from '../components/BibleText';
+import DetailScreenLayout from '../components/layouts/DetailScreenLayout';
+import GlassCard from '../components/GlassCard';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5'
 import EvilIcons from '@expo/vector-icons/EvilIcons';
+import { colors } from '../theme/colors';
 import api from "../api/api";
 
 
 export default function DevotionalDetailsScreen() {
-
     const navigation = useNavigation();
     const route = useRoute();
-    const { devotional } = route.params || {};
+    const { devotional: initialDevotional } = route.params || {};
+    const [devotional, setDevotional] = useState(initialDevotional);
+    const [refreshing, setRefreshing] = useState(false);
+
+    const fetchDevotional = useCallback(async () => {
+        if (!initialDevotional?.id) return
+        try {
+            setRefreshing(true)
+            const response = await api.get(`/devotionals/${initialDevotional.id}`)
+            setDevotional(response.data)
+        } catch (error) {
+            console.error('Erro ao carregar devocional:', error)
+        } finally {
+            setRefreshing(false)
+        }
+    }, [initialDevotional?.id])
+
+    // Recarrega quando a tela recebe foco (após editar)
+    useFocusEffect(
+        useCallback(() => {
+            if (initialDevotional?.id) {
+                fetchDevotional()
+            }
+        }, [initialDevotional?.id, fetchDevotional])
+    )
+
+    const handleRefresh = useCallback(() => {
+        fetchDevotional()
+    }, [fetchDevotional])
 
     if (!devotional) {
         return (
-            <View style={styles.centered}>
-                <Text style={styles.errorText}>Devocional não encontrado.</Text>
-            </View>
+            <DetailScreenLayout
+                headerProps={{
+                    title: "Detalhes do Devocional",
+                    Icon: FontAwesome5,
+                    iconName: "bible",
+                }}
+            >
+                <View style={styles.centered}>
+                    <Text style={styles.errorText}>Devocional não encontrado.</Text>
+                </View>
+            </DetailScreenLayout>
         );
     }
 
@@ -33,16 +71,17 @@ export default function DevotionalDetailsScreen() {
     });
 
     return (
-        <ScrollView contentContainerStyle={styles.container}>
-            {/* Imagem de topo */}
-            <ImageBackground
-                source={require('../../assets/devotionalimage.png')}
-                style={styles.image}
-            >
-            </ImageBackground>
-
-            {/* Card branco */}
-            <View style={styles.card}>
+        <DetailScreenLayout
+            headerProps={{
+                title: "Detalhes do Devocional",
+                Icon: FontAwesome5,
+                iconName: "bible",
+            }}
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+        >
+            <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+                <GlassCard opacity={0.4} blurIntensity={20} borderRadius={20} style={styles.card}>
                 {/* Título */}
                 <Text style={styles.title}>{devotional.title}</Text>
 
@@ -61,7 +100,7 @@ export default function DevotionalDetailsScreen() {
                 <Text style={styles.reference}>{devotional.passage}</Text>
 
                 {/* Conteúdo/reflexão */}
-                <Text style={styles.content}>{devotional.content}</Text>
+                <Text style={styles.devotionalContent}>{devotional.content}</Text>
 
                 {/* Botões Curtir / Compartilhar */}
                 <View style={styles.actions}>
@@ -69,72 +108,76 @@ export default function DevotionalDetailsScreen() {
                         <EvilIcons name="share-apple" size={40} color="black" />
                     </TouchableOpacity>
                 </View>
-            </View>
+            </GlassCard>
         </ScrollView>
+        </DetailScreenLayout>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        backgroundColor: '#f9f9f9',
-        flexGrow: 1,
-    },
-    image: {
-        width: '100%',
-        height: 250,
-        resizeMode: 'cover',
+    content: {
+        padding: 16,
+        paddingTop: 0,
+        paddingBottom: 100,
     },
     card: {
-        backgroundColor: '#fff',
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-        marginTop: -40, // sobrepõe a imagem
         padding: 24,
-        flexGrow: 1,
+        marginTop: 20,
     },
     title: {
-        fontSize: 26,
-        fontWeight: 'bold',
+        fontSize: 28,
+        fontWeight: '700',
+        lineHeight: 36,
+        color: '#0F172A',
         textAlign: 'left',
         marginBottom: 8,
     },
     date: {
         fontSize: 12,
-        color: '#666',
+        fontWeight: '400',
+        lineHeight: 18,
+        color: '#64748B',
         textAlign: 'left',
         marginBottom: 4,
     },
     author: {
         fontSize: 12,
-        color: '#666',
+        fontWeight: '400',
+        lineHeight: 18,
+        color: '#64748B',
         textAlign: 'left',
         marginBottom: 16,
     },
     passage: {
         fontSize: 18,
+        fontWeight: '400',
         fontStyle: 'italic',
-        color: '#444',
+        lineHeight: 28,
+        color: '#0F172A',
         textAlign: 'left',
         marginBottom: 4,
     },
     reference: {
         fontSize: 12,
+        fontWeight: '400',
         fontStyle: 'italic',
-        color: '#777',
+        lineHeight: 18,
+        color: '#64748B',
         textAlign: 'left',
         marginBottom: 30,
     },
-    content: {
+    devotionalContent: {
         fontSize: 16,
-        color: '#333',
+        fontWeight: '400',
         lineHeight: 24,
+        color: '#0F172A',
         textAlign: 'left',
         marginBottom: 30,
     },
     actions: {
         flexDirection: 'row',
         justifyContent: 'space-around',
-        marginTop: 300,
+        marginTop: 20,
     },
     actionButton: {
         textAlign: 'center',
@@ -144,17 +187,21 @@ const styles = StyleSheet.create({
     },
     actionText: {
         fontSize: 16,
-        fontWeight: 'bold',
-        color: '#555',
+        fontWeight: '600',
+        lineHeight: 24,
+        color: '#0F172A',
     },
     centered: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
         padding: 20,
+        marginTop: 110,
     },
     errorText: {
         fontSize: 18,
-        color: 'red',
+        fontWeight: '400',
+        lineHeight: 28,
+        color: colors.status.error,
     },
 });

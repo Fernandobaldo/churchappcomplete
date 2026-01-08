@@ -4,9 +4,9 @@ import Constants from 'expo-constants'
 import { useAuthStore } from '../stores/authStore'
 
 // Configuração da API base
-// Prioridade: variável de ambiente EXPO_PUBLIC > app.config.js extra > detecção de plataforma > fallback
+// Prioridade: variável de ambiente EXPO_PUBLIC_API_URL > app.config.js extra > fallback localhost
 const getBaseURL = (): string => {
-  // 1. Verificar variável de ambiente EXPO_PUBLIC (mais alta prioridade)
+  // 1. Verificar variável de ambiente EXPO_PUBLIC_API_URL (mais alta prioridade)
   if (process.env.EXPO_PUBLIC_API_URL) {
     return process.env.EXPO_PUBLIC_API_URL
   }
@@ -17,28 +17,16 @@ const getBaseURL = (): string => {
     return configApiUrl
   }
 
-  // 3. Detecção automática do IP baseado na plataforma (fallback para desenvolvimento)
-  // IMPORTANTE: Se estiver usando Expo Go em dispositivo físico, você PRECISA usar o IP da sua máquina
-  // Para descobrir seu IP: ifconfig (macOS/Linux) ou ipconfig (Windows)
-  // Procure pelo IP na interface en0 (WiFi) ou en1 (Ethernet)
-  
-  let devIP: string
+  // 3. Fallback para desenvolvimento local
+  // Para desenvolvimento, use variável de ambiente ou configure no app.config.js
+  // Para dispositivo físico, use o IP da sua máquina (ex: 'http://192.168.1.7:3333')
   if (Platform.OS === 'android') {
     // Emulador Android usa este IP especial para localhost
-    // Para dispositivo físico Android, use o IP da sua máquina (ex: '192.168.1.7')
-    devIP = '10.0.2.2'
-  } else if (Platform.OS === 'ios') {
-    // iOS Simulator pode usar localhost
-    // Para dispositivo físico iOS, use o IP da sua máquina (ex: '192.168.1.7')
-    // Nota: __DEV__ pode não funcionar corretamente em todos os casos
-    // Se tiver problemas, force o IP da sua máquina aqui
-    devIP = '192.168.1.7' // Atualize com o IP da sua máquina se necessário
-  } else {
-    // Web ou outras plataformas
-    devIP = '192.168.1.7'
+    return 'http://10.0.2.2:3333'
   }
   
-  return `http://${devIP}:3333`
+  // iOS Simulator e outras plataformas
+  return 'http://localhost:3333'
 }
 
 // Obter URL base

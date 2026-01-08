@@ -1,8 +1,7 @@
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
@@ -11,10 +10,13 @@ import {
   TouchableWithoutFeedback,
   ScrollView,
 } from 'react-native'
+import { LinearGradient } from 'expo-linear-gradient'
 import { useNavigation } from '@react-navigation/native'
 import Toast from 'react-native-toast-message'
 import api, { setToken } from '../api/api'
 import { useAuthStore } from '../stores/authStore'
+import TextInputField from '../components/TextInputField'
+import { colors } from '../theme/colors'
 
 export default function RegisterScreen() {
   const navigation = useNavigation()
@@ -24,6 +26,20 @@ export default function RegisterScreen() {
   const [churchName, setChurchName] = useState('')
   const [loading, setLoading] = useState(false)
   const { setUserFromToken } = useAuthStore()
+
+  // Validação: verifica se todos os campos obrigatórios estão preenchidos
+  const isFormValid = useMemo(() => {
+    if (!name || !email || !password || !churchName) return false
+    
+    // Validação básica de email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) return false
+    
+    // Validação de senha
+    if (password.length < 6) return false
+    
+    return true
+  }, [name, email, password, churchName])
 
   const handleRegister = async () => {
     if (!name || !email || !password || !churchName) {
@@ -198,65 +214,70 @@ export default function RegisterScreen() {
             <Text style={styles.subtitle}>Crie sua conta para começar</Text>
 
             <View style={styles.form}>
-              <Text style={styles.label}>
-                Nome completo <Text style={styles.required}>*</Text>
-              </Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Seu nome completo"
+              <TextInputField
+                fieldKey="name"
+                label="Nome completo"
                 value={name}
                 onChangeText={setName}
+                placeholder="Seu nome completo"
+                required
                 autoCapitalize="words"
-                placeholderTextColor="#999"
               />
 
-              <Text style={styles.label}>
-                Email <Text style={styles.required}>*</Text>
-              </Text>
-              <TextInput
-                style={styles.input}
-                placeholder="exemplo@email.com"
+              <TextInputField
+                fieldKey="email"
+                label="Email"
                 value={email}
                 onChangeText={setEmail}
+                placeholder="exemplo@email.com"
+                required
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
-                placeholderTextColor="#999"
               />
 
-              <Text style={styles.label}>
-                Senha <Text style={styles.required}>*</Text>
-              </Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Mínimo 6 caracteres"
+              <TextInputField
+                fieldKey="password"
+                label="Senha"
                 value={password}
                 onChangeText={setPassword}
+                placeholder="Mínimo 6 caracteres"
+                required
                 secureTextEntry
                 autoCapitalize="none"
-                placeholderTextColor="#999"
+                autoCorrect={false}
               />
 
-              <Text style={styles.label}>
-                Nome da igreja <Text style={styles.required}>*</Text>
-              </Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Ex: Igreja Exemplo"
+              <TextInputField
+                fieldKey="churchName"
+                label="Nome da igreja"
                 value={churchName}
                 onChangeText={setChurchName}
+                placeholder="Ex: Igreja Exemplo"
+                required
                 autoCapitalize="words"
-                placeholderTextColor="#999"
               />
 
               <TouchableOpacity
-                style={[styles.button, loading && styles.buttonDisabled]}
+                style={styles.button}
                 onPress={handleRegister}
-                disabled={loading}
+                disabled={loading || !isFormValid}
+                activeOpacity={0.8}
               >
-                <Text style={styles.buttonText}>
-                  {loading ? 'Criando conta...' : 'Criar conta e continuar'}
-                </Text>
+                <LinearGradient
+                  colors={
+                    isFormValid && !loading
+                      ? colors.gradients.primary as [string, string]
+                      : ['#94A3B8', '#94A3B8'] // Cinza quando desativado
+                  }
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.buttonGradient}
+                >
+                  <Text style={styles.buttonText}>
+                    {loading ? 'Criando conta...' : 'Criar conta e continuar'}
+                  </Text>
+                </LinearGradient>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -311,38 +332,22 @@ const styles = StyleSheet.create({
   form: {
     gap: 16,
   },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 4,
-  },
-  required: {
-    color: '#e74c3c',
-    fontWeight: 'bold',
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    backgroundColor: '#fff',
-  },
   button: {
-    backgroundColor: '#333',
-    borderRadius: 8,
+    borderRadius: 18,
+    overflow: 'hidden',
+    marginTop: 20,
+  },
+  buttonGradient: {
     padding: 16,
     alignItems: 'center',
-    marginTop: 8,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
+    justifyContent: 'center',
+    minHeight: 56,
   },
   buttonText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
+    lineHeight: 24,
   },
   linkButton: {
     marginTop: 16,

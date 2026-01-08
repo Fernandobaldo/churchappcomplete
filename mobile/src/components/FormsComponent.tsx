@@ -1,6 +1,6 @@
 // components/FormsComponent.tsx
 
-import React, { useState } from 'react'
+import React, { useState, useMemo, useCallback } from 'react'
 import {
     View,
     Text,
@@ -9,16 +9,19 @@ import {
     TouchableOpacity,
     StyleSheet,
     KeyboardTypeOptions,
-    Image, Platform, Keyboard,
-    KeyboardAvoidingView,
-    TouchableWithoutFeedback,
+    Image, Platform,
 } from 'react-native'
+import { BlurView } from 'expo-blur'
+import { LinearGradient } from 'expo-linear-gradient'
 import * as ImagePicker from 'expo-image-picker'
-import DateTimePickerModal from 'react-native-modal-datetime-picker'
-import { format } from 'date-fns'
 import {useNavigation} from "@react-navigation/native"
 import ModalSelector from 'react-native-modal-selector'
 import TimePicker from './TimePicker'
+import DateTimePickerComponent from './DateTimePicker'
+import TextInputField from './TextInputField'
+import { colors } from '../theme/colors'
+import { typography } from '../theme/typography'
+import GlassCard from './GlassCard'
 
 type SelectOption = {
     key: string
@@ -44,6 +47,7 @@ type MemberFormProps = {
     fields: Field[]
     onSubmit: () => void
     submitLabel?: string
+    hideButtons?: boolean
 }
 
 export default function FormsComponent({
@@ -52,43 +56,41 @@ export default function FormsComponent({
                                            fields,
                                            onSubmit,
                                            submitLabel = 'Salvar',
+                                           hideButtons = false,
                                        }: MemberFormProps) {
-    const [isDatePickerVisible, setDatePickerVisible] = useState(false)
-    const [activeDateKey, setActiveDateKey] = useState<string | null>(null)
-    const [selectedDate, setSelectedDate] = useState<Date>(new Date())
     const navigation = useNavigation()
 
-    const showDatePicker = (key: string) => {
-        setActiveDateKey(key)
-        // Se já existe uma data no form, usa ela, senão usa a data atual
-        if (form[key]) {
-            try {
-                const parsedDate = new Date(form[key].split('/').reverse().join('-'))
-                if (!isNaN(parsedDate.getTime())) {
-                    setSelectedDate(parsedDate)
-                } else {
-                    setSelectedDate(new Date())
-                }
-            } catch {
-                setSelectedDate(new Date())
+    // Validação: verifica se todos os campos obrigatórios estão preenchidos
+    const isFormValid = useMemo(() => {
+        return fields.every((field) => {
+            // Se o campo não é obrigatório, sempre válido
+            if (!field.required) return true
+            
+            // Se o campo depende de outro que não está ativo, não precisa validar
+            if (field.dependsOn && !form[field.dependsOn]) return true
+            
+            const value = form[field.key]
+            
+            // Validação baseada no tipo
+            if (field.type === 'toggle') {
+                return true // Toggle sempre tem valor (true/false)
             }
-        } else {
-            setSelectedDate(new Date())
-        }
-        setDatePickerVisible(true)
-    }
+            
+            if (field.type === 'image') {
+                return !!value // Imagem precisa estar selecionada
+            }
+            
+            // Para outros tipos, verifica se tem valor
+            return value !== null && value !== undefined && value !== ''
+        })
+    }, [form, fields])
 
-    const hideDatePicker = () => {
-        setDatePickerVisible(false)
-        setActiveDateKey(null)
-    }
-
-    const handleConfirm = (date: Date) => {
-        if (activeDateKey) {
-            setForm((prev) => ({ ...prev, [activeDateKey]: format(date, 'dd/MM/yyyy') }))
+    // Memoizar handlers de onChangeText para evitar re-renderizações
+    const handleTextChange = useCallback((fieldKey: string) => {
+        return (text: string) => {
+            setForm((prev: any) => ({ ...prev, [fieldKey]: text }))
         }
-        hideDatePicker()
-    }
+    }, [setForm])
 
     const handleSelectImage = async (key: string) => {
         const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync()
@@ -104,14 +106,12 @@ export default function FormsComponent({
         })
 
         if (!result.canceled && result.assets?.[0]?.uri) {
-            setForm((prev) => ({ ...prev, [key]: result.assets[0].uri }))
+            setForm((prev: any) => ({ ...prev, [key]: result.assets[0].uri }))
         }
     }
 
     return (
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <View style={styles.container}>
+        <View style={[styles.container, hideButtons && styles.containerNoPadding]}>
             {fields.map((field) => {
                 // Verifica dependências
                 if (field.dependsOn && !form[field.dependsOn]) return null
@@ -123,40 +123,50 @@ export default function FormsComponent({
                         {field.required && <Text style={styles.required}> *</Text>}
                     </Text>
                 )
+                
+                // Wrapper para inputs glass (sem BlurView para não interferir com TextInput)
+                const GlassInputWrapper = ({ children }: { children: React.ReactNode }) => (
+                    <View style={styles.inputWrapper}>
+                        {children}
+                    </View>
+                )
 
                 // Determina estilo do input baseado em erro
-                const getInputStyle = (baseStyle: any) => [
-                    baseStyle,
-                    field.error && styles.inputError
-                ]
+                const getInputStyle = (baseStyle: any) => {
+                    if (field.error) {
+                        return [baseStyle, styles.inputError]
+                    }
+                    return baseStyle
+                }
 
                 if (field.type === 'date') {
                     return (
-                        <View key={field.key}>
-                            {renderLabel()}
-                            <TouchableOpacity
-                                style={getInputStyle(styles.input)}
-                                onPress={() => showDatePicker(field.key)}
-                            >
-                                <Text style={form[field.key] ? styles.inputText : styles.placeholderText}>
-                                    {form[field.key] || field.placeholder || 'DD/MM/AAAA'}
-                                </Text>
-                            </TouchableOpacity>
-                            {field.error && <Text style={styles.errorText}>{field.error}</Text>}
+                        <View key={field.key} style={styles.fieldContainer}>
+                            <DateTimePickerComponent
+                                label={field.label}
+                                required={field.required}
+                                value={form[field.key]}
+                                onChange={(value) => setForm((prev: any) => ({ ...prev, [field.key]: value }))}
+                                mode="date"
+                                placeholder={field.placeholder || 'DD/MM/AAAA'}
+                                error={field.error}
+                            />
                         </View>
                     )
                 }
 
                 if (field.type === 'time') {
                     return (
-                        <View key={field.key}>
-                            {renderLabel()}
-                            <TimePicker
+                        <View key={field.key} style={styles.fieldContainer}>
+                            <DateTimePickerComponent
+                                label={field.label}
+                                required={field.required}
                                 value={form[field.key]}
-                                onChange={(time) => setForm((prev) => ({ ...prev, [field.key]: time }))}
+                                onChange={(value) => setForm((prev: any) => ({ ...prev, [field.key]: value }))}
+                                mode="time"
                                 placeholder={field.placeholder || 'HH:mm'}
+                                error={field.error}
                             />
-                            {field.error && <Text style={styles.errorText}>{field.error}</Text>}
                         </View>
                     )
                 }
@@ -176,8 +186,16 @@ export default function FormsComponent({
                             <TouchableOpacity
                                 style={styles.buttonSmall}
                                 onPress={() => handleSelectImage(field.key)}
+                                activeOpacity={0.8}
                             >
-                                <Text style={styles.buttonText}>Selecionar Imagem</Text>
+                                <LinearGradient
+                                    colors={colors.gradients.secondary as [string, string]}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 0 }}
+                                    style={styles.gradientButtonSmall}
+                                >
+                                    <Text style={styles.buttonText}>Selecionar Imagem</Text>
+                                </LinearGradient>
                             </TouchableOpacity>
                             {field.error && <Text style={styles.errorText}>{field.error}</Text>}
                         </View>
@@ -191,8 +209,11 @@ export default function FormsComponent({
                             <Switch
                                 value={!!form[field.key]}
                                 onValueChange={(value) =>
-                                    setForm((prev) => ({ ...prev, [field.key]: value }))
+                                    setForm((prev: any) => ({ ...prev, [field.key]: value }))
                                 }
+                                trackColor={{ false: '#CBD5E1', true: colors.gradients.primary[1] }}
+                                thumbColor={!!form[field.key] ? '#FFFFFF' : '#F1F5F9'}
+                                ios_backgroundColor="#CBD5E1"
                             />
                         </View>
                     )
@@ -201,26 +222,28 @@ export default function FormsComponent({
                 if (field.type === 'select') {
                     const selectedOption = field.options?.find(opt => opt.value === form[field.key])
                     return (
-                        <View key={field.key}>
+                        <View key={field.key} style={styles.fieldContainer}>
                             {renderLabel()}
-                            <ModalSelector
-                                data={field.options || []}
-                                initValue={selectedOption?.label || field.placeholder || 'Selecione uma opção'}
-                                onChange={(option) => {
-                                    setForm((prev) => ({ ...prev, [field.key]: option.value }))
-                                }}
-                                style={getInputStyle(styles.input)}
-                                initValueTextStyle={{ color: form[field.key] ? '#333' : '#999' }}
-                                selectTextStyle={{ padding: 12 }}
-                            >
-                                <TextInput
+                            <GlassInputWrapper>
+                                <ModalSelector
+                                    data={field.options || []}
+                                    initValue={selectedOption?.label || field.placeholder || 'Selecione uma opção'}
+                                    onChange={(option) => {
+                                        setForm((prev: any) => ({ ...prev, [field.key]: option.value }))
+                                    }}
                                     style={getInputStyle(styles.input)}
-                                    editable={false}
-                                    placeholder={field.placeholder || 'Selecione uma opção'}
-                                    value={selectedOption?.label || ''}
-                                    placeholderTextColor="#999"
-                                />
-                            </ModalSelector>
+                                    initValueTextStyle={{ color: form[field.key] ? colors.text.primary : colors.text.tertiary }}
+                                    selectTextStyle={{ padding: 12 }}
+                                >
+                                    <TextInput
+                                        style={getInputStyle(styles.input)}
+                                        editable={false}
+                                        placeholder={field.placeholder || 'Selecione uma opção'}
+                                        value={selectedOption?.label || ''}
+                                        placeholderTextColor={colors.text.tertiary}
+                                    />
+                                </ModalSelector>
+                            </GlassInputWrapper>
                             {field.error && <Text style={styles.errorText}>{field.error}</Text>}
                         </View>
                     )
@@ -251,164 +274,234 @@ export default function FormsComponent({
                     }
                 }
 
+                // Campos que devem ser multiline
+                const multilineKeys = ['description', 'message', 'content']
+                const isMultiline = multilineKeys.includes(field.key)
+
                 return (
-                    <View key={field.key}>
-                        {renderLabel()}
-                        <TextInput
-                            style={getInputStyle(field.key === 'description' ? styles.inputDescription : styles.input)}
-                            value={form[field.key] || ''}
-                            placeholder={getDefaultPlaceholder()}
-                            placeholderTextColor="#999"
-                            secureTextEntry={secure}
-                            keyboardType={keyboardType}
-                            autoCapitalize={field.type === 'email' ? 'none' : 'sentences'}
-                            autoCorrect={field.type === 'email' || field.type === 'password' ? false : true}
-                            onChangeText={(text) =>
-                                setForm((prev) => ({ ...prev, [field.key]: text }))
-                            }
-                        />
-                        {field.error && <Text style={styles.errorText}>{field.error}</Text>}
-                    </View>
+                    <TextInputField
+                        key={field.key}
+                        fieldKey={field.key}
+                        label={field.label}
+                        value={form[field.key] || ''}
+                        placeholder={getDefaultPlaceholder()}
+                        required={field.required}
+                        error={field.error}
+                        keyboardType={keyboardType}
+                        secureTextEntry={secure}
+                        autoCapitalize={field.type === 'email' ? 'none' : 'sentences'}
+                        autoCorrect={field.type === 'email' || field.type === 'password' ? false : true}
+                        multiline={isMultiline}
+                        onChangeText={handleTextChange(field.key)}
+                    />
                 )
 
             })}
-            <View style={styles.buttonRow}>
-                <TouchableOpacity style={styles.cancelButton} onPress={() => navigation.goBack()}>
-                    <Text style={styles.cancelText}>Cancelar</Text>
-                </TouchableOpacity>
-            <TouchableOpacity style={styles.saveButton} onPress={onSubmit}>
-                <Text style={styles.buttonText}>{submitLabel}</Text>
-            </TouchableOpacity>
-            </View>
+            {!hideButtons && (
+                <View style={styles.buttonRow}>
+                    <TouchableOpacity style={styles.cancelButton} onPress={() => navigation.goBack()}>
+                        <GlassCard opacity={0.3} blurIntensity={10} borderRadius={16} style={styles.cancelButtonGlass}>
+                            <Text style={styles.cancelText}>Cancelar</Text>
+                        </GlassCard>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                        style={styles.saveButton} 
+                        onPress={onSubmit} 
+                        activeOpacity={0.8}
+                        disabled={!isFormValid}
+                    >
+                        <LinearGradient
+                            colors={
+                                isFormValid 
+                                    ? colors.gradients.primary as [string, string]
+                                    : ['#94A3B8', '#94A3B8'] // Cinza quando desativado
+                            }
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                            style={styles.gradientButton}
+                        >
+                            <Text style={styles.buttonText}>{submitLabel}</Text>
+                        </LinearGradient>
+                    </TouchableOpacity>
+                </View>
+            )}
 
-            <DateTimePickerModal
-                isVisible={isDatePickerVisible}
-                mode="date"
-                date={selectedDate}
-                onConfirm={handleConfirm}
-                onCancel={hideDatePicker}
-                locale="pt_BR"
-            />
         </View>
-            </TouchableWithoutFeedback>
-        </KeyboardAvoidingView>
-
     )
 }
 
 const styles = StyleSheet.create({
     container: { 
-        padding: 20,
-        paddingTop: 130, // Altura do header fixo + padding
+        padding: 16,
+        paddingTop: 0, // Removido paddingTop para permitir controle externo
+    },
+    containerNoPadding: {
+        padding: 0,
+    },
+    fieldContainer: {
+        marginBottom: 8,
     },
     label: { 
-        fontSize: 14, 
-        marginBottom: 3, 
-        marginTop: 12, 
-        color: '#333',
+        ...typography.styles.label,
+        marginBottom: 8, 
+        marginTop: 16, 
+        color: colors.text.primary,
+        fontSize: 16,
         fontWeight: '600',
+        lineHeight: 24,
     },
     required: {
-        color: '#e74c3c',
-        fontWeight: 'bold',
+        color: colors.status.error,
+        fontWeight: typography.fontWeight.bold,
     },
     buttonRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        marginTop: 30,
+        marginTop: 32,
+        gap: 12,
     },
     switchRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginVertical: 12,
+        marginVertical: 16,
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        backgroundColor: colors.glass.overlay,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: colors.glass.border,
+        ...colors.shadow.glassLight,
     },
     saveButton: {
-        backgroundColor: '#3366FF',
-        padding: 14,
-        borderRadius: 8,
         flex: 1,
-        marginLeft: 10,
-        alignItems: 'center',
+        marginLeft: 6,
+        borderRadius: 18,
+        overflow: 'hidden',
+        ...colors.shadow.glassLight,
     },
-    cancelText: { color: '#333' },
-    cancelButton: {
-        backgroundColor: '#eee',
-        padding: 14,
-        borderRadius: 8,
-        flex: 1,
-        marginRight: 10,
+    gradientButton: {
+        width: '100%',
+        height: 56,
+        padding: 16,
         alignItems: 'center',
+        justifyContent: 'center',
+    },
+    cancelText: {
+        fontSize: typography.fontSize.base,
+        fontWeight: typography.fontWeight.medium,
+        lineHeight: typography.lineHeight.normal * typography.fontSize.base,
+        color: colors.text.primary,
+    },
+    cancelButton: {
+        flex: 1,
+        marginRight: 6,
+        borderRadius: 18,
+    },
+    cancelButtonGlass: {
+        padding: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    inputWrapper: {
+        width: '100%',
+        backgroundColor: colors.glass.overlay,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: colors.glass.border,
+        ...colors.shadow.glassLight,
+        marginBottom: 0,
+        padding: 0,
     },
     input: {
-        borderWidth: 1,
-        borderColor: '#ccc',
-        padding: 12,
-        borderRadius: 8,
-        marginBottom: 2,
-        backgroundColor: '#fff',
+        borderWidth: 0,
+        padding: 16,
+        borderRadius: 16,
+        marginBottom: 0,
+        backgroundColor: 'transparent',
         fontSize: 16,
+        fontWeight: '400',
+        color: '#0F172A',
+        includeFontPadding: false,
+        textAlignVertical: 'center',
     },
     inputError: {
-        borderColor: '#e74c3c',
-        borderWidth: 2,
+        borderColor: colors.status.error,
+        borderWidth: 1.5,
     },
     inputText: {
-        color: '#333',
-        fontSize: 16,
+        fontSize: typography.fontSize.base,
+        fontWeight: typography.fontWeight.regular,
+        lineHeight: typography.lineHeight.normal * typography.fontSize.base,
+        color: colors.text.primary,
     },
     placeholderText: {
-        color: '#999',
-        fontSize: 16,
+        fontSize: typography.fontSize.base,
+        fontWeight: typography.fontWeight.regular,
+        lineHeight: typography.lineHeight.normal * typography.fontSize.base,
+        color: colors.text.tertiary,
     },
     errorText: {
-        color: '#e74c3c',
-        fontSize: 12,
-        marginTop: 4,
-        marginBottom: 8,
+        ...typography.styles.captionSmall,
+        color: colors.status.error,
+        marginTop: 6,
+        marginBottom: 4,
+        marginLeft: 4,
     },
     button: {
-        backgroundColor: '#3366FF',
-        paddingVertical: 14,
-        borderRadius: 8,
+        paddingVertical: 16,
+        borderRadius: 18,
         marginTop: 24,
     },
     buttonSmall: {
-        backgroundColor: '#3366FF',
-        paddingVertical: 10,
-        paddingHorizontal: 20,
-        borderRadius: 8,
         marginTop: 12,
+        borderRadius: 16,
+        overflow: 'hidden',
+    },
+    gradientButtonSmall: {
+        width: '100%',
+        minHeight: 44,
+        paddingVertical: 12,
+        paddingHorizontal: 24,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     buttonText: {
-        color: '#fff',
-        fontWeight: 'bold',
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#FFFFFF',
         textAlign: 'center',
     },
     imagePreview: {
         width: '100%',
-        height: 160,
-        borderRadius: 12,
-        marginTop: 10,
+        height: 180,
+        borderRadius: 20,
+        marginTop: 12,
+        overflow: 'hidden',
     },
     imagePlaceholder: {
-        backgroundColor: '#eee',
+        backgroundColor: 'rgba(255, 255, 255, 0.3)',
         justifyContent: 'center',
         alignItems: 'center',
-        marginTop: 10,
+        marginTop: 12,
         width: '100%',
-        height: 160,
-        resizeMode: 'cover',
-        borderRadius: 12,
+        height: 180,
+        borderRadius: 20,
+        borderWidth: 2,
+        borderColor: colors.glass.border,
+        borderStyle: 'dashed',
     },
     inputDescription: {
-        height: 80,
-        borderWidth: 1,
-        borderColor: '#ccc',
-        padding: 12,
-        borderRadius: 8,
-        marginBottom: 2,
-        backgroundColor: '#fff',
+        height: 100,
+        borderWidth: 0,
+        padding: 16,
+        borderRadius: 16,
+        marginBottom: 0,
+        backgroundColor: 'transparent',
         textAlignVertical: 'top',
+        fontSize: 16,
+        fontWeight: '400',
+        color: '#0F172A',
+        includeFontPadding: false,
     }
 })
