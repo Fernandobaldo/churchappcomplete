@@ -3,7 +3,7 @@ import { ContributionController } from '../controllers/contributionController'
 import { checkPermission } from '../middlewares/checkPermission'
 import { checkRole } from '../middlewares/checkRole'
 import { checkBranchId } from '../middlewares/checkBranchId'
-import { createContributionSchema } from '../schemas/contributionSchemas'
+import { createContributionSchema, updateContributionSchema } from '../schemas/contributionSchemas'
 import { authenticate } from '../middlewares/authenticate'
 
 export async function contributionsRoutes(app: FastifyInstance) {
@@ -83,6 +83,28 @@ export async function contributionsRoutes(app: FastifyInstance) {
     ],
     schema: createContributionSchema
   }, controller.create.bind(controller))
+
+  app.put('/:id', {
+    preHandler: [
+      authenticate,
+      checkBranchId(),
+      checkRole(['ADMINGERAL', 'ADMINFILIAL', 'COORDINATOR']),
+      checkPermission(['contributions_manage'])
+    ],
+    schema: {
+      ...updateContributionSchema,
+      params: {
+        type: 'object',
+        required: ['id'],
+        properties: {
+          id: {
+            type: 'string',
+            description: 'ID da contribuição',
+          },
+        },
+      },
+    },
+  }, controller.update.bind(controller))
 
   app.patch('/:id/toggle-active', {
     preHandler: [

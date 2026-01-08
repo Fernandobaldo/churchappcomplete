@@ -104,24 +104,49 @@ export async function eventsRoutes(app: FastifyInstance) {
           })
         }
 
-        // Aceita formato ISO (YYYY-MM-DDTHH:mm:ss) ou dd/MM/yyyy
+        // Aceita formato ISO (YYYY-MM-DDTHH:mm:ss) ou dd-MM-yyyy
         let parsedStartDate: Date
         let parsedEndDate: Date
         
-        // Tenta parse ISO primeiro, depois dd/MM/yyyy
-        const isoStartDate = new Date(data.startDate)
-        const isoEndDate = new Date(data.endDate)
+        // Verifica se é formato ISO válido (YYYY-MM-DD)
+        const isoRegex = /^\d{4}-\d{2}-\d{2}/
+        const isISOStart = isoRegex.test(data.startDate)
+        const isISOEnd = isoRegex.test(data.endDate)
         
-        if (!isNaN(isoStartDate.getTime())) {
-          parsedStartDate = isoStartDate
+        if (isISOStart) {
+          // Formato ISO: YYYY-MM-DD
+          parsedStartDate = new Date(data.startDate)
+          if (isNaN(parsedStartDate.getTime())) {
+            throw new Error('Data de início inválida (formato ISO)')
+          }
         } else {
-          parsedStartDate = parse(data.startDate.trim(), 'dd/MM/yyyy', new Date())
+          // Formato brasileiro: dd-MM-yyyy
+          try {
+            parsedStartDate = parse(data.startDate.trim(), 'dd-MM-yyyy', new Date())
+            if (isNaN(parsedStartDate.getTime())) {
+              throw new Error('Data de início inválida (formato dd-MM-yyyy)')
+            }
+          } catch (error) {
+            throw new Error(`Data de início inválida: ${data.startDate}. Use formato dd-MM-yyyy`)
+          }
         }
         
-        if (!isNaN(isoEndDate.getTime())) {
-          parsedEndDate = isoEndDate
+        if (isISOEnd) {
+          // Formato ISO: YYYY-MM-DD
+          parsedEndDate = new Date(data.endDate)
+          if (isNaN(parsedEndDate.getTime())) {
+            throw new Error('Data de fim inválida (formato ISO)')
+          }
         } else {
-          parsedEndDate = parse(data.endDate.trim(), 'dd/MM/yyyy', new Date())
+          // Formato brasileiro: dd-MM-yyyy
+          try {
+            parsedEndDate = parse(data.endDate.trim(), 'dd-MM-yyyy', new Date())
+            if (isNaN(parsedEndDate.getTime())) {
+              throw new Error('Data de fim inválida (formato dd-MM-yyyy)')
+            }
+          } catch (error) {
+            throw new Error(`Data de fim inválida: ${data.endDate}. Use formato dd-MM-yyyy`)
+          }
         }
 
         const newEvent = await prisma.event.create({
@@ -186,25 +211,55 @@ app.put(
           return reply.status(404).send({ message: 'Evento ou filial não encontrada.' })
         }
 
-      // Aceita formato ISO (YYYY-MM-DDTHH:mm:ss) ou dd/MM/yyyy
+      // Aceita formato ISO (YYYY-MM-DD) ou dd-MM-yyyy
       let parsedStartDate: Date | undefined
       let parsedEndDate: Date | undefined
       
       if (data.startDate) {
-        const isoStartDate = new Date(data.startDate)
-        if (!isNaN(isoStartDate.getTime())) {
-          parsedStartDate = isoStartDate
+        // Verifica se é formato ISO válido (YYYY-MM-DD)
+        const isoRegex = /^\d{4}-\d{2}-\d{2}/
+        const isISOStart = isoRegex.test(data.startDate)
+        
+        if (isISOStart) {
+          // Formato ISO: YYYY-MM-DD
+          parsedStartDate = new Date(data.startDate)
+          if (isNaN(parsedStartDate.getTime())) {
+            throw new Error('Data de início inválida (formato ISO)')
+          }
         } else {
-          parsedStartDate = parse(data.startDate.trim(), 'dd/MM/yyyy', new Date())
+          // Formato brasileiro: dd-MM-yyyy
+          try {
+            parsedStartDate = parse(data.startDate.trim(), 'dd-MM-yyyy', new Date())
+            if (isNaN(parsedStartDate.getTime())) {
+              throw new Error('Data de início inválida (formato dd-MM-yyyy)')
+            }
+          } catch (error) {
+            throw new Error(`Data de início inválida: ${data.startDate}. Use formato dd-MM-yyyy`)
+          }
         }
       }
       
       if (data.endDate) {
-        const isoEndDate = new Date(data.endDate)
-        if (!isNaN(isoEndDate.getTime())) {
-          parsedEndDate = isoEndDate
+        // Verifica se é formato ISO válido (YYYY-MM-DD)
+        const isoRegex = /^\d{4}-\d{2}-\d{2}/
+        const isISOEnd = isoRegex.test(data.endDate)
+        
+        if (isISOEnd) {
+          // Formato ISO: YYYY-MM-DD
+          parsedEndDate = new Date(data.endDate)
+          if (isNaN(parsedEndDate.getTime())) {
+            throw new Error('Data de fim inválida (formato ISO)')
+          }
         } else {
-          parsedEndDate = parse(data.endDate.trim(), 'dd/MM/yyyy', new Date())
+          // Formato brasileiro: dd-MM-yyyy
+          try {
+            parsedEndDate = parse(data.endDate.trim(), 'dd-MM-yyyy', new Date())
+            if (isNaN(parsedEndDate.getTime())) {
+              throw new Error('Data de fim inválida (formato dd-MM-yyyy)')
+            }
+          } catch (error) {
+            throw new Error(`Data de fim inválida: ${data.endDate}. Use formato dd-MM-yyyy`)
+          }
         }
       }
 

@@ -2,10 +2,8 @@ import { prisma } from '../lib/prisma'
 import { TransactionType, EntryType, ExitType } from '@prisma/client'
 
 interface CreateTransactionInput {
-  title: string
   amount: number
   type: TransactionType
-  category?: string
   entryType?: EntryType
   exitType?: ExitType
   exitTypeOther?: string
@@ -15,13 +13,12 @@ interface CreateTransactionInput {
   isTithePayerMember?: boolean
   createdBy?: string
   branchId: string
+  date?: Date
 }
 
 interface UpdateTransactionInput {
-  title?: string
   amount?: number
   type?: TransactionType
-  category?: string
   entryType?: EntryType
   exitType?: ExitType
   exitTypeOther?: string
@@ -29,6 +26,7 @@ interface UpdateTransactionInput {
   tithePayerMemberId?: string
   tithePayerName?: string
   isTithePayerMember?: boolean
+  date?: Date
 }
 
 interface FilterOptions {
@@ -225,22 +223,26 @@ export class FinanceService {
   }
 
   async create(data: CreateTransactionInput) {
+    // Construir objeto de dados removendo campos undefined
+    const transactionData: any = {
+      amount: data.amount,
+      type: data.type,
+      branchId: data.branchId,
+      date: data.date || new Date()
+    }
+
+    // Adicionar campos opcionais apenas se estiverem definidos
+    if (data.entryType) transactionData.entryType = data.entryType
+    if (data.exitType) transactionData.exitType = data.exitType
+    if (data.exitTypeOther) transactionData.exitTypeOther = data.exitTypeOther
+    if (data.contributionId) transactionData.contributionId = data.contributionId
+    if (data.tithePayerMemberId) transactionData.tithePayerMemberId = data.tithePayerMemberId
+    if (data.tithePayerName) transactionData.tithePayerName = data.tithePayerName
+    if (data.isTithePayerMember !== undefined) transactionData.isTithePayerMember = data.isTithePayerMember
+    if (data.createdBy) transactionData.createdBy = data.createdBy
+
     return prisma.transaction.create({
-      data: {
-        title: data.title,
-        amount: data.amount,
-        type: data.type,
-        category: data.category,
-        entryType: data.entryType,
-        exitType: data.exitType,
-        exitTypeOther: data.exitTypeOther,
-        contributionId: data.contributionId,
-        tithePayerMemberId: data.tithePayerMemberId,
-        tithePayerName: data.tithePayerName,
-        isTithePayerMember: data.isTithePayerMember,
-        createdBy: data.createdBy,
-        branchId: data.branchId
-      },
+      data: transactionData,
       include: {
         CreatedByUser: {
           select: {
