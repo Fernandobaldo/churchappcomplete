@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Image } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native'
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
-import api from '../api/api'
+import { membersService } from '../services/members.service'
 import Toast from 'react-native-toast-message'
 import { useAuthStore } from '../stores/authStore'
 import { hasAccess } from '../utils/authUtils'
@@ -30,23 +30,23 @@ export default function MemberDetailsScreen() {
   const { user } = useAuthStore()
   const [member, setMember] = useState<Member | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
 
   const fetchMember = useCallback(async () => {
     try {
-      const response = await api.get(`/members/${id}`)
-      setMember(response.data)
-    } catch (error) {
-      Toast.show({
-        type: 'error',
-        text1: 'Erro ao carregar membro',
-      })
-      navigation.goBack()
+      setError(null)
+      const data = await membersService.getById(id)
+      setMember(data)
+    } catch (err: any) {
+      console.error('Erro ao carregar detalhes do membro:', err)
+      const errorMessage = err.response?.data?.message || 'Não foi possível carregar os detalhes do membro.'
+      setError(errorMessage)
     } finally {
       setLoading(false)
       setRefreshing(false)
     }
-  }, [id, navigation])
+  }, [id])
 
   useEffect(() => {
     if (id) {
@@ -57,16 +57,23 @@ export default function MemberDetailsScreen() {
   // Recarrega quando a tela recebe foco (após editar)
   useFocusEffect(
     useCallback(() => {
-      if (id) {
+      if (id && !loading && !refreshing) {
         fetchMember()
       }
-    }, [id, fetchMember])
+    }, [id, fetchMember, loading, refreshing])
   )
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true)
     fetchMember()
   }, [fetchMember])
+
+  const handleRetry = useCallback(() => {
+    setLoading(true)
+    fetchMember().finally(() => setLoading(false))
+  }, [fetchMember])
+
+  const isEmpty = !loading && !member && !error
 
   const getRoleLabel = (role: string) => {
     const labels: Record<string, string> = {
@@ -78,39 +85,6 @@ export default function MemberDetailsScreen() {
     return labels[role] || role
   }
 
-  if (loading) {
-    return (
-      <DetailScreenLayout
-        headerProps={{
-          title: "Detalhes do Membro",
-          Icon: FontAwesome5,
-          iconName: "user",
-        }}
-      >
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.gradients.primary[1]} />
-          <Text style={styles.loadingText}>Carregando...</Text>
-        </View>
-      </DetailScreenLayout>
-    )
-  }
-
-  if (!member) {
-    return (
-      <DetailScreenLayout
-        headerProps={{
-          title: "Detalhes do Membro",
-          Icon: FontAwesome5,
-          iconName: "user",
-        }}
-      >
-        <View style={styles.loadingContainer}>
-          <Text style={styles.errorText}>Membro não encontrado</Text>
-        </View>
-      </DetailScreenLayout>
-    )
-  }
-
   const canManagePermissions = user?.permissions?.some(p => p.type === 'MANAGE_PERMISSIONS') || user?.role === 'ADMINGERAL'
   const canViewSensitiveData = hasAccess(user, 'members_manage')
 
@@ -120,99 +94,90 @@ export default function MemberDetailsScreen() {
         title: "Detalhes do Membro",
         Icon: FontAwesome5,
         iconName: "user",
-        rightButtonIcon: canManagePermissions ? (
+        rightButtonIcon: canManagePermissions && member ? (
           <Ionicons name="shield-outline" size={24} color="white" />
         ) : undefined,
-        onRightButtonPress: canManagePermissions
+        onRightButtonPress: canManagePermissions && member
           ? () => navigation.navigate('Permissions' as never)
           : undefined,
       }}
+      loading={loading}
+      error={error}
+      empty={isEmpty}
+      emptyTitle="Membro não encontrado"
+      emptySubtitle="O membro solicitado não existe ou foi removido"
       refreshing={refreshing}
       onRefresh={handleRefresh}
+      onRetry={handleRetry}
     >
-        <View style={styles.profileSection}>
-          {member.avatarUrl ? (
-            <Image source={{ uri: member.avatarUrl }} style={styles.avatar} />
-          ) : (
-            <View style={styles.avatarPlaceholder}>
-              <Text style={styles.avatarText}>{member.name.charAt(0).toUpperCase()}</Text>
+      {member && (
+        <>
+          <View style={styles.profileSection}>
+            {member.avatarUrl ? (
+              <Image source={{ uri: member.avatarUrl }} style={styles.avatar} />
+            ) : (
+              <View style={styles.avatarPlaceholder}>
+                <Text style={styles.avatarText}>{member.name.charAt(0).toUpperCase()}</Text>
+              </View>
+            )}
+            <Text style={styles.name}>{member.name}</Text>
+            <View style={styles.roleBadge}>
+              <Text style={styles.roleText}>{getRoleLabel(member.role)}</Text>
             </View>
-          )}
-          <Text style={styles.name}>{member.name}</Text>
-          <View style={styles.roleBadge}>
-            <Text style={styles.roleText}>{getRoleLabel(member.role)}</Text>
           </View>
-        </View>
 
-        <GlassCard opacity={0.4} blurIntensity={20} borderRadius={20} style={styles.card}>
-          {canViewSensitiveData && (
-            <>
+          <GlassCard opacity={0.4} blurIntensity={20} borderRadius={20} style={styles.card}>
+            {canViewSensitiveData && (
+              <>
+                <View style={styles.infoRow}>
+                  <Ionicons name="mail-outline" size={20} color={colors.text.secondary} />
+                  <View style={styles.infoContent}>
+                    <Text style={styles.infoLabel}>Email</Text>
+                    <Text style={styles.infoValue}>{member.email}</Text>
+                  </View>
+                </View>
+
+                {member.phone && (
+                  <View style={styles.infoRow}>
+                    <Ionicons name="call-outline" size={20} color={colors.text.secondary} />
+                    <View style={styles.infoContent}>
+                      <Text style={styles.infoLabel}>Telefone</Text>
+                      <Text style={styles.infoValue}>{member.phone}</Text>
+                    </View>
+                  </View>
+                )}
+
+                {member.address && (
+                  <View style={styles.infoRow}>
+                    <Ionicons name="location-outline" size={20} color={colors.text.secondary} />
+                    <View style={styles.infoContent}>
+                      <Text style={styles.infoLabel}>Endereço</Text>
+                      <Text style={styles.infoValue}>{member.address}</Text>
+                    </View>
+                  </View>
+                )}
+              </>
+            )}
+
+            {member.birthDate && (
               <View style={styles.infoRow}>
-                <Ionicons name="mail-outline" size={20} color={colors.text.secondary} />
+                <Ionicons name="calendar-outline" size={20} color={colors.text.secondary} />
                 <View style={styles.infoContent}>
-                  <Text style={styles.infoLabel}>Email</Text>
-                  <Text style={styles.infoValue}>{member.email}</Text>
+                  <Text style={styles.infoLabel}>Data de Nascimento</Text>
+                  <Text style={styles.infoValue}>
+                    {new Date(member.birthDate).toLocaleDateString('pt-BR')}
+                  </Text>
                 </View>
               </View>
-
-              {member.phone && (
-                <View style={styles.infoRow}>
-                  <Ionicons name="call-outline" size={20} color={colors.text.secondary} />
-                  <View style={styles.infoContent}>
-                    <Text style={styles.infoLabel}>Telefone</Text>
-                    <Text style={styles.infoValue}>{member.phone}</Text>
-                  </View>
-                </View>
-              )}
-
-              {member.address && (
-                <View style={styles.infoRow}>
-                  <Ionicons name="location-outline" size={20} color={colors.text.secondary} />
-                  <View style={styles.infoContent}>
-                    <Text style={styles.infoLabel}>Endereço</Text>
-                    <Text style={styles.infoValue}>{member.address}</Text>
-                  </View>
-                </View>
-              )}
-            </>
-          )}
-
-          {member.birthDate && (
-            <View style={styles.infoRow}>
-              <Ionicons name="calendar-outline" size={20} color={colors.text.secondary} />
-              <View style={styles.infoContent}>
-                <Text style={styles.infoLabel}>Data de Nascimento</Text>
-                <Text style={styles.infoValue}>
-                  {new Date(member.birthDate).toLocaleDateString('pt-BR')}
-                </Text>
-              </View>
-            </View>
-          )}
-        </GlassCard>
+            )}
+          </GlassCard>
+        </>
+      )}
     </DetailScreenLayout>
   )
 }
 
 const styles = StyleSheet.create({
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 110,
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    fontWeight: '400',
-    lineHeight: 24,
-    color: '#475569',
-  },
-  errorText: {
-    fontSize: 16,
-    fontWeight: '400',
-    lineHeight: 24,
-    color: '#64748B',
-  },
   profileSection: {
     alignItems: 'center',
     marginBottom: 24,

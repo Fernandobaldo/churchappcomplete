@@ -1,15 +1,15 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react'
-import { View, Text, FlatList, ActivityIndicator, StyleSheet } from 'react-native'
-import { useNavigation } from '@react-navigation/native'
+import { View, FlatList, ActivityIndicator, StyleSheet } from 'react-native'
+import { useNavigation, useFocusEffect } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
-import api from '../api/api'
+import { devotionalsService } from '../services/devotionals.service'
 import DevotionalCard from '../components/DevotionalCard'
 import ViewScreenLayout from '../components/layouts/ViewScreenLayout'
 import FontAwesome5 from "@expo/vector-icons/FontAwesome5";
 import {useAuthStore} from "../stores/authStore";
 import { colors } from '../theme/colors'
 import { useBackToDashboard } from '../hooks/useBackToDashboard'
-import EmptyState from '../components/EmptyState'
+import Toast from 'react-native-toast-message'
 
 export default function FeedDevotionalsScreen() {
     const navigation = useNavigation()
@@ -23,19 +23,22 @@ export default function FeedDevotionalsScreen() {
 
     const [devotionals, setDevotionals] = useState([])
     const [loading, setLoading] = useState(true)
+    const [error, setError] = useState<string | null>(null)
     const [refreshing, setRefreshing] = useState(false)
     const [page, setPage] = useState(1)
     const [loadingMore, setLoadingMore] = useState(false)
     const ITEMS_PER_PAGE = 10
 
-    const fetchDevotionals = async () => {
+    const fetchDevotionals = useCallback(async () => {
         try {
-            const res = await api.get('/devotionals')
-            setDevotionals(res.data)
-        } catch (error) {
-            console.error('Erro ao carregar devocionais:', error)
+            setError(null)
+            const data = await devotionalsService.getAll()
+            setDevotionals(data || [])
+        } catch (err: any) {
+            console.error('Erro ao carregar devocionais:', err)
+            setError(err.response?.data?.message || 'Erro ao carregar devocionais')
         }
-    }
+    }, [])
 
     useEffect(() => {
         const loadDevotionals = async () => {
@@ -44,14 +47,29 @@ export default function FeedDevotionalsScreen() {
             setLoading(false)
         }
         loadDevotionals()
-    }, [])
+    }, [fetchDevotionals])
 
-    const handleRefresh = async () => {
+    // Recarrega quando a tela ganha foco (após voltar de criar/editar devocional)
+    useFocusEffect(
+        useCallback(() => {
+            // Evita requisições duplicadas se já estiver carregando ou refrescando
+            if (!loading && !refreshing) {
+                fetchDevotionals()
+            }
+        }, [fetchDevotionals, loading, refreshing])
+    )
+
+    const handleRefresh = useCallback(async () => {
         setRefreshing(true)
         setPage(1)
         await fetchDevotionals()
         setRefreshing(false)
-    }
+    }, [fetchDevotionals])
+
+    const handleRetry = useCallback(() => {
+        setLoading(true)
+        fetchDevotionals().finally(() => setLoading(false))
+    }, [fetchDevotionals])
     
     // Paginação: mostra apenas os primeiros N itens
     const paginatedDevotionals = useMemo(() => 
@@ -74,6 +92,29 @@ export default function FeedDevotionalsScreen() {
         user.role === 'ADMINFILIAL' ||
         user.permissions?.some((p: any) => p.type === 'devotional_manage')
 
+    const isEmpty = !loading && devotionals.length === 0 && !error
+
+    const handleLike = useCallback(async (devotionalId: string, liked: boolean) => {
+        try {
+            if (liked) {
+                await devotionalsService.like(devotionalId)
+            } else {
+                await devotionalsService.unlike(devotionalId)
+            }
+            // Recarregar lista para atualizar contadores
+            await fetchDevotionals()
+        } catch (error: any) {
+            console.error('Erro ao curtir:', error.response?.data || error.message)
+            Toast.show({
+                type: 'error',
+                text1: 'Erro',
+                text2: 'Não foi possível curtir o devocional',
+            })
+            // Recarregar para reverter estado visual
+            await fetchDevotionals()
+        }
+    }, [fetchDevotionals])
+
     return (
         <ViewScreenLayout
             headerProps={{
@@ -87,12 +128,18 @@ export default function FeedDevotionalsScreen() {
             refreshing={refreshing}
             onRefresh={handleRefresh}
             contentContainerStyle={styles.viewContent}
+            loading={loading}
+            error={error}
+            empty={isEmpty}
+            emptyTitle="Nenhum devocional encontrado"
+            emptySubtitle="Quando houver devocionais disponíveis, eles aparecerão aqui 🙏"
+            onRetry={handleRetry}
         >
             <FlatList
                 contentContainerStyle={styles.list}
                 data={paginatedDevotionals}
                 renderItem={({ item }) => (
-                    <DevotionalCard devotional={item} refreshDevotionals={fetchDevotionals} />
+                    <DevotionalCard devotional={item} onLike={handleLike} />
                 )}
                 keyExtractor={(item) => item.id}
                 refreshing={refreshing}
@@ -105,12 +152,6 @@ export default function FeedDevotionalsScreen() {
                             <ActivityIndicator size="small" color={colors.gradients.primary[1]} />
                         </View>
                     ) : null
-                }
-                ListEmptyComponent={
-                    <EmptyState
-                        icon="book-outline"
-                        message="Nenhum devocional encontrado 🙏"
-                    />
                 }
             />
         </ViewScreenLayout>

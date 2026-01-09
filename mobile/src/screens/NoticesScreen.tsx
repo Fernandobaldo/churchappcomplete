@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react'
-import { View, Text, FlatList, StyleSheet, RefreshControl, ActivityIndicator } from 'react-native'
-import { useNavigation } from '@react-navigation/native'
+import { View, Text, FlatList, StyleSheet, ActivityIndicator } from 'react-native'
+import { useNavigation, useFocusEffect } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
 import api from '../api/api'
 import ViewScreenLayout from '../components/layouts/ViewScreenLayout'
@@ -16,11 +16,12 @@ import Tabs from '../components/Tabs'
 import { Notice } from '../types'
 import { colors } from '../theme/colors'
 import { useBackToDashboard } from '../hooks/useBackToDashboard'
-import EmptyState from '../components/EmptyState'
+import { EmptyState } from '../components/states'
 
 export default function NoticesScreen() {
     const [notices, setNotices] = useState<Notice[]>([])
     const [loading, setLoading] = useState(true)
+    const [error, setError] = useState<string | null>(null)
     const [refreshing, setRefreshing] = useState(false)
     const [activeTab, setActiveTab] = useState<'unread' | 'read'>('unread')
     const [page, setPage] = useState(1)
@@ -35,10 +36,12 @@ export default function NoticesScreen() {
 
     const fetchData = useCallback(async () => {
         try {
+            setError(null)
             const res = await api.get<Notice[]>('/notices')
             setNotices(res.data || [])
-        } catch (error) {
-            console.error('Erro ao carregar avisos:', error)
+        } catch (err: any) {
+            console.error('Erro ao carregar avisos:', err)
+            setError(err.response?.data?.message || 'Erro ao carregar avisos')
         } finally {
             setLoading(false)
             setRefreshing(false)
@@ -46,12 +49,33 @@ export default function NoticesScreen() {
     }, [])
 
     useEffect(() => {
-        fetchData()
+        const loadNotices = async () => {
+            setLoading(true)
+            await fetchData()
+        }
+        loadNotices()
     }, [fetchData])
+
+    // Recarrega quando a tela ganha foco (após voltar de criar/editar aviso)
+    useFocusEffect(
+        useCallback(() => {
+            // Evita requisições duplicadas se já estiver carregando ou refrescando
+            if (!loading && !refreshing) {
+                fetchData()
+            }
+        }, [fetchData, loading, refreshing])
+    )
 
     const onRefresh = useCallback(() => {
         setRefreshing(true)
+        setPage(1)
+        setHasMore(true)
         fetchData()
+    }, [fetchData])
+
+    const handleRetry = useCallback(() => {
+        setLoading(true)
+        fetchData().finally(() => setLoading(false))
     }, [fetchData])
 
     const markAsRead = useCallback(async (id: string) => {
@@ -107,6 +131,11 @@ export default function NoticesScreen() {
         setHasMore(true)
     }, [activeTab])
 
+    // Global empty: verifica se TODAS as tabs estão vazias
+    const isGlobalEmpty = !loading && notices.length === 0 && !error
+    // Tab empty: verifica se apenas a tab atual está vazia
+    const isTabEmpty = !loading && filteredNotices.length === 0 && !error && notices.length > 0
+
     return (
         <ViewScreenLayout
             headerProps={{
@@ -126,6 +155,12 @@ export default function NoticesScreen() {
             refreshing={refreshing}
             onRefresh={onRefresh}
             contentContainerStyle={styles.viewContent}
+            loading={loading}
+            error={error}
+            empty={isGlobalEmpty}
+            emptyTitle="Nenhum aviso encontrado"
+            emptySubtitle="Quando houver avisos disponíveis, eles aparecerão aqui"
+            onRetry={handleRetry}
         >
             {/* Tabs */}
             <Tabs
@@ -149,18 +184,8 @@ export default function NoticesScreen() {
                 keyExtractor={(item) => item.id}
                 contentContainerStyle={styles.listContent}
                 style={styles.list}
-                refreshControl={
-                    <RefreshControl 
-                        refreshing={refreshing} 
-                        onRefresh={() => {
-                            setPage(1)
-                            setHasMore(true)
-                            onRefresh()
-                        }}
-                        colors={colors.gradients.primary}
-                        tintColor={colors.gradients.primary[1]}
-                    />
-                }
+                refreshing={refreshing}
+                onRefresh={onRefresh}
                 onEndReached={loadMore}
                 onEndReachedThreshold={0.5}
                 ListFooterComponent={
@@ -168,6 +193,14 @@ export default function NoticesScreen() {
                         <View style={styles.loadingMore}>
                             <ActivityIndicator size="small" color={colors.gradients.primary[1]} />
                         </View>
+                    ) : null
+                }
+                ListEmptyComponent={
+                    isTabEmpty ? (
+                        <EmptyState
+                            title={activeTab === 'unread' ? 'Nenhum aviso não lido' : 'Nenhum aviso lido'}
+                            subtitle="Quando houver avisos nesta categoria, eles aparecerão aqui"
+                        />
                     ) : null
                 }
                 renderItem={({ item }) => (
@@ -201,14 +234,6 @@ export default function NoticesScreen() {
                             </Text>
                         </GlassCard>
                 )}
-                ListEmptyComponent={
-                    <EmptyState
-                        icon="notifications-outline"
-                        message={activeTab === 'unread' 
-                            ? 'Nenhum aviso não lido' 
-                            : 'Nenhum aviso lido'}
-                    />
-                }
             />
 
         </ViewScreenLayout>

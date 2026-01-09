@@ -8,10 +8,12 @@ import ViewScreenLayout from '../components/layouts/ViewScreenLayout'
 import GlassCard from '../components/GlassCard'
 import { colors } from '../theme/colors'
 import { useBackToDashboard } from '../hooks/useBackToDashboard'
+import { removeToken } from '../api/api'
 
 export default function MoreScreen() {
     const navigation = useNavigation()
     const user = useAuthStore((s) => s.user)
+    const logout = useAuthStore((s) => s.logout)
     const permissions = user?.permissions?.map((p) => p.type) || []
     
     // Intercepta gesto de voltar para navegar ao Dashboard quando não há página anterior
@@ -28,7 +30,7 @@ export default function MoreScreen() {
     const adminOptions = [
         { label: 'Finanças', icon: <Ionicons name="cash-outline" size={20} />, screen: 'Finances', permission: 'finances_manage' },
         { label: 'Permissões', icon: <Feather name="lock" size={20} />, screen: 'Permissions', permission: 'MANAGE_PERMISSIONS' },
-        { label: 'Igreja', icon: <Ionicons name="church-outline" size={20} />, screen: 'ChurchSettings', permission: 'church_manage' },
+        { label: 'Igreja', icon: <Ionicons name="business-outline" size={20} />, screen: 'ChurchSettings', permission: 'church_manage' },
         { label: 'Membros', icon: <Ionicons name="people-outline" size={20} />, screen: 'MembersListScreen', permission: 'members_manage' },
         { label: 'Gestão de Eventos', icon: <Ionicons name="calendar-outline" size={20} />, screen: 'Events', permission: 'events_manage' },
         { label: 'Cargos', icon: <Ionicons name="shield-outline" size={20} />, screen: 'Positions', role: 'ADMINGERAL' },
@@ -51,6 +53,18 @@ export default function MoreScreen() {
 
     const handleNavigate = (screen: string) => {
         navigation.navigate(screen as never)
+    }
+
+    const handleLogout = () => {
+        // Limpar token do axios
+        removeToken()
+        // Limpar estado de autenticação
+        logout()
+        // Resetar navegação para Login (limpa histórico)
+        navigation.reset({
+            index: 0,
+            routes: [{ name: 'Login' as never }],
+        })
     }
 
     return (
@@ -100,7 +114,7 @@ export default function MoreScreen() {
                 )}
 
                 <GlassCard
-                    onPress={() => navigation.navigate('Login' as never)}
+                    onPress={handleLogout}
                     opacity={0.4}
                     blurIntensity={20}
                     borderRadius={20}

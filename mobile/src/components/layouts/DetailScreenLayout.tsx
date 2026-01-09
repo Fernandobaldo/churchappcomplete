@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react'
-import { View, StyleSheet, ScrollView, Image, RefreshControl, ActivityIndicator, ImageBackground, InteractionManager } from 'react-native'
+import { View, StyleSheet, ScrollView, Image, RefreshControl, ImageBackground, InteractionManager } from 'react-native'
 import PageHeader, { PageHeaderProps } from '../PageHeader'
 import GlassBackground from '../GlassBackground'
 import { colors } from '../../theme/colors'
+import { LoadingState, ErrorState, EmptyState } from '../states'
 
 type DetailScreenLayoutProps = {
   headerProps: PageHeaderProps
@@ -13,6 +14,14 @@ type DetailScreenLayoutProps = {
   refreshing?: boolean
   onRefresh?: () => void
   backgroundImageUri?: string
+  topSlot?: React.ReactNode
+  bottomSlot?: React.ReactNode
+  floatingSlot?: React.ReactNode
+  error?: string | null
+  empty?: boolean
+  emptyTitle?: string
+  emptySubtitle?: string
+  onRetry?: () => void
 }
 
 export default function DetailScreenLayout({
@@ -24,6 +33,14 @@ export default function DetailScreenLayout({
   refreshing = false,
   onRefresh,
   backgroundImageUri,
+  topSlot,
+  bottomSlot,
+  floatingSlot,
+  error = null,
+  empty = false,
+  emptyTitle,
+  emptySubtitle,
+  onRetry,
 }: DetailScreenLayoutProps) {
   const [isReady, setIsReady] = useState(false)
 
@@ -34,19 +51,28 @@ export default function DetailScreenLayout({
     return () => interaction.cancel()
   }, [])
 
-  if (loading) {
+  // Priority logic: loading > error > empty > children
+  const renderContent = () => {
+    if (loading) {
+      return <LoadingState />
+    }
+    if (error) {
+      return <ErrorState message={error} onRetry={onRetry} />
+    }
+    if (empty) {
+      return (
+        <EmptyState
+          title={emptyTitle || 'Nenhum item encontrado'}
+          subtitle={emptySubtitle}
+        />
+      )
+    }
     return (
-      <GlassBackground
-        imageUri={backgroundImageUri}
-        overlayOpacity={0.35}
-        blurIntensity={15}
-        style={styles.container}
-      >
-        <PageHeader {...headerProps} />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.gradients.primary[1]} />
-        </View>
-      </GlassBackground>
+      <>
+        {topSlot}
+        {children}
+        {bottomSlot}
+      </>
     )
   }
 
@@ -58,7 +84,7 @@ export default function DetailScreenLayout({
       style={styles.container}
     >
       <PageHeader {...headerProps} />
-      {imageUrl && (
+      {!loading && !error && !empty && imageUrl && (
         <View style={styles.imageContainer}>
           <ImageBackground
             source={{ uri: imageUrl }}
@@ -72,10 +98,10 @@ export default function DetailScreenLayout({
       )}
       {isReady ? (
         <ScrollView
-          style={[styles.scrollView, imageUrl && styles.scrollViewWithImage]}
+          style={[styles.scrollView, !loading && !error && !empty && imageUrl && styles.scrollViewWithImage]}
           contentContainerStyle={styles.scrollContent}
           refreshControl={
-            onRefresh ? (
+            onRefresh && !loading ? (
               <RefreshControl
                 refreshing={refreshing}
                 onRefresh={onRefresh}
@@ -85,10 +111,15 @@ export default function DetailScreenLayout({
             ) : undefined
           }
         >
-          {children}
+          {renderContent()}
         </ScrollView>
       ) : (
-        <View style={[styles.scrollView, imageUrl && styles.scrollViewWithImage]} />
+        <View style={[styles.scrollView, !loading && !error && !empty && imageUrl && styles.scrollViewWithImage]} />
+      )}
+      {floatingSlot && (
+        <View style={styles.floatingSlot} pointerEvents="box-none">
+          {floatingSlot}
+        </View>
       )}
     </GlassBackground>
   )
@@ -131,6 +162,13 @@ const styles = StyleSheet.create({
     padding: 16, // Padding aumentado para sensação premium
     paddingTop: 30, // Espaço para cards flutuantes quando há imagem
     paddingBottom: 40,
+  },
+  floatingSlot: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
 })
 

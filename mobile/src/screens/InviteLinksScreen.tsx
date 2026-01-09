@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import {
   View,
   Text,
@@ -8,20 +8,24 @@ import {
   Alert,
   ActivityIndicator,
   Share,
-  RefreshControl,
+  Switch,
 } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
-import { useNavigation } from '@react-navigation/native'
+import { useNavigation, useFocusEffect } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
 import api from '../api/api'
 import { useAuthStore } from '../stores/authStore'
 import Toast from 'react-native-toast-message'
 import ViewScreenLayout from '../components/layouts/ViewScreenLayout'
 import GlassCard from '../components/GlassCard'
+import GlassFormModal from '../components/GlassFormModal'
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5'
 import PlanUpgradeModal from '../components/PlanUpgradeModal'
 import Tabs from '../components/Tabs'
 import { colors } from '../theme/colors'
+import { EmptyState } from '../components/states'
+import DateTimePickerComponent from '../components/DateTimePicker'
+import TextInputField from '../components/TextInputField'
 
 interface InviteLink {
   id: string
@@ -47,6 +51,7 @@ export default function InviteLinksScreen() {
   const { user } = useAuthStore()
   const [links, setLinks] = useState<InviteLink[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
@@ -54,39 +59,60 @@ export default function InviteLinksScreen() {
   const [currentPlan, setCurrentPlan] = useState<{ name: string; maxMembers: number | null } | undefined>()
   const [activeTab, setActiveTab] = useState<'active' | 'inactive'>('active')
   const [formData, setFormData] = useState({
-    maxUses: 'unlimited' as string,
-    expiresAt: '',
+    maxUses: '',
+    isUnlimited: true,
+    expiresAt: null as Date | null,
   })
 
-  useEffect(() => {
-    if (user?.branchId) {
-      setLoading(true)
-      fetchLinks()
-    }
-  }, [user?.branchId])
-
-  const fetchLinks = async () => {
+  const fetchLinks = useCallback(async () => {
     if (!user?.branchId) return
 
     try {
+      setError(null)
       const response = await api.get(`/invite-links/branch/${user.branchId}`)
-      setLinks(response.data)
-    } catch (error: any) {
+      setLinks(response.data || [])
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.error || 'Erro ao carregar links de convite'
+      setError(errorMessage)
       Toast.show({
         type: 'error',
         text1: 'Erro',
-        text2: error.response?.data?.error || 'Erro ao carregar links de convite',
+        text2: errorMessage,
       })
     } finally {
       setLoading(false)
       setRefreshing(false)
     }
-  }
+  }, [user?.branchId])
 
-  const onRefresh = () => {
+  useEffect(() => {
+    if (user?.branchId) {
+      const loadLinks = async () => {
+        setLoading(true)
+        await fetchLinks()
+      }
+      loadLinks()
+    }
+  }, [user?.branchId, fetchLinks])
+
+  // Recarrega quando a tela ganha foco (após voltar de criar link)
+  useFocusEffect(
+    useCallback(() => {
+      if (user?.branchId && !loading && !refreshing) {
+        fetchLinks()
+      }
+    }, [fetchLinks, user?.branchId, loading, refreshing])
+  )
+
+  const onRefresh = useCallback(() => {
     setRefreshing(true)
     fetchLinks()
-  }
+  }, [fetchLinks])
+
+  const handleRetry = useCallback(() => {
+    setLoading(true)
+    fetchLinks().finally(() => setLoading(false))
+  }, [fetchLinks])
 
   const handleCreateLink = async () => {
     if (!user?.branchId) {
@@ -104,14 +130,24 @@ export default function InviteLinksScreen() {
         branchId: user.branchId,
       }
 
-      if (formData.maxUses && formData.maxUses !== 'unlimited') {
-        payload.maxUses = parseInt(formData.maxUses)
-      } else {
+      if (formData.isUnlimited) {
         payload.maxUses = null
+      } else {
+        const maxUsesNum = parseInt(formData.maxUses)
+        if (isNaN(maxUsesNum) || maxUsesNum <= 0) {
+          Toast.show({
+            type: 'error',
+            text1: 'Erro',
+            text2: 'Por favor, informe um limite de usos válido',
+          })
+          setCreating(false)
+          return
+        }
+        payload.maxUses = maxUsesNum
       }
 
       if (formData.expiresAt) {
-        payload.expiresAt = new Date(formData.expiresAt).toISOString()
+        payload.expiresAt = formData.expiresAt.toISOString()
       } else {
         payload.expiresAt = null
       }
@@ -123,7 +159,7 @@ export default function InviteLinksScreen() {
         text2: 'Link de convite criado com sucesso!',
       })
       setShowCreateModal(false)
-      setFormData({ maxUses: 'unlimited', expiresAt: '' })
+      setFormData({ maxUses: '', isUnlimited: true, expiresAt: null })
       fetchLinks()
     } catch (error: any) {
       if (error.response?.data?.code === 'PLAN_LIMIT_REACHED' || error.response?.data?.error === 'PLAN_LIMIT_REACHED') {
@@ -216,7 +252,11 @@ export default function InviteLinksScreen() {
 
   const isExpired = (expiresAt: string | null) => {
     if (!expiresAt) return false
-    return new Date(expiresAt) < new Date()
+    // Validação no frontend: link expira apenas quando now > expiresAt (estritamente maior)
+    // O backend já normaliza para fim do dia, então aqui apenas comparamos
+    const expiresDate = new Date(expiresAt)
+    const now = new Date()
+    return now > expiresDate
   }
 
   const isLimitReached = (link: InviteLink) => {
@@ -228,6 +268,11 @@ export default function InviteLinksScreen() {
     activeTab === 'active' ? link.isActive : !link.isActive
   )
 
+  // Global empty: verifica se TODAS as tabs estão vazias
+  const isGlobalEmpty = !loading && links.length === 0 && !error
+  // Tab empty: verifica se apenas a tab atual está vazia
+  const isTabEmpty = !loading && filteredLinks.length === 0 && !error && links.length > 0
+
   return (
     <>
     <ViewScreenLayout
@@ -237,6 +282,30 @@ export default function InviteLinksScreen() {
         iconName: "link",
       }}
       scrollable={false}
+      refreshing={refreshing}
+      onRefresh={onRefresh}
+      loading={loading}
+      error={error}
+      empty={isGlobalEmpty}
+      emptyTitle="Nenhum link de convite encontrado"
+      emptySubtitle="Crie um novo link de convite para compartilhar"
+      onRetry={handleRetry}
+      floatingSlot={
+        <TouchableOpacity
+          style={styles.fab}
+          onPress={() => setShowCreateModal(true)}
+          activeOpacity={0.8}
+        >
+          <LinearGradient
+            colors={colors.gradients.primary as [string, string]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.fabGradient}
+          >
+            <Ionicons name="add" size={24} color="white" />
+          </LinearGradient>
+        </TouchableOpacity>
+      }
     >
       {/* Tabs */}
       <Tabs
@@ -266,13 +335,15 @@ export default function InviteLinksScreen() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         style={styles.list}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={colors.gradients.primary}
-            tintColor={colors.gradients.primary[1]}
-          />
+        refreshing={refreshing}
+        onRefresh={onRefresh}
+        ListEmptyComponent={
+          isTabEmpty ? (
+            <EmptyState
+              title={activeTab === 'active' ? 'Nenhum link ativo' : 'Nenhum link desativado'}
+              subtitle="Quando houver links nesta categoria, eles aparecerão aqui"
+            />
+          ) : null
         }
         renderItem={({ item: link }) => (
           <GlassCard
@@ -343,100 +414,88 @@ export default function InviteLinksScreen() {
             </View>
           </GlassCard>
         )}
-        ListEmptyComponent={
-          <GlassCard opacity={0.4} blurIntensity={20} borderRadius={20} style={styles.emptyContainer}>
-            <Ionicons name="link-outline" size={64} color={colors.text.tertiary} />
-            <Text style={styles.emptyText}>
-              {activeTab === 'active' 
-                ? 'Nenhum link ativo' 
-                : 'Nenhum link desativado'}
-            </Text>
-          </GlassCard>
-        }
       />
-
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={() => setShowCreateModal(true)}
-        activeOpacity={0.8}
-      >
-        <LinearGradient
-          colors={colors.gradients.primary as [string, string]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.fabGradient}
-        >
-          <Ionicons name="add" size={24} color="white" />
-        </LinearGradient>
-      </TouchableOpacity>
     </ViewScreenLayout>
 
       {/* Modal de Criação */}
-      {showCreateModal && (
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Criar Novo Link de Convite</Text>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Limite de Usos</Text>
-              <View style={styles.radioGroup}>
-                {['unlimited', '10', '25', '50', '100'].map((value) => (
-                  <TouchableOpacity
-                    key={value}
-                    style={[
-                      styles.radioOption,
-                      formData.maxUses === value && styles.radioOptionSelected,
-                    ]}
-                    onPress={() => setFormData({ ...formData, maxUses: value })}
-                  >
-                    <Text
-                      style={[
-                        styles.radioText,
-                        formData.maxUses === value && styles.radioTextSelected,
-                      ]}
-                    >
-                      {value === 'unlimited' ? 'Ilimitado' : `${value} usos`}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Data de Expiração (opcional)</Text>
-              <Text style={styles.hint}>
-                Deixe em branco para link sem expiração
-              </Text>
-            </View>
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonCancel]}
-                onPress={() => {
-                  setShowCreateModal(false)
-                  setFormData({ maxUses: 'unlimited', expiresAt: '' })
-                }}
-                disabled={creating}
-              >
-                <Text style={styles.modalButtonText}>Cancelar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonPrimary]}
-                onPress={handleCreateLink}
-                disabled={creating}
-              >
-                {creating ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Text style={[styles.modalButtonText, styles.modalButtonTextPrimary]}>
-                    Criar Link
-                  </Text>
-                )}
-              </TouchableOpacity>
-            </View>
+      <GlassFormModal
+        visible={showCreateModal}
+        title="Criar Novo Link de Convite"
+        onClose={() => {
+          setShowCreateModal(false)
+          setFormData({ maxUses: '', isUnlimited: true, expiresAt: null })
+        }}
+        onSubmit={handleCreateLink}
+        submitLabel="Criar Link"
+        cancelLabel="Cancelar"
+        loading={creating}
+        position="bottom"
+      >
+        <View style={styles.formGroup}>
+          <View style={styles.switchContainer}>
+            <Text style={styles.label}>Ilimitado</Text>
+            <Switch
+              value={formData.isUnlimited}
+              onValueChange={(value) => setFormData({ ...formData, isUnlimited: value, maxUses: value ? '' : formData.maxUses })}
+              trackColor={{ false: '#CBD5E1', true: colors.gradients.primary[1] }}
+              thumbColor={formData.isUnlimited ? '#FFFFFF' : '#F1F5F9'}
+              ios_backgroundColor="#CBD5E1"
+            />
           </View>
+          {!formData.isUnlimited && (
+            <TextInputField
+              fieldKey="maxUses"
+              label="Limite de Usos"
+              value={formData.maxUses}
+              onChangeText={(text) => {
+                // Apenas números inteiros
+                const numericValue = text.replace(/[^0-9]/g, '')
+                setFormData({ ...formData, maxUses: numericValue })
+              }}
+              placeholder="Ex: 10, 25, 50, 100"
+              keyboardType="numeric"
+              required
+            />
+          )}
         </View>
-      )}
+
+        <View style={styles.formGroup}>
+          <DateTimePickerComponent
+            label="Data de Expiração (opcional)"
+            value={formData.expiresAt}
+            onChange={(value) => {
+              // DateTimePickerComponent retorna string no formato 'dd/MM/yyyy' quando mode='date'
+              if (typeof value === 'string') {
+                // Parse da string para Date
+                // Criar data no fim do dia (23:59:59.999) para garantir que seja válida até o final do dia
+                const [day, month, year] = value.split('/').map(Number)
+                const dateValue = new Date(year, month - 1, day, 23, 59, 59, 999)
+                setFormData({ ...formData, expiresAt: dateValue })
+              } else if (value instanceof Date) {
+                // Se já é um Date, garantir que está no fim do dia se não tiver hora específica
+                const hours = value.getHours()
+                const minutes = value.getMinutes()
+                const seconds = value.getSeconds()
+                const milliseconds = value.getMilliseconds()
+                
+                // Se for meia-noite (00:00:00.000), converter para fim do dia
+                if (hours === 0 && minutes === 0 && seconds === 0 && milliseconds === 0) {
+                  const endOfDay = new Date(value)
+                  endOfDay.setHours(23, 59, 59, 999)
+                  setFormData({ ...formData, expiresAt: endOfDay })
+                } else {
+                  setFormData({ ...formData, expiresAt: value })
+                }
+              } else {
+                setFormData({ ...formData, expiresAt: null })
+              }
+            }}
+            mode="date"
+            placeholder="Selecione a data (opcional)"
+            minimumDate={new Date()}
+          />
+        </View>
+      </GlassFormModal>
 
       {/* Modal de Upgrade de Plano */}
       <PlanUpgradeModal
@@ -538,20 +597,6 @@ const styles = StyleSheet.create({
   actionButtonTextDanger: {
     color: '#EF4444',
   },
-  emptyContainer: {
-    padding: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginHorizontal: 16,
-  },
-  emptyText: {
-    fontSize: 16,
-    fontWeight: '400',
-    lineHeight: 24,
-    color: '#475569',
-    marginTop: 16,
-    textAlign: 'center',
-  },
   fab: {
     position: 'absolute',
     right: 20,
@@ -569,93 +614,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  modalOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000,
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 24,
-    width: '90%',
-    maxWidth: 400,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 24,
-  },
   formGroup: {
     marginBottom: 20,
   },
   label: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#374151',
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text.primary,
     marginBottom: 8,
   },
-  hint: {
-    fontSize: 12,
-    color: '#6b7280',
-    marginTop: 4,
-  },
-  radioGroup: {
+  switchContainer: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  radioOption: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    backgroundColor: '#fff',
-  },
-  radioOptionSelected: {
-    borderColor: '#3366FF',
-    backgroundColor: '#eef2ff',
-  },
-  radioText: {
-    fontSize: 14,
-    color: '#6b7280',
-  },
-  radioTextSelected: {
-    color: '#3366FF',
-    fontWeight: '500',
-  },
-  modalActions: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 24,
-  },
-  modalButton: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 8,
+    justifyContent: 'space-between',
     alignItems: 'center',
-  },
-  modalButtonCancel: {
-    backgroundColor: '#f3f4f6',
-  },
-  modalButtonPrimary: {
-    backgroundColor: '#3366FF',
-  },
-  modalButtonText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#374151',
-  },
-  modalButtonTextPrimary: {
-    color: '#fff',
+    marginBottom: 16,
   },
   tabsContainerWithHeader: {
     marginTop: 110, // Altura do header fixo

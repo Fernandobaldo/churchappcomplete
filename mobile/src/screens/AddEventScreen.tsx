@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react'
 import { Platform } from 'react-native'
-import api from '../api/api'
+import { eventsService } from '../services/events.service'
 import { useNavigation } from '@react-navigation/native'
 import Toast from 'react-native-toast-message'
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5'
@@ -87,7 +87,7 @@ export default function AddEventScreen() {
                 name: 'event-image.jpg',
             } as any)
 
-            const baseURL = api.defaults.baseURL
+            const baseURL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000'
             const response = await fetch(`${baseURL}/upload/event-image`, {
                 method: 'POST',
                 headers: {
@@ -161,7 +161,7 @@ export default function AddEventScreen() {
 
             console.log('Payload a ser enviado:', payload)
 
-            await api.post('/events', payload)
+            await eventsService.create(payload)
 
             Toast.show({
                 type: 'success',

@@ -148,6 +148,14 @@ Services ← Hooks ←   (no fetch)
 - **Services/API**: TypeScript (.ts)
 - **Only exception**: `utils/translateBooks.js` (TODO: convert)
 
+## Environment Variables
+
+### Required for Bible API
+- **`EXPO_PUBLIC_BIBLE_API_TOKEN`**: Token for A Biblia Digital API (used by `BibleText` component)
+  - Can also be configured in `app.config.js` under `extra.bibleApiToken`
+  - Used by: `mobile/src/services/bible.service.ts`
+  - Required for: Bible passage fetching functionality
+
 ## References
 
 - Layout documentation: `docs/mobile-layouts.md`

@@ -14,6 +14,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import Toast from 'react-native-toast-message'
 import api from '../../api/api'
 import { useAuthStore } from '../../stores/authStore'
+import { authService } from '../../services/auth.service'
 
 export default function ChurchScreen() {
   const navigation = useNavigation()
@@ -24,10 +25,6 @@ export default function ChurchScreen() {
 
   const [formData, setFormData] = useState({
     name: '',
-    country: 'BR',
-    city: '',
-    language: 'pt-BR',
-    primaryColor: '#3B82F6',
     address: '',
   })
 
@@ -48,10 +45,6 @@ export default function ChurchScreen() {
           setChurchId(church.id)
           setFormData({
             name: church.name || '',
-            country: church.country || 'BR',
-            city: church.city || '',
-            language: church.language || 'pt-BR',
-            primaryColor: church.primaryColor || '#3B82F6',
             address: church.address || '',
           })
         }
@@ -78,18 +71,23 @@ export default function ChurchScreen() {
       } else {
         // Cria nova igreja
         const response = await api.post('/churches', {
-          ...formData,
+          name: formData.name,
+          address: formData.address || undefined,
           withBranch: structureType === 'branches',
           branchName: 'Sede',
         })
-        setChurchId(response.data.id)
+        
+        // O backend retorna um novo token na resposta quando cria member
+        if (response.data.token) {
+          setUserFromToken(response.data.token)
+        }
+        
+        // O backend retorna a igreja em response.data.church
+        const churchId = response.data.church?.id || response.data.id
+        if (churchId) {
+          setChurchId(churchId)
+        }
         Toast.show({ type: 'success', text1: 'Igreja criada!' })
-      }
-
-      // Atualiza token do usuário (pode ter mudado branchId)
-      const meResponse = await api.get('/auth/me')
-      if (meResponse.data.token) {
-        setUserFromToken(meResponse.data.token)
       }
 
       // Navega para próxima etapa
@@ -129,14 +127,6 @@ export default function ChurchScreen() {
               placeholder="Ex: Igreja Exemplo"
               value={formData.name}
               onChangeText={(text) => setFormData({ ...formData, name: text })}
-            />
-
-            <Text style={styles.label}>Cidade</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Ex: São Paulo"
-              value={formData.city}
-              onChangeText={(text) => setFormData({ ...formData, city: text })}
             />
 
             <Text style={styles.label}>Endereço</Text>

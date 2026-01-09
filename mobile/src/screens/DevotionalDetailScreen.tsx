@@ -1,5 +1,5 @@
-import React, {useState, useCallback} from 'react';
-import {View, Text, ScrollView, StyleSheet, ImageBackground, TouchableOpacity, Share} from 'react-native';
+import React, {useState, useCallback, useEffect} from 'react';
+import {View, Text, StyleSheet, TouchableOpacity, Share} from 'react-native';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { BibleText } from '../components/BibleText';
 import DetailScreenLayout from '../components/layouts/DetailScreenLayout';
@@ -7,68 +7,79 @@ import GlassCard from '../components/GlassCard';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5'
 import EvilIcons from '@expo/vector-icons/EvilIcons';
 import { colors } from '../theme/colors';
-import api from "../api/api";
+import { devotionalsService } from '../services/devotionals.service'
 
 
 export default function DevotionalDetailsScreen() {
     const navigation = useNavigation();
     const route = useRoute();
-    const { devotional: initialDevotional } = route.params || {};
+    const { devotional: initialDevotional } = (route.params as { devotional?: any }) || {};
     const [devotional, setDevotional] = useState(initialDevotional);
+    const [loading, setLoading] = useState(!initialDevotional);
+    const [error, setError] = useState<string | null>(null);
     const [refreshing, setRefreshing] = useState(false);
 
     const fetchDevotional = useCallback(async () => {
-        if (!initialDevotional?.id) return
+        if (!initialDevotional?.id) {
+            setError('Devocional não encontrado')
+            setLoading(false)
+            return
+        }
         try {
-            setRefreshing(true)
-            const response = await api.get(`/devotionals/${initialDevotional.id}`)
-            setDevotional(response.data)
-        } catch (error) {
-            console.error('Erro ao carregar devocional:', error)
+            setError(null)
+            const data = await devotionalsService.getById(initialDevotional.id)
+            setDevotional(data)
+        } catch (err: any) {
+            console.error('Erro ao carregar detalhes do devocional:', err)
+            const errorMessage = err.response?.data?.message || 'Não foi possível carregar os detalhes do devocional.'
+            setError(errorMessage)
         } finally {
+            setLoading(false)
             setRefreshing(false)
         }
     }, [initialDevotional?.id])
 
+    useEffect(() => {
+        if (initialDevotional?.id) {
+            fetchDevotional()
+        } else {
+            setLoading(false)
+            setError('Devocional não encontrado')
+        }
+    }, [initialDevotional?.id, fetchDevotional])
+
     // Recarrega quando a tela recebe foco (após editar)
     useFocusEffect(
         useCallback(() => {
-            if (initialDevotional?.id) {
+            if (initialDevotional?.id && !loading && !refreshing) {
                 fetchDevotional()
             }
-        }, [initialDevotional?.id, fetchDevotional])
+        }, [initialDevotional?.id, fetchDevotional, loading, refreshing])
     )
 
     const handleRefresh = useCallback(() => {
+        setRefreshing(true)
         fetchDevotional()
     }, [fetchDevotional])
 
-    if (!devotional) {
-        return (
-            <DetailScreenLayout
-                headerProps={{
-                    title: "Detalhes do Devocional",
-                    Icon: FontAwesome5,
-                    iconName: "bible",
-                }}
-            >
-                <View style={styles.centered}>
-                    <Text style={styles.errorText}>Devocional não encontrado.</Text>
-                </View>
-            </DetailScreenLayout>
-        );
-    }
+    const handleRetry = useCallback(() => {
+        setLoading(true)
+        fetchDevotional().finally(() => setLoading(false))
+    }, [fetchDevotional])
+
+    const isEmpty = !loading && !devotional && !error
 
     const handleShare = async () => {
+        if (!devotional) return
         const text = `📖 ${devotional.passage}\n\n🇧🇷 ${devotional.textPt}\n\n🇫🇷 ${devotional.textFr}`
         await Share.share({ message: text })
     }
 
-    const formattedDate = new Date(devotional.createdAt).toLocaleDateString('pt-BR', {
+    const formattedDate = devotional ? new Date(devotional.createdAt).toLocaleDateString('pt-BR', {
         month: 'long',
         day: '2-digit',
         year: 'numeric',
-    });
+    }) : ''
 
     return (
         <DetailScreenLayout
@@ -77,13 +88,19 @@ export default function DevotionalDetailsScreen() {
                 Icon: FontAwesome5,
                 iconName: "bible",
             }}
+            loading={loading}
+            error={error}
+            empty={isEmpty}
+            emptyTitle="Devocional não encontrado"
+            emptySubtitle="O devocional solicitado não existe ou foi removido"
             refreshing={refreshing}
             onRefresh={handleRefresh}
+            onRetry={handleRetry}
         >
-            <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+            {devotional && (
                 <GlassCard opacity={0.4} blurIntensity={20} borderRadius={20} style={styles.card}>
-                {/* Título */}
-                <Text style={styles.title}>{devotional.title}</Text>
+                    {/* Título */}
+                    <Text style={styles.title}>{devotional.title}</Text>
 
                 {/* Data */}
                 <Text style={styles.date}>{formattedDate}</Text>
@@ -109,17 +126,12 @@ export default function DevotionalDetailsScreen() {
                     </TouchableOpacity>
                 </View>
             </GlassCard>
-        </ScrollView>
+            )}
         </DetailScreenLayout>
     );
 }
 
 const styles = StyleSheet.create({
-    content: {
-        padding: 16,
-        paddingTop: 0,
-        paddingBottom: 100,
-    },
     card: {
         padding: 24,
         marginTop: 20,
@@ -190,18 +202,5 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         lineHeight: 24,
         color: '#0F172A',
-    },
-    centered: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 20,
-        marginTop: 110,
-    },
-    errorText: {
-        fontSize: 18,
-        fontWeight: '400',
-        lineHeight: 28,
-        color: colors.status.error,
     },
 });

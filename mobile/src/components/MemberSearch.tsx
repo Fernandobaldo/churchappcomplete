@@ -1,13 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Keyboard, Platform } from 'react-native'
-import api from '../api/api'
-
-interface Member {
-  id: string
-  name: string
-  email?: string
-  role?: string
-}
+import { useMembersSearch } from '../hooks/useMembersSearch'
+import { membersService, Member } from '../services/members.service'
 
 interface MemberSearchProps {
   value?: string
@@ -17,13 +11,13 @@ interface MemberSearchProps {
 
 export default function MemberSearch({ value, onChange, placeholder = 'Buscar membro...' }: MemberSearchProps) {
   const [searchTerm, setSearchTerm] = useState('')
-  const [members, setMembers] = useState<Member[]>([])
   const [isOpen, setIsOpen] = useState(false)
   const [selectedMember, setSelectedMember] = useState<Member | null>(null)
-  const [loading, setLoading] = useState(false)
   const [keyboardVisible, setKeyboardVisible] = useState(false)
-  const searchTimeoutRef = useRef<NodeJS.Timeout>()
   const inputRef = useRef<TextInput>(null)
+
+  // Use hook for searching members with debounce
+  const { members, loading } = useMembersSearch(searchTerm, { limit: 10 })
 
   useEffect(() => {
     // Listener para detectar quando o teclado aparece/desaparece
@@ -46,47 +40,14 @@ export default function MemberSearch({ value, onChange, placeholder = 'Buscar me
     }
   }, [])
 
+  // Open dropdown when search results are available
   useEffect(() => {
-    // Buscar membros quando houver termo de busca
-    if (searchTerm.trim().length >= 2) {
-      setLoading(true)
-      
-      // Debounce da busca
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current)
-      }
-
-      searchTimeoutRef.current = setTimeout(async () => {
-        try {
-          const response = await api.get('/members')
-          const allMembers = response.data as Member[]
-          
-          // Filtrar membros localmente baseado no termo de busca
-          const filtered = allMembers.filter(member =>
-            member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            member.email?.toLowerCase().includes(searchTerm.toLowerCase())
-          )
-          
-          setMembers(filtered.slice(0, 10)) // Limitar a 10 resultados
-          setIsOpen(true)
-        } catch (error) {
-          console.error('Erro ao buscar membros:', error)
-          setMembers([])
-        } finally {
-          setLoading(false)
-        }
-      }, 300)
-    } else {
-      setMembers([])
+    if (searchTerm.trim().length >= 2 && (members.length > 0 || loading)) {
+      setIsOpen(true)
+    } else if (searchTerm.trim().length < 2) {
       setIsOpen(false)
     }
-
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current)
-      }
-    }
-  }, [searchTerm])
+  }, [members.length, loading, searchTerm])
 
   const handleSelectMember = (member: Member) => {
     setSelectedMember(member)
@@ -105,21 +66,22 @@ export default function MemberSearch({ value, onChange, placeholder = 'Buscar me
     inputRef.current?.focus()
   }
 
-  // Se houver value inicial, buscar o membro
+  // If initial value is provided, fetch the member by ID
   useEffect(() => {
     if (value && !selectedMember) {
-      // Se value é um ID, buscar o membro
-      api.get('/members')
-        .then(response => {
-          const member = response.data.find((m: Member) => m.id === value)
+      membersService
+        .getById(value)
+        .then((member) => {
           if (member) {
             setSelectedMember(member)
             setSearchTerm(member.name)
           }
         })
-        .catch(console.error)
+        .catch((error) => {
+          console.error('Error fetching member by ID:', error)
+        })
     } else if (!value && selectedMember) {
-      // Se value foi removido, limpar seleção
+      // If value was removed, clear selection
       setSelectedMember(null)
       setSearchTerm('')
     }

@@ -1,21 +1,21 @@
 import React, { useCallback, useEffect, useState, useMemo } from 'react'
-import {View, Text, TouchableOpacity, FlatList, StyleSheet, ActivityIndicator, RefreshControl} from 'react-native'
+import {View, Text, TouchableOpacity, FlatList, StyleSheet, ActivityIndicator} from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5'
 import { Ionicons } from '@expo/vector-icons'
 import api from '../api/api'
-import { useNavigation } from '@react-navigation/native'
+import { useNavigation, useFocusEffect } from '@react-navigation/native'
 import { useAuthStore } from '../stores/authStore'
 import ViewScreenLayout from '../components/layouts/ViewScreenLayout'
 import GlassCard from '../components/GlassCard'
 import Tabs from '../components/Tabs'
 import { colors } from '../theme/colors'
-import { typography } from '../theme/typography'
 import { useBackToDashboard } from '../hooks/useBackToDashboard'
-import EmptyState from '../components/EmptyState'
+import { EmptyState } from '../components/states'
+import { Contribution } from '../services/contributions.service'
 
 export default function ContributionsScreen() {
-    const [allContributions, setAllContributions] = useState([])
+    const [allContributions, setAllContributions] = useState<Contribution[]>([])
     const [tab, setTab] = useState<'ativas' | 'desativadas'>('ativas')
     const navigation = useNavigation()
     const user = useAuthStore((s) => s.user)
@@ -25,6 +25,7 @@ export default function ContributionsScreen() {
     useBackToDashboard()
 
     const [loading, setLoading] = useState(true)
+    const [error, setError] = useState<string | null>(null)
     const [refreshing, setRefreshing] = useState(false)
     const [page, setPage] = useState(1)
     const [loadingMore, setLoadingMore] = useState(false)
@@ -32,11 +33,13 @@ export default function ContributionsScreen() {
 
     const fetchContributions = useCallback(async () => {
         try {
+            setError(null)
             const res = await api.get('/contributions')
             // Armazena todas as contribuições sem filtrar
             setAllContributions(res.data || [])
-        } catch (error) {
-            console.error('Erro ao carregar contribuições:', error)
+        } catch (err: any) {
+            console.error('Erro ao carregar contribuições:', err)
+            setError(err.response?.data?.message || 'Erro ao carregar contribuições')
         }
     }, [])
 
@@ -64,6 +67,16 @@ export default function ContributionsScreen() {
         }
         loadContributions()
     }, [fetchContributions])
+
+    // Recarrega quando a tela ganha foco (após voltar de criar/editar contribuição)
+    useFocusEffect(
+        useCallback(() => {
+            // Evita requisições duplicadas se já estiver carregando ou refrescando
+            if (!loading && !refreshing) {
+                fetchContributions()
+            }
+        }, [fetchContributions, loading, refreshing])
+    )
 
     // Quando a tab muda, reseta a paginação
     useEffect(() => {
@@ -95,26 +108,19 @@ export default function ContributionsScreen() {
     }, [loadingMore, paginatedContributions.length, contributions.length])
 
     const canManageContributions =
-        user.role === 'ADMINGERAL' ||
-        user.role === 'ADMINFILIAL' ||
-        user.permissions?.some((p: any) => p.type === 'contributions_manage')
+        user?.role === 'ADMINGERAL' ||
+        user?.role === 'ADMINFILIAL' ||
+        user?.permissions?.some((p: any) => p.type === 'contributions_manage')
 
-    if (loading) {
-        return (
-            <ViewScreenLayout
-                headerProps={{
-                    title: "Contribuir",
-                    Icon: FontAwesome5,
-                    iconName: "hand-holding-heart",
-                }}
-                scrollable={false}
-            >
-                <View style={styles.centered}>
-                    <ActivityIndicator size="large" color={colors.gradients.primary[1]} />
-                </View>
-            </ViewScreenLayout>
-        )
-    }
+    const handleRetry = useCallback(() => {
+        setLoading(true)
+        fetchContributions().finally(() => setLoading(false))
+    }, [fetchContributions])
+
+    // Global empty: verifica se TODAS as tabs estão vazias
+    const isGlobalEmpty = !loading && allContributions.length === 0 && !error
+    // Tab empty: verifica se apenas a tab atual está vazia
+    const isTabEmpty = !loading && contributions.length === 0 && !error && allContributions.length > 0
 
     return (
         <ViewScreenLayout
@@ -123,10 +129,18 @@ export default function ContributionsScreen() {
                 Icon: FontAwesome5,
                 iconName: "hand-holding-heart",
                 rightButtonIcon: canManageContributions ? <Ionicons name="add" size={24} color="white" /> : undefined,
-                onRightButtonPress: canManageContributions ? () => navigation.navigate('AddContributions') : undefined,
+                onRightButtonPress: canManageContributions ? () => (navigation as any).navigate('AddContributions') : undefined,
             }}
             scrollable={false}
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
             contentContainerStyle={styles.viewContent}
+            loading={loading}
+            error={error}
+            empty={isGlobalEmpty}
+            emptyTitle="Nenhuma contribuição encontrada"
+            emptySubtitle="Quando houver campanhas disponíveis, elas aparecerão aqui 🙏"
+            onRetry={handleRetry}
         >
             <Text style={styles.subtitle}>Escolha abaixo as oportunidades para contribuir:</Text>
 
@@ -143,14 +157,8 @@ export default function ContributionsScreen() {
                 data={paginatedContributions}
                 keyExtractor={(item) => item.id}
                 contentContainerStyle={styles.listContent}
-                refreshControl={
-                    <RefreshControl
-                        refreshing={refreshing}
-                        onRefresh={handleRefresh}
-                        colors={colors.gradients.primary}
-                        tintColor={colors.gradients.primary[1]}
-                    />
-                }
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
                 onEndReached={loadMore}
                 onEndReachedThreshold={0.5}
                 ListFooterComponent={
@@ -158,6 +166,14 @@ export default function ContributionsScreen() {
                         <View style={styles.loadingMore}>
                             <ActivityIndicator size="small" color={colors.gradients.primary[1]} />
                         </View>
+                    ) : null
+                }
+                ListEmptyComponent={
+                    isTabEmpty ? (
+                        <EmptyState
+                            title={tab === 'ativas' ? 'Nenhuma campanha ativa' : 'Nenhuma campanha desativada'}
+                            subtitle="Quando houver campanhas nesta categoria, elas aparecerão aqui 🙏"
+                        />
                     ) : null
                 }
                 renderItem={({ item }) => (
@@ -190,15 +206,15 @@ export default function ContributionsScreen() {
                                     Meta: R$ {item.goal.toFixed(2).replace('.', ',')}
                                 </Text>
                             )}
-                            {item.raised !== undefined && (
+                            {item.currentAmount !== undefined && (
                                 <Text style={styles.raisedText}>
-                                    Arrecadado: R$ {(item.raised || 0).toFixed(2).replace('.', ',')}
+                                    Arrecadado: R$ {(item.currentAmount || 0).toFixed(2).replace('.', ',')}
                                 </Text>
                             )}
                         </View>
                         <TouchableOpacity
                             style={styles.contributeButton}
-                            onPress={() => navigation.navigate('ContributionDetail', { contribution: item })}
+                            onPress={() => (navigation as any).navigate('ContributionDetail', { contribution: item })}
                             activeOpacity={0.8}
                         >
                             <LinearGradient
@@ -212,23 +228,12 @@ export default function ContributionsScreen() {
                         </TouchableOpacity>
                     </GlassCard>
                 )}
-                ListEmptyComponent={
-                    <EmptyState
-                        icon="heart-outline"
-                        message="Nenhuma contribuição encontrada 🙏"
-                    />
-                }
             />
         </ViewScreenLayout>
     )
 }
 
 const styles = StyleSheet.create({
-    centered: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
     viewContent: {
         flex: 1,
         padding: 0,

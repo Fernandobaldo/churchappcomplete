@@ -99,28 +99,38 @@ export default function DashboardScreen() {
             }
 
             // Buscar perfil do membro para obter avatar
-            try {
-                const memberResponse = await api.get<Profile>('/members/me')
-                if (memberResponse?.data) {
-                    const avatarUrl = memberResponse.data.avatarUrl
-                    if (avatarUrl) {
-                        // Se o avatar não começa com http, adiciona a baseURL
-                        if (avatarUrl.startsWith('http://') || avatarUrl.startsWith('https://')) {
-                            setUserAvatar(avatarUrl)
+            // Só tenta buscar se o usuário tem memberId (já tem Member associado)
+            if (user?.memberId) {
+                try {
+                    const memberResponse = await api.get<Profile>('/members/me')
+                    if (memberResponse?.data) {
+                        const avatarUrl = memberResponse.data.avatarUrl
+                        if (avatarUrl) {
+                            // Se o avatar não começa com http, adiciona a baseURL
+                            if (avatarUrl.startsWith('http://') || avatarUrl.startsWith('https://')) {
+                                setUserAvatar(avatarUrl)
+                            } else {
+                                // Remove barra inicial se houver
+                                const cleanUrl = avatarUrl.startsWith('/') ? avatarUrl.substring(1) : avatarUrl
+                                setUserAvatar(`${api.defaults.baseURL}/${cleanUrl}`)
+                            }
                         } else {
-                            // Remove barra inicial se houver
-                            const cleanUrl = avatarUrl.startsWith('/') ? avatarUrl.substring(1) : avatarUrl
-                            setUserAvatar(`${api.defaults.baseURL}/${cleanUrl}`)
+                            setUserAvatar(null)
                         }
                     } else {
                         setUserAvatar(null)
                     }
-                } else {
+                } catch (error: any) {
+                    // 404 significa que o membro ainda não foi criado (normal durante onboarding)
+                    // Não é um erro crítico, apenas não tem avatar ainda
+                    if (error.response?.status !== 404) {
+                        console.error('Erro ao buscar perfil do membro:', error)
+                    }
+                    // Mesmo com erro, define como null para mostrar placeholder
                     setUserAvatar(null)
                 }
-            } catch (error) {
-                console.error('Erro ao buscar perfil do membro:', error)
-                // Mesmo com erro, define como null para mostrar placeholder
+            } else {
+                // Usuário ainda não tem Member associado (durante onboarding)
                 setUserAvatar(null)
             }
 

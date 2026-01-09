@@ -11,6 +11,7 @@ import { generateQRCode } from '../services/qrCodeService'
 import { generateInviteLinkPDF } from '../services/pdfService'
 import { logAudit } from '../utils/auditHelper'
 import { AuditAction } from '@prisma/client'
+import { normalizeExpirationDate } from '../utils/dateUtils'
 
 /**
  * Cria um novo link de convite
@@ -35,11 +36,16 @@ export async function createInviteLinkController(
 
     let inviteLink
     try {
+      // Normalizar data de expiração: se for date-only, converter para fim do dia
+      const expiresAtDate = bodyData.expiresAt 
+        ? normalizeExpirationDate(bodyData.expiresAt) 
+        : null
+      
       inviteLink = await generateInviteLink({
         branchId: bodyData.branchId,
         createdBy: userId,
         maxUses: bodyData.maxUses ?? null,
-        expiresAt: bodyData.expiresAt ? new Date(bodyData.expiresAt) : null,
+        expiresAt: expiresAtDate,
       })
     } catch (error: any) {
       console.error('❌ [INVITE LINK CONTROLLER] Erro ao criar link:', error.message, error.code)

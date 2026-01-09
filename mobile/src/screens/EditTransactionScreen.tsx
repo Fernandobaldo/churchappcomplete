@@ -23,7 +23,7 @@ import GlassCard from '../components/GlassCard'
 import TextInputField from '../components/TextInputField'
 import { colors } from '../theme/colors'
 import { format } from 'date-fns'
-import ptBR from 'date-fns/locale/pt-BR'
+import { ptBR } from 'date-fns/locale/pt-BR'
 
 interface Member {
   id: string
@@ -60,6 +60,7 @@ export default function EditTransactionScreen() {
   const [contributionMemberName, setContributionMemberName] = useState('')
   const [loading, setLoading] = useState(false)
   const [initialLoading, setInitialLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (id) {
@@ -75,6 +76,8 @@ export default function EditTransactionScreen() {
 
   const fetchTransaction = async () => {
     try {
+      setInitialLoading(true)
+      setError(null)
       const response = await api.get(`/finances/${id}`)
       const transaction = response.data
       
@@ -106,17 +109,17 @@ export default function EditTransactionScreen() {
           setExitTypeOther(transaction.exitTypeOther || '')
         }
       }
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.message || 'Erro ao carregar transação'
-      Toast.show({
-        type: 'error',
-        text1: errorMessage,
-      })
-      console.error('Erro ao carregar transação:', error)
-      navigation.goBack()
+    } catch (err: any) {
+      console.error('Erro ao carregar transação:', err)
+      const errorMessage = err.response?.data?.message || 'Não foi possível carregar os dados da transação.'
+      setError(errorMessage)
     } finally {
       setInitialLoading(false)
     }
+  }
+
+  const handleRetry = async () => {
+    await fetchTransaction()
   }
 
   const fetchContributions = async () => {
@@ -251,23 +254,6 @@ export default function EditTransactionScreen() {
     }
   }
 
-  if (initialLoading) {
-    return (
-      <FormScreenLayout
-        headerProps={{
-          title: "Editar Transação",
-          Icon: Ionicons,
-          iconName: "create-outline",
-        }}
-      >
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.gradients.primary[1]} />
-          <Text style={styles.loadingText}>Carregando...</Text>
-        </View>
-      </FormScreenLayout>
-    )
-  }
-
   return (
     <FormScreenLayout
       headerProps={{
@@ -275,6 +261,9 @@ export default function EditTransactionScreen() {
         Icon: Ionicons,
         iconName: "create-outline",
       }}
+      loading={initialLoading}
+      error={error}
+      onRetry={handleRetry}
     >
       <Text style={styles.label}>
         Tipo <Text style={styles.required}>*</Text>
@@ -617,19 +606,6 @@ export default function EditTransactionScreen() {
 }
 
 const styles = StyleSheet.create({
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 110,
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    fontWeight: '400',
-    lineHeight: 24,
-    color: '#475569',
-  },
   label: {
     fontSize: 16,
     fontWeight: '600',

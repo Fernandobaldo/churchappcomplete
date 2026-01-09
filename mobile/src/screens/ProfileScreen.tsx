@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react'
 
-import { View, Text, StyleSheet, Image, TouchableOpacity, ActivityIndicator, ScrollView, RefreshControl } from 'react-native'
+import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native'
 
 import {useNavigation, useRoute} from '@react-navigation/native'
 import { LinearGradient } from 'expo-linear-gradient'
@@ -8,11 +8,12 @@ import DetailScreenLayout from '../components/layouts/DetailScreenLayout'
 import GlassCard from '../components/GlassCard'
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5'
 import { Ionicons } from '@expo/vector-icons'
-import api from '../api/api'
+import { membersService } from '../services/members.service'
+import { authService } from '../services/auth.service'
 
 import { useAuthStore } from '../stores/authStore'
 import { format, parse, isValid } from 'date-fns'
-import ptBR from 'date-fns/locale/pt-BR'
+import { ptBR } from 'date-fns/locale/pt-BR'
 import { Profile } from '../types'
 import { colors } from '../theme/colors'
 
@@ -26,20 +27,25 @@ export default function ProfileScreen() {
 
     const [profile, setProfile] = useState<Profile | null>(null)
     const [loading, setLoading] = useState(true)
+    const [error, setError] = useState<string | null>(null)
     const navigation = useNavigation()
 
     const fetchProfile = useCallback(async () => {
         try {
-            setLoading(true)
+            setError(null)
             if (isOwnProfile) {
-                const res = await api.get<Profile>('/members/me')
-                setProfile(res.data)
+                const data = await authService.getCurrentUser()
+                setProfile(data as Profile)
             } else if (memberId) {
-                const res = await api.get<Profile>(`/members/${memberId}`)
-                setProfile(res.data)
+                const data = await membersService.getById(memberId)
+                setProfile(data as Profile)
+            } else {
+                setError('Perfil não encontrado')
             }
-        } catch (err) {
+        } catch (err: any) {
             console.error('Erro ao carregar perfil:', err)
+            const errorMessage = err.response?.data?.message || 'Não foi possível carregar o perfil.'
+            setError(errorMessage)
         } finally {
             setLoading(false)
         }
@@ -51,12 +57,16 @@ export default function ProfileScreen() {
 
     const handleRefresh = useCallback(async () => {
         setRefreshing(true)
-        try {
-            await fetchProfile()
-        } finally {
-            setRefreshing(false)
-        }
+        await fetchProfile()
+        setRefreshing(false)
     }, [fetchProfile])
+
+    const handleRetry = useCallback(() => {
+        setLoading(true)
+        fetchProfile().finally(() => setLoading(false))
+    }, [fetchProfile])
+
+    const isEmpty = !loading && !profile && !error
 
     // Função para formatar data de nascimento
     const formatBirthDate = useCallback((dateString: string | null | undefined): string => {
@@ -133,40 +143,39 @@ export default function ProfileScreen() {
             .join(', ')
     }, [])
 
-    if (loading || !profile) {
-        return (
-            <View style={styles.centered}>
-                <ActivityIndicator size="large" color="#3366FF" />
-            </View>
-        )
-    }
-
     return (
         <DetailScreenLayout
             headerProps={{
                 title: memberId ? 'Perfil do Membro' : 'Meu Perfil',
                 Icon: FontAwesome5,
                 iconName: "user",
-                rightButtonIcon: !memberId ? (
+                rightButtonIcon: !memberId && profile ? (
                     <Ionicons name="settings-outline" size={24} color="white" />
                 ) : undefined,
-                onRightButtonPress: !memberId
+                onRightButtonPress: !memberId && profile
                     ? () => {
                         navigation.navigate('EditProfileScreen' as never)
                     }
                     : undefined,
             }}
+            loading={loading}
+            error={error}
+            empty={isEmpty}
+            emptyTitle="Perfil não encontrado"
+            emptySubtitle="O perfil solicitado não existe ou foi removido"
             refreshing={refreshing}
             onRefresh={handleRefresh}
+            onRetry={handleRetry}
         >
-            <View style={styles.scrollContent}>
+            {profile && (
+                <View style={styles.scrollContent}>
                 <GlassCard opacity={0.4} blurIntensity={20} borderRadius={20} style={styles.card}>
                     {profile.avatarUrl && typeof profile.avatarUrl === 'string' && profile.avatarUrl.trim().length > 0 ? (
                         <Image
                             source={{
                                 uri: profile.avatarUrl.startsWith('http')
                                     ? profile.avatarUrl
-                                    : `${api.defaults.baseURL}${profile.avatarUrl}`,
+                                    : `${process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000'}${profile.avatarUrl}`,
                             }}
                             style={styles.avatar}
                         />
@@ -244,6 +253,7 @@ export default function ProfileScreen() {
                     )}
                 </GlassCard>
             </View>
+            )}
         </DetailScreenLayout>
     )
 }
@@ -293,11 +303,6 @@ const styles = StyleSheet.create({
         fontWeight: '400',
         lineHeight: 24,
         color: '#475569',
-    },
-    centered: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
     },
     divider: {
         width: '100%',

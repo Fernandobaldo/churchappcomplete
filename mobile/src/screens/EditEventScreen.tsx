@@ -4,7 +4,7 @@ import Toast from 'react-native-toast-message'
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5'
 import FormScreenLayout from '../components/layouts/FormScreenLayout'
 import MemberForm from '../components/FormsComponent'
-import api from '../api/api'
+import { eventsService } from '../services/events.service'
 import { parse, format, isValid } from 'date-fns'
 
 export default function EditEventScreen() {
@@ -12,6 +12,8 @@ export default function EditEventScreen() {
     const route = useRoute()
     const { id } = route.params as { id: string }
 
+    const [loading, setLoading] = useState(true)
+    const [error, setError] = useState<string | null>(null)
     const [form, setForm] = useState({
         title: '',
         startDate: '',
@@ -59,8 +61,9 @@ export default function EditEventScreen() {
 
     const fetchEvent = async () => {
         try {
-            const res = await api.get(`/events/${id}`)
-            const e = res.data
+            setLoading(true)
+            setError(null)
+            const e = await eventsService.getById(id)
 
             // Combina startDate com time para preencher o campo time corretamente
             let timeValue = e.time || ''
@@ -77,7 +80,9 @@ export default function EditEventScreen() {
             if (imageUrl && !imageUrl.startsWith('http://') && !imageUrl.startsWith('https://')) {
                 // URL relativa, adicionar baseURL
                 const cleanUrl = imageUrl.startsWith('/') ? imageUrl.substring(1) : imageUrl
-                imageUrl = `${api.defaults.baseURL}/${cleanUrl}`
+                // Importar api apenas para baseURL se necessário, ou usar constante
+                const baseURL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000'
+                imageUrl = `${baseURL}/${cleanUrl}`
             }
 
             setForm({
@@ -88,19 +93,22 @@ export default function EditEventScreen() {
                 location: e.location || '',
                 imageUrl: imageUrl,
             })
-        } catch (error) {
-            Toast.show({
-                type: 'error',
-                text1: 'Erro ao carregar evento',
-                text2: 'Não foi possível carregar os dados do evento.',
-            })
-
+        } catch (err: any) {
+            console.error('Erro ao carregar evento:', err)
+            const errorMessage = err.response?.data?.message || 'Não foi possível carregar os dados do evento.'
+            setError(errorMessage)
+        } finally {
+            setLoading(false)
         }
     }
 
     useEffect(() => {
         fetchEvent()
     }, [id])
+
+    const handleRetry = async () => {
+        await fetchEvent()
+    }
 
     const handleUpdate = async () => {
         // Validação de campos obrigatórios
@@ -131,7 +139,7 @@ export default function EditEventScreen() {
         }
 
         try {
-            await api.put(`/events/${id}`, payload)
+            await eventsService.update(id, payload)
             Toast.show({
                 type: 'success',
                 text1: 'Evento atualizado!',
@@ -155,6 +163,9 @@ export default function EditEventScreen() {
                 Icon: FontAwesome5,
                 iconName: "calendar"
             }}
+            loading={loading}
+            error={error}
+            onRetry={handleRetry}
         >
             <MemberForm
                 form={form}

@@ -223,6 +223,64 @@ describe('inviteLinkService', () => {
       expect(result.error).toBe('Este link de convite expirou')
     })
 
+    it('deve considerar link válido se expiresAt for hoje (fim do dia)', async () => {
+      // Cria uma data para hoje no fim do dia (23:59:59.999)
+      const todayEndOfDay = new Date()
+      todayEndOfDay.setHours(23, 59, 59, 999)
+
+      const mockLink = {
+        id: 'link-1',
+        token: 'inv_test_token',
+        isActive: true,
+        expiresAt: todayEndOfDay,
+        maxUses: null,
+        currentUses: 0,
+        Branch: {
+          id: 'branch-1',
+          name: 'Sede',
+          churchId: 'church-1',
+          Church: {
+            id: 'church-1',
+            name: 'Igreja Teste',
+          },
+        },
+      }
+
+      vi.mocked(prisma.memberInviteLink.findUnique).mockResolvedValue(mockLink as any)
+      vi.mocked(prisma.user.findFirst).mockResolvedValue(null)
+
+      const result = await validateInviteLink('inv_test_token')
+
+      expect(result.valid).toBe(true)
+      expect(result.inviteLink).toBeDefined()
+    })
+
+    it('deve considerar link expirado apenas após o fim do dia', async () => {
+      // Cria uma data para ontem no fim do dia
+      const yesterdayEndOfDay = new Date()
+      yesterdayEndOfDay.setDate(yesterdayEndOfDay.getDate() - 1)
+      yesterdayEndOfDay.setHours(23, 59, 59, 999)
+
+      const mockLink = {
+        id: 'link-1',
+        token: 'inv_test_token',
+        isActive: true,
+        expiresAt: yesterdayEndOfDay,
+        Branch: {
+          Church: {
+            name: 'Igreja Teste',
+          },
+        },
+      }
+
+      vi.mocked(prisma.memberInviteLink.findUnique).mockResolvedValue(mockLink as any)
+
+      const result = await validateInviteLink('inv_test_token')
+
+      expect(result.valid).toBe(false)
+      expect(result.error).toBe('Este link de convite expirou')
+    })
+
     it('deve retornar LIMIT_REACHED se limite de membros do plano foi atingido', async () => {
       const mockLink = {
         id: 'link-1',
@@ -394,7 +452,8 @@ describe('inviteLinkService', () => {
       ]
 
       const mockCreator = {
-        name: 'Admin Test',
+        firstName: 'Admin',
+        lastName: 'Test',
         email: 'admin@test.com',
       }
 
