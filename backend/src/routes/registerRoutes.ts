@@ -25,6 +25,7 @@ import { uploadRoutes } from './uploadRoutes.js'
 import { positionRoutes } from './positionRoutes.js'
 import { paymentRoutes } from './paymentRoutes.js'
 import { healthRoutes } from './health.js'
+import { onboardingRoutes } from './onboardingRoutes.js'
 
 
     export async function registerRoutes(app: FastifyInstance) {
@@ -53,6 +54,7 @@ import { healthRoutes } from './health.js'
         app.register(paymentRoutes, { prefix: '/api' })
         // Health check - sem prefixo para acesso direto em /health
         app.register(healthRoutes)
+        app.register(onboardingRoutes, { prefix: '/onboarding' })
 
 
 

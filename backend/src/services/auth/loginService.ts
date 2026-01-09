@@ -2,6 +2,7 @@ import { prisma } from '../../lib/prisma'
 import { SubscriptionStatus } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import { FastifyInstance } from 'fastify'
+import { OnboardingProgressService } from '../onboardingProgressService'
 
 export async function loginUserService(app: FastifyInstance, email: string, password: string) {
   const user = await prisma.user.findUnique({
@@ -21,6 +22,9 @@ export async function loginUserService(app: FastifyInstance, email: string, pass
     throw new Error('Credenciais inválidas')
   }
 
+  const progressService = new OnboardingProgressService()
+  const onboardingCompleted = await progressService.isCompleted(user.id)
+
   const tokenPayload = {
     userId: user.id,
     email: user.email,
@@ -28,6 +32,7 @@ export async function loginUserService(app: FastifyInstance, email: string, pass
     role: user.Member?.role ?? null,
     branchId: user.Member?.branchId ?? null,
     permissions: user.Member?.Permission.map((p: any) => p.type) ?? [],
+    onboardingCompleted,
   }
 
   const token = app.jwt.sign(tokenPayload, { sub: user.id, expiresIn: '7d' })

@@ -1,14 +1,65 @@
-import React, { useState } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native'
+import React, { useState, useEffect } from 'react'
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { Ionicons } from '@expo/vector-icons'
+import api from '../../api/api'
+import { useAuthStore } from '../../stores/authStore'
+import Toast from 'react-native-toast-message'
+import { resetToLogin } from '../../navigation/navigationRef'
 
 type StructureType = 'simple' | 'branches' | 'existing' | null
 
 export default function StartScreen() {
   const navigation = useNavigation()
+  const { user } = useAuthStore()
   const [selectedStructure, setSelectedStructure] = useState<StructureType>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const checkOnboardingState = async () => {
+      try {
+        const response = await api.get('/onboarding/state')
+        const state = response.data
+
+        if (state.status === 'COMPLETE') {
+          // Onboarding completo, redirecionar para Main
+          // O AppNavigator já gerencia isso, mas podemos forçar navegação
+          return
+        } else if (state.status === 'PENDING') {
+          // Onboarding pendente, preencher dados e continuar
+          if (state.church) {
+            // Salvar dados da igreja para prefill
+            await AsyncStorage.setItem('onboarding_church_id', state.church.id)
+            await AsyncStorage.setItem('onboarding_church_name', state.church.name || '')
+            await AsyncStorage.setItem('onboarding_church_address', state.church.address || '')
+          }
+          
+          if (state.branch) {
+            // Se tem branch, pode ser estrutura com filiais
+            await AsyncStorage.setItem('onboarding_structure', 'branches')
+            setSelectedStructure('branches')
+          } else {
+            // Se não tem branch, pode ser estrutura simples
+            await AsyncStorage.setItem('onboarding_structure', 'simple')
+            setSelectedStructure('simple')
+          }
+        }
+        // Se status é NEW, deixa o usuário escolher normalmente
+      } catch (error: any) {
+        console.error('Erro ao verificar estado de onboarding:', error)
+        // Em caso de erro, continua normalmente
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    checkOnboardingState()
+  }, [])
+
+  const handleLogout = () => {
+    resetToLogin()
+  }
 
   const handleContinue = async () => {
     if (!selectedStructure) {
@@ -26,9 +77,25 @@ export default function StartScreen() {
     }
   }
 
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#3b82f6" />
+      </View>
+    )
+  }
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.content}>
+        <TouchableOpacity 
+          style={styles.logoutButton}
+          onPress={handleLogout}
+        >
+          <Ionicons name="log-out-outline" size={20} color="#666" />
+          <Text style={styles.logoutText}>Sair</Text>
+        </TouchableOpacity>
+
         <Text style={styles.title}>Escolha a estrutura da sua igreja</Text>
         <Text style={styles.subtitle}>
           Selecione a opção que melhor descreve a estrutura da sua igreja
@@ -169,6 +236,18 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-end',
+    padding: 8,
+    marginBottom: 16,
+  },
+  logoutText: {
+    marginLeft: 4,
+    fontSize: 14,
+    color: '#666',
   },
 })
 

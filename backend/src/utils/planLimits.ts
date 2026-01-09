@@ -51,8 +51,9 @@ export async function checkPlanMembersLimit(userId: string): Promise<void> {
     })
 
     // Tentar usar a subscription mais recente do plano Free se existir
+    // Buscar por code primeiro, depois fallback para name (backward compatibility)
     const freeSubscription = allUserSubscriptions.find(s => 
-      s.Plan.name.toLowerCase() === 'free' && 
+      (s.Plan.code === 'FREE' || s.Plan.name.toLowerCase() === 'free') && 
       (s.status === SubscriptionStatus.active || s.status === SubscriptionStatus.pending)
     )
     
@@ -104,8 +105,9 @@ export async function checkPlanMembersLimit(userId: string): Promise<void> {
         })
 
         // Tentar usar a subscription mais recente do plano Free se existir
+        // Buscar por code primeiro, depois fallback para name (backward compatibility)
         const freeSubscription = allAdminSubscriptions.find(s => 
-          s.Plan.name.toLowerCase() === 'free' && 
+          (s.Plan.code === 'FREE' || s.Plan.name.toLowerCase() === 'free') && 
           (s.status === SubscriptionStatus.active || s.status === SubscriptionStatus.pending)
         )
         
@@ -195,8 +197,9 @@ export async function checkPlanBranchesLimit(userId: string): Promise<void> {
     })
 
     // Tentar usar a subscription mais recente do plano Free se existir
+    // Buscar por code primeiro, depois fallback para name (backward compatibility)
     const freeSubscription = allUserSubscriptions.find(s => 
-      s.Plan.name.toLowerCase() === 'free' && 
+      (s.Plan.code === 'FREE' || s.Plan.name.toLowerCase() === 'free') && 
       (s.status === SubscriptionStatus.active || s.status === SubscriptionStatus.pending)
     )
     

@@ -47,7 +47,8 @@ describe('Onboarding Routes - Fluxo Completo', () => {
     const hashedPassword = await bcrypt.hash('password123', 10)
     const user = await prisma.user.create({
       data: {
-        name: 'Onboarding User',
+        firstName: 'Onboarding',
+        lastName: 'User',
         email: `onboarding-${Date.now()}@test.com`,
         password: hashedPassword,
       },
@@ -71,7 +72,7 @@ describe('Onboarding Routes - Fluxo Completo', () => {
     const tokenPayload = {
       sub: user.id,
       email: user.email,
-      name: user.name,
+      name: `${user.firstName} ${user.lastName}`,
       type: 'user' as const,
       role: null,
       branchId: null,
@@ -140,6 +141,43 @@ describe('Onboarding Routes - Fluxo Completo', () => {
       expect(response.body.church.name).toBe('Igreja de Teste')
       expect(response.body).toHaveProperty('branch')
       expect(response.body.branch.isMainBranch).toBe(true)
+    })
+
+    it('deve retornar igreja existente ao tentar criar segunda vez (idempotência)', async () => {
+      // Primeira criação
+      const firstResponse = await request(app.server)
+        .post('/churches')
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({
+          name: 'Igreja Idempotente',
+          withBranch: true,
+          branchName: 'Sede',
+        })
+
+      expect(firstResponse.status).toBe(201)
+      const firstChurchId = firstResponse.body.church.id
+
+      // Segunda tentativa de criação (deve retornar a mesma igreja)
+      const secondResponse = await request(app.server)
+        .post('/churches')
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({
+          name: 'Igreja Idempotente 2',
+          withBranch: true,
+          branchName: 'Sede',
+        })
+
+      logTestResponse(secondResponse, 200)
+      expect(secondResponse.status).toBe(200)
+      expect(secondResponse.body).toHaveProperty('existing', true)
+      expect(secondResponse.body.church.id).toBe(firstChurchId)
+      expect(secondResponse.body.church.name).toBe('Igreja Idempotente') // Mantém nome original
+
+      // Verificar que não foi criada uma segunda igreja
+      const churches = await prisma.church.findMany({
+        where: { createdByUserId: userId },
+      })
+      expect(churches.length).toBe(1)
     })
 
     it('deve criar membro administrador ao criar igreja', async () => {
@@ -211,7 +249,8 @@ describe('Onboarding Routes - Fluxo Completo', () => {
       const hashedPassword2 = await bcrypt.hash('password123', 10)
       const user2 = await prisma.user.create({
         data: {
-          name: 'Outro Usuário',
+          firstName: 'Outro',
+          lastName: 'Usuário',
           email: `otheruser-${Date.now()}@test.com`,
           password: hashedPassword2,
         },
@@ -231,7 +270,7 @@ describe('Onboarding Routes - Fluxo Completo', () => {
       const tokenPayload2 = {
         sub: user2.id,
         email: user2.email,
-        name: user2.name,
+        name: `${user2.firstName} ${user2.lastName}`,
         type: 'user' as const,
         role: null,
         branchId: null,
@@ -418,6 +457,70 @@ describe('Onboarding Routes - Fluxo Completo', () => {
 
       logTestResponse(response, 400)
       expect(response.status).toBe(400)
+    })
+  })
+
+  describe('GET /onboarding/state - Estado de Onboarding', () => {
+    it('deve retornar NEW quando usuário não tem igreja', async () => {
+      const response = await request(app.server)
+        .get('/onboarding/state')
+        .set('Authorization', `Bearer ${userToken}`)
+
+      logTestResponse(response, 200)
+      expect(response.status).toBe(200)
+      expect(response.body.status).toBe('NEW')
+    })
+
+    it('deve retornar PENDING quando usuário tem igreja mas não completou onboarding', async () => {
+      // Cria igreja
+      const churchResponse = await request(app.server)
+        .post('/churches')
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({
+          name: 'Igreja Pendente',
+          withBranch: true,
+          branchName: 'Sede',
+        })
+
+      expect(churchResponse.status).toBe(201)
+
+      // Busca estado (com token que não tem branchId completo)
+      const stateResponse = await request(app.server)
+        .get('/onboarding/state')
+        .set('Authorization', `Bearer ${userToken}`)
+
+      logTestResponse(stateResponse, 200)
+      expect(stateResponse.status).toBe(200)
+      expect(stateResponse.body.status).toBe('PENDING')
+      expect(stateResponse.body.church).toBeDefined()
+      expect(stateResponse.body.church.id).toBe(churchResponse.body.church.id)
+    })
+
+    it('deve retornar COMPLETE quando usuário tem memberId e branchId', async () => {
+      // Cria igreja (que cria member completo)
+      const churchResponse = await request(app.server)
+        .post('/churches')
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({
+          name: 'Igreja Completa',
+          withBranch: true,
+          branchName: 'Sede',
+        })
+
+      expect(churchResponse.status).toBe(201)
+      const memberToken = churchResponse.body.token
+
+      // Busca estado com token que tem memberId e branchId
+      const stateResponse = await request(app.server)
+        .get('/onboarding/state')
+        .set('Authorization', `Bearer ${memberToken}`)
+
+      logTestResponse(stateResponse, 200)
+      expect(stateResponse.status).toBe(200)
+      expect(stateResponse.body.status).toBe('COMPLETE')
+      expect(stateResponse.body.church).toBeDefined()
+      expect(stateResponse.body.branch).toBeDefined()
+      expect(stateResponse.body.member).toBeDefined()
     })
   })
 

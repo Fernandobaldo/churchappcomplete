@@ -4,6 +4,7 @@ import { registerUserService } from '../../services/auth/registerService'
 import { logAudit, AuditLogger } from '../../utils/auditHelper'
 import { prisma } from '../../lib/prisma'
 import { AuditAction } from '@prisma/client'
+import { OnboardingProgressService } from '../../services/onboardingProgressService'
 
 export async function registerController(request: FastifyRequest, reply: FastifyReply) {
   const bodySchema = z.object({
@@ -76,6 +77,8 @@ export async function registerController(request: FastifyRequest, reply: Fastify
         }
         
         const { getUserFullName } = await import('../../utils/userUtils')
+        const progressService = new OnboardingProgressService()
+        const onboardingCompleted = await progressService.isCompleted(user.id)
         const tokenPayload = {
           sub: user.id,
           email: user.email,
@@ -85,6 +88,7 @@ export async function registerController(request: FastifyRequest, reply: Fastify
           role: 'role' in result ? result.role : null,
           branchId: 'branchId' in result ? result.branchId : null,
           permissions: [],
+          onboardingCompleted,
         }
         
         if (!request.server?.jwt) {
@@ -227,12 +231,15 @@ export async function registerController(request: FastifyRequest, reply: Fastify
         // Isso mantém o token limpo e permite que o frontend verifique com toBeUndefined()
         const { getUserFullName } = await import('../../utils/userUtils')
         const fullName = getUserFullName(user)
+        const progressService = new OnboardingProgressService()
+        const onboardingCompleted = await progressService.isCompleted(user.id)
         const tokenPayload = {
           sub: user.id,
           email: user.email,
           name: fullName,
           type: 'user' as const,
           permissions: [], // Usuário não tem permissões (apenas membros têm)
+          onboardingCompleted,
         }
         
         if (!request.server?.jwt) {

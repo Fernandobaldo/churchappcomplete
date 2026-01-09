@@ -23,13 +23,12 @@ export default function RegisterScreen() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [churchName, setChurchName] = useState('')
   const [loading, setLoading] = useState(false)
   const { setUserFromToken } = useAuthStore()
 
   // Validação: verifica se todos os campos obrigatórios estão preenchidos
   const isFormValid = useMemo(() => {
-    if (!name || !email || !password || !churchName) return false
+    if (!name || !email || !password) return false
     
     // Validação básica de email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -39,10 +38,10 @@ export default function RegisterScreen() {
     if (password.length < 6) return false
     
     return true
-  }, [name, email, password, churchName])
+  }, [name, email, password])
 
   const handleRegister = async () => {
-    if (!name || !email || !password || !churchName) {
+    if (!name || !email || !password) {
       Toast.show({ type: 'error', text1: 'Preencha todos os campos.' })
       return
     }
@@ -85,41 +84,29 @@ export default function RegisterScreen() {
         // Salva o token e dados do usuário no store
         setUserFromToken(token)
 
-        // Tenta criar a igreja com filial
-        try {
-          await api.post('/churches', {
-            name: churchName,
-            withBranch: true,
-            branchName: 'Sede',
-          })
-          Toast.show({
-            type: 'success',
-            text1: 'Conta e igreja criadas com sucesso!',
-          })
-        } catch (churchError: any) {
-          // Se não conseguir criar a igreja, continua mesmo assim
-          console.warn('Não foi possível criar a igreja automaticamente:', churchError)
-          Toast.show({
-            type: 'success',
-            text1: 'Conta criada!',
-            text2: 'Complete a configuração da igreja no próximo passo.',
-          })
-        }
+        Toast.show({
+          type: 'success',
+          text1: 'Conta criada com sucesso!',
+        })
 
-        // Verifica se precisa completar onboarding
-        const userData = useAuthStore.getState().user
-        if (!userData?.branchId || !userData?.role) {
-          // @ts-ignore
-          navigation.replace('StartOnboarding')
-        } else {
-          // @ts-ignore
-          navigation.replace('Dashboard')
-        }
+        // O AppNavigator detecta automaticamente a mudança de estado
+        // e renderiza o navigator de onboarding quando isAuthenticated=true e hasCompleteMember=false
+        // Não é necessário fazer reset manual aqui
         return
       } catch (firstError: any) {
-        // Se falhar, tenta o endpoint /public/register
+        // Verificar se é erro de email já cadastrado - não tentar endpoint alternativo
         if (
-          firstError.response?.status === 400 ||
+          firstError.response?.status === 400 &&
+          (firstError.response?.data?.error?.includes('já cadastrado') ||
+           firstError.response?.data?.message?.includes('já cadastrado') ||
+           firstError.response?.data?.error?.includes('Email já cadastrado'))
+        ) {
+          // Email já cadastrado, não tenta endpoint alternativo
+          throw firstError
+        }
+        
+        // Se falhar, tenta o endpoint /public/register (apenas para 404 ou 401)
+        if (
           firstError.response?.status === 404 ||
           firstError.response?.status === 401
         ) {
@@ -144,29 +131,14 @@ export default function RegisterScreen() {
           // Salva o token e dados do usuário no store
           setUserFromToken(token)
 
-          // Tenta criar a igreja com filial
-          try {
-            await api.post('/churches', {
-              name: churchName,
-              withBranch: true,
-              branchName: 'Sede',
-            })
-            Toast.show({
-              type: 'success',
-              text1: 'Conta e igreja criadas com sucesso!',
-            })
-          } catch (churchError: any) {
-            console.warn('Não foi possível criar a igreja automaticamente:', churchError)
-            Toast.show({
-              type: 'success',
-              text1: 'Conta criada!',
-              text2: 'Complete a configuração da igreja no próximo passo.',
-            })
-          }
+          Toast.show({
+            type: 'success',
+            text1: 'Conta criada com sucesso!',
+          })
 
-          // Navega para o dashboard
-          // @ts-ignore
-          navigation.replace('Dashboard')
+          // O AppNavigator detecta automaticamente a mudança de estado
+          // e renderiza o navigator de onboarding quando isAuthenticated=true e hasCompleteMember=false
+          // Não é necessário fazer reset manual aqui
           return
         }
         throw firstError
@@ -174,7 +146,19 @@ export default function RegisterScreen() {
     } catch (error: any) {
       console.error('Erro ao criar conta:', error)
 
+      // Verificar se é erro de email já cadastrado
       if (
+        error.response?.status === 400 &&
+        (error.response?.data?.error?.includes('já cadastrado') ||
+         error.response?.data?.message?.includes('já cadastrado') ||
+         error.response?.data?.error?.includes('Email já cadastrado'))
+      ) {
+        Toast.show({
+          type: 'error',
+          text1: 'Email já cadastrado',
+          text2: 'Tente fazer login ou use outro email.',
+        })
+      } else if (
         error.response?.status === 409 ||
         error.response?.data?.message?.includes('já está em uso') ||
         error.response?.data?.message?.includes('já cadastrado')
@@ -246,16 +230,6 @@ export default function RegisterScreen() {
                 secureTextEntry
                 autoCapitalize="none"
                 autoCorrect={false}
-              />
-
-              <TextInputField
-                fieldKey="churchName"
-                label="Nome da igreja"
-                value={churchName}
-                onChangeText={setChurchName}
-                placeholder="Ex: Igreja Exemplo"
-                required
-                autoCapitalize="words"
               />
 
               <TouchableOpacity

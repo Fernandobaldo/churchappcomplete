@@ -109,6 +109,14 @@ export default function BranchesScreen() {
       }
 
       Toast.show({ type: 'success', text1: 'Filiais salvas!' })
+      
+      // Marcar etapa branches como completa
+      try {
+        await api.post('/onboarding/progress/branches')
+      } catch (progressError) {
+        console.error('Erro ao marcar progresso:', progressError)
+      }
+      
       // @ts-ignore
       navigation.navigate('SettingsOnboarding')
     } catch (error: unknown) {
