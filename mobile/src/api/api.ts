@@ -2,6 +2,7 @@ import axios from 'axios'
 import { Platform } from 'react-native'
 import Constants from 'expo-constants'
 import { useAuthStore } from '../stores/authStore'
+import { resetToLogin } from '../navigation/navigationRef'
 
 // Configuração da API base
 // Prioridade: variável de ambiente EXPO_PUBLIC_API_URL > app.config.js extra > fallback localhost
@@ -98,12 +99,13 @@ api.interceptors.response.use(
     
     // Tratamento de erros de autenticação
     if (error.response?.status === 401) {
-      // Token inválido ou expirado
-      removeToken()
-      useAuthStore.getState().logout()
+      // Token inválido ou expirado - redirecionar para Login
+      // Não logar erros 401 no console (credenciais inválidas são esperadas)
+      resetToLogin()
+      return Promise.reject(error)
     }
     
-    // Log detalhado do erro para debug
+    // Log detalhado do erro para debug (exceto 401 que já foi tratado)
     if (process.env.NODE_ENV === 'development') {
       console.error('Erro na requisição:', {
         message: error.message,

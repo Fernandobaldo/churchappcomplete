@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import {
   View,
   Text,
@@ -11,10 +11,11 @@ import {
   ScrollView,
 } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
-import { useNavigation, useFocusEffect } from '@react-navigation/native'
+import { useNavigation } from '@react-navigation/native'
 import Toast from 'react-native-toast-message'
 import api, { setToken } from '../api/api'
 import { useAuthStore } from '../stores/authStore'
+import { authService } from '../services/auth.service'
 import GlassBackground from '../components/GlassBackground'
 import GlassCard from '../components/GlassCard'
 import TextInputField from '../components/TextInputField'
@@ -26,32 +27,10 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const { setUserFromToken, token, user } = useAuthStore()
+  const { setUserFromToken } = useAuthStore()
 
-  // Previne navegação de volta para Login quando o usuário está autenticado
-  useEffect(() => {
-    // Se o usuário já está autenticado, redireciona para Main imediatamente
-    if (token && user) {
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Main' as never }],
-      })
-      return
-    }
-
-    // Previne navegação de volta para Login quando o usuário está autenticado
-    const unsubscribe = navigation.addListener('beforeRemove', (e) => {
-      if (token && user) {
-        e.preventDefault()
-        navigation.reset({
-          index: 0,
-          routes: [{ name: 'Main' as never }],
-        })
-      }
-    })
-
-    return unsubscribe
-  }, [navigation, token, user])
+  // O AppNavigator já gerencia a navegação baseado no estado de autenticação
+  // Não é necessário fazer reset manual aqui
 
   // Verifica se os campos estão preenchidos
   const isFormValid = email.trim().length > 0 && password.trim().length > 0
@@ -84,22 +63,11 @@ export default function LoginScreen() {
       // Salva o token e dados do usuário no store
       setUserFromToken(token)
       
-      // Aguarda um pouco para o store atualizar
-      setTimeout(() => {
-        // Verifica se precisa completar onboarding (sem branchId ou role)
-        const userData = useAuthStore.getState().user
-        if (!userData?.branchId || !userData?.role) {
-          Toast.show({ type: 'info', text1: 'Complete a configuração inicial' })
-          navigation.navigate('StartOnboarding' as never)
-        } else {
-          Toast.show({ type: 'success', text1: 'Login realizado!' })
-          navigation.navigate('Main' as never)
-        }
-      }, 100)
+      // O AppNavigator gerencia automaticamente a navegação baseado no estado do usuário
+      // Quando setUserFromToken atualiza o estado, o AppNavigator re-renderiza com o navigator correto
+      Toast.show({ type: 'success', text1: 'Login realizado!' })
     } catch (error: any) {
-      console.error('Erro no login:', error)
-      
-      // Tratamento melhorado de erros
+      // Tratamento melhorado de erros (sem log no console para credenciais inválidas)
       let errorMessage = 'Verifique seus dados.'
       if (error.response?.data?.message) {
         errorMessage = error.response.data.message

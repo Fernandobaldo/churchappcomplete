@@ -2,9 +2,40 @@ import React from 'react'
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
+import { useAuthStore } from '../../stores/authStore'
+import api from '../../api/api'
+import Toast from 'react-native-toast-message'
 
 export default function ConcluidoScreen() {
   const navigation = useNavigation()
+  const { user, setUserFromToken } = useAuthStore()
+
+  const handleGoToDashboard = async () => {
+    try {
+      // Marcar onboarding como completo
+      const response = await api.post('/onboarding/complete')
+      
+      // Se o backend retornar um token atualizado, atualizar o store
+      if (response.data.token) {
+        setUserFromToken(response.data.token)
+      } else {
+        // Se não retornar token, fazer login novamente para obter token atualizado
+        // O AppNavigator detectará automaticamente quando onboardingCompleted for true
+        Toast.show({
+          type: 'success',
+          text1: 'Onboarding concluído!',
+          text2: 'Redirecionando para o painel...',
+        })
+      }
+    } catch (error: any) {
+      console.error('Erro ao marcar onboarding como completo:', error)
+      Toast.show({
+        type: 'error',
+        text1: 'Erro ao concluir onboarding',
+        text2: 'Tente novamente mais tarde',
+      })
+    }
+  }
 
   return (
     <View style={styles.container}>
@@ -24,7 +55,7 @@ export default function ConcluidoScreen() {
 
         <TouchableOpacity
           style={styles.button}
-          onPress={() => navigation.navigate('Main' as never)}
+          onPress={handleGoToDashboard}
         >
           <Text style={styles.buttonText}>Ir para o painel</Text>
         </TouchableOpacity>

@@ -78,11 +78,7 @@ export default function RegisterInviteScreen() {
         return
       }
 
-      if (response.data.expiresAt && new Date(response.data.expiresAt) < new Date()) {
-        setError('Este link de convite expirou')
-        setValidating(false)
-        return
-      }
+      // Validação de expiresAt removida - backend é a única fonte de verdade
 
       if (
         response.data.maxUses !== null &&

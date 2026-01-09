@@ -1,5 +1,7 @@
 import { NavigationContainer } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
+import { useAuthStore } from '../stores/authStore'
+import { navigationRef } from './navigationRef'
 import LoginScreen from '../screens/LoginScreen'
 import RegisterScreen from '../screens/RegisterScreen'
 import DashboardScreen from '../screens/DashboardScreen'
@@ -54,9 +56,64 @@ import PositionsScreen from '../screens/PositionsScreen'
 const Stack = createNativeStackNavigator()
 
 export default function AppNavigator() {
+    const { user, isAuthenticated } = useAuthStore()
+    
+    // Usa método centralizado do store para verificar autenticação
+    // isAuthenticated() já valida se token existe e não está expirado
+    const authenticated = isAuthenticated()
+    
+    // Guard: verificar se user tem Member completo E onboarding completo (apenas se estiver autenticado)
+    const hasCompleteMember = user?.memberId && user?.branchId && user?.role
+    const onboardingCompleted = user?.onboardingCompleted === true
+    const canAccessMain = hasCompleteMember && onboardingCompleted
+    
+    // Se não está autenticado, mostrar Login
+    if (!authenticated) {
+        return (
+            <NavigationContainer key="auth" ref={navigationRef}>
+                <Stack.Navigator 
+                    initialRouteName="Login" 
+                    screenOptions={{animation: 'slide_from_right', headerShown: false}}
+                >
+                    <Stack.Screen 
+                        name="Login" 
+                        component={LoginScreen}
+                        options={{ gestureEnabled: false }}
+                    />
+                    <Stack.Screen name="Register" component={RegisterScreen} />
+                    <Stack.Screen name="RegisterInvite" component={RegisterInviteScreen} />
+                </Stack.Navigator>
+            </NavigationContainer>
+        )
+    }
+    
+    // Se está autenticado mas não tem Member completo OU onboarding não completo, mostrar onboarding
+    if (!canAccessMain) {
+        return (
+            <NavigationContainer key="onboarding" ref={navigationRef}>
+                <Stack.Navigator 
+                    initialRouteName="StartOnboarding" 
+                    screenOptions={{animation: 'slide_from_right', headerShown: false}}
+                >
+                    <Stack.Screen name="Login" component={LoginScreen} options={{ gestureEnabled: false }} />
+                    <Stack.Screen name="Register" component={RegisterScreen} />
+                    <Stack.Screen name="RegisterInvite" component={RegisterInviteScreen} />
+                    <Stack.Screen name="StartOnboarding" component={StartOnboardingScreen} />
+                    <Stack.Screen name="ChurchOnboarding" component={ChurchOnboardingScreen} />
+                    <Stack.Screen name="BranchesOnboarding" component={BranchesOnboardingScreen} />
+                    <Stack.Screen name="SettingsOnboarding" component={SettingsScreen} />
+                    <Stack.Screen name="ConvitesOnboarding" component={ConvitesScreen} />
+                    <Stack.Screen name="ConcluidoOnboarding" component={ConcluidoOnboardingScreen} />
+                    <Stack.Screen name="BemVindoOnboarding" component={BemVindoScreen} />
+                </Stack.Navigator>
+            </NavigationContainer>
+        )
+    }
+    
+    // Se tem Member completo, renderizar navegador completo
     return (
-        <NavigationContainer>
-            <Stack.Navigator initialRouteName="Login" screenOptions={{animation: 'slide_from_right', headerShown: false }}>
+        <NavigationContainer key="main" ref={navigationRef}>
+            <Stack.Navigator initialRouteName="Main" screenOptions={{animation: 'slide_from_right', headerShown: false }}>
                 <Stack.Screen 
                     name="Login" 
                     component={LoginScreen}

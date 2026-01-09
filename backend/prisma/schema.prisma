@@ -49,36 +49,40 @@ model Branch {
 }
 
 model Church {
-  id          String          @id @default(cuid())
-  name        String
-  logoUrl     String?
-  avatarUrl   String?
-  isActive    Boolean         @default(true)
-  address     String?
-  phone       String?
-  email       String?
-  website     String?
-  socialMedia Json?
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
-  Branch      Branch[]
-  Positions   ChurchPosition[]
+  id              String           @id @default(cuid())
+  name            String
+  logoUrl         String?
+  avatarUrl       String?
+  isActive        Boolean          @default(true)
+  address         String?
+  phone           String?
+  email           String?
+  website         String?
+  socialMedia     Json?
+  createdByUserId String?
+  User            User?            @relation("ChurchCreator", fields: [createdByUserId], references: [id])
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  Branch          Branch[]
+  Positions       ChurchPosition[]
+
+  @@index([createdByUserId])
 }
 
 model Contribution {
-  id                String                      @id @default(cuid())
-  title             String
-  description       String?
-  goal              Float?
-  endDate           DateTime?
-  raised            Float?                       @default(0)
-  isActive          Boolean                      @default(true)
-  createdAt         DateTime                     @default(now())
-  updatedAt         DateTime                     @updatedAt
-  branchId          String
-  Branch            Branch                       @relation(fields: [branchId], references: [id])
-  Transaction      Transaction[]
-  PaymentMethods    ContributionPaymentMethod[]
+  id             String                      @id @default(cuid())
+  title          String
+  description    String?
+  goal           Float?
+  endDate        DateTime?
+  raised         Float?                      @default(0)
+  isActive       Boolean                     @default(true)
+  createdAt      DateTime                    @default(now())
+  updatedAt      DateTime                    @updatedAt
+  branchId       String
+  Branch         Branch                      @relation(fields: [branchId], references: [id])
+  Transaction    Transaction[]
+  PaymentMethods ContributionPaymentMethod[]
 }
 
 model Devotional {
@@ -172,6 +176,7 @@ model Permission {
 model Plan {
   id               String         @id @default(cuid())
   name             String         @unique
+  code             String?        @unique // Código estável para identificação (ex: 'FREE', 'PREMIUM')
   price            Float
   features         String[]
   maxBranches      Int?
@@ -186,24 +191,24 @@ model Plan {
 }
 
 model Subscription {
-  id                   String            @id @default(cuid())
-  userId               String
-  planId               String
-  status               SubscriptionStatus @default(pending)
-  startedAt            DateTime          @default(now())
-  endsAt               DateTime?
-  gatewayProvider      String?
+  id                    String             @id @default(cuid())
+  userId                String
+  planId                String
+  status                SubscriptionStatus @default(pending)
+  startedAt             DateTime           @default(now())
+  endsAt                DateTime?
+  gatewayProvider       String?
   gatewaySubscriptionId String?
-  gatewayCustomerId    String?
-  paymentMethodId      String?
-  currentPeriodStart   DateTime?
-  currentPeriodEnd     DateTime?
-  cancelAtPeriodEnd    Boolean           @default(false)
-  canceledAt           DateTime?
-  trialEnd             DateTime?
-  Plan                 Plan              @relation(fields: [planId], references: [id])
-  User                 User              @relation(fields: [userId], references: [id])
-  PaymentHistory       PaymentHistory[]
+  gatewayCustomerId     String?
+  paymentMethodId       String?
+  currentPeriodStart    DateTime?
+  currentPeriodEnd      DateTime?
+  cancelAtPeriodEnd     Boolean            @default(false)
+  canceledAt            DateTime?
+  trialEnd              DateTime?
+  Plan                  Plan               @relation(fields: [planId], references: [id])
+  User                  User               @relation(fields: [userId], references: [id])
+  PaymentHistory        PaymentHistory[]
 
   @@index([planId])
   @@index([userId])
@@ -224,7 +229,7 @@ model Transaction {
   tithePayerMemberId String?
   tithePayerName     String?
   isTithePayerMember Boolean?
-  contributionId    String?
+  contributionId     String?
   createdBy          String?
   branchId           String
   date               DateTime?
@@ -255,32 +260,49 @@ model ServiceSchedule {
 }
 
 model AdminUser {
-  id           String      @id @default(cuid())
+  id           String     @id @default(cuid())
   name         String
-  email        String      @unique
+  email        String     @unique
   passwordHash String
-  adminRole    AdminRole   @default(SUPPORT)
-  isActive     Boolean     @default(true)
+  adminRole    AdminRole  @default(SUPPORT)
+  isActive     Boolean    @default(true)
   lastLoginAt  DateTime?
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
   AuditLog     AuditLog[]
 }
 
 model User {
-  id           String         @id @default(cuid())
-  firstName    String         // Primeiro nome (obrigatório)
-  lastName     String         // Sobrenome (obrigatório)
-  email        String         @unique
-  password     String
-  phone        String?        // Telefone (opcional por enquanto, mas recomendado)
-  document     String?        // CPF/CNPJ (opcional por enquanto, mas recomendado)
-  isBlocked    Boolean        @default(false)
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-  Member       Member?
-  Subscription Subscription[]
-  Transactions Transaction[]
+  id                 String              @id @default(cuid())
+  firstName          String // Primeiro nome (obrigatório)
+  lastName           String // Sobrenome (obrigatório)
+  email              String              @unique
+  password           String
+  phone              String? // Telefone (opcional por enquanto, mas recomendado)
+  document           String? // CPF/CNPJ (opcional por enquanto, mas recomendado)
+  isBlocked          Boolean             @default(false)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  Member             Member?
+  Subscription       Subscription[]
+  Transactions       Transaction[]
+  CreatedChurches    Church[]            @relation("ChurchCreator")
+  OnboardingProgress OnboardingProgress?
+}
+
+model OnboardingProgress {
+  id                 String    @id @default(cuid())
+  userId             String    @unique
+  churchConfigured   Boolean   @default(false)
+  branchesConfigured Boolean   @default(false)
+  settingsConfigured Boolean   @default(false)
+  completed          Boolean   @default(false)
+  completedAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  User               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model MemberInviteLink {
@@ -328,16 +350,16 @@ model ContributionPaymentMethod {
 }
 
 model PaymentHistory {
-  id                String       @id @default(cuid())
-  subscriptionId    String
-  amount            Decimal      @db.Decimal(10, 2)
-  currency          String       @default("BRL")
-  status            String
-  gatewayPaymentId  String?
-  gatewayProvider   String?
-  paidAt            DateTime?
-  createdAt         DateTime     @default(now())
-  Subscription      Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  id               String       @id @default(cuid())
+  subscriptionId   String
+  amount           Decimal      @db.Decimal(10, 2)
+  currency         String       @default("BRL")
+  status           String
+  gatewayPaymentId String?
+  gatewayProvider  String?
+  paidAt           DateTime?
+  createdAt        DateTime     @default(now())
+  Subscription     Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
 
   @@index([subscriptionId])
   @@index([gatewayPaymentId])
@@ -345,14 +367,14 @@ model PaymentHistory {
 }
 
 model WebhookEvent {
-  id              String   @id @default(cuid())
+  id              String    @id @default(cuid())
   gatewayProvider String
   gatewayEventId  String
   eventType       String
-  processed       Boolean  @default(false)
+  processed       Boolean   @default(false)
   processedAt     DateTime?
   payload         Json?
-  createdAt       DateTime @default(now())
+  createdAt       DateTime  @default(now())
 
   @@unique([gatewayProvider, gatewayEventId])
   @@index([gatewayProvider])

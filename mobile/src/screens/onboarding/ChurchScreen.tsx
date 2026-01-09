@@ -35,7 +35,44 @@ export default function ChurchScreen() {
         setStructureType(structure)
       }
 
-      // Tenta carregar igreja existente
+      // Primeiro tenta carregar dados salvos do AsyncStorage (do onboarding state)
+      const savedChurchId = await AsyncStorage.getItem('onboarding_church_id')
+      const savedChurchName = await AsyncStorage.getItem('onboarding_church_name')
+      const savedChurchAddress = await AsyncStorage.getItem('onboarding_church_address')
+
+      // Validar dados do AsyncStorage: buscar da API para confirmar ownership
+      if (savedChurchId && savedChurchName) {
+        try {
+          const response = await api.get('/churches').catch(() => ({ data: [] }))
+          const churches = response.data
+
+          if (churches && Array.isArray(churches) && churches.length > 0) {
+            // Verificar se a igreja salva pertence ao usuário atual
+            const church = churches.find(c => c.id === savedChurchId)
+            
+            if (church) {
+              // Só usar se encontrar na API (confirma ownership)
+              setChurchId(church.id)
+              setFormData({
+                name: church.name || '',
+                address: church.address || '',
+              })
+              return
+            } else {
+              // Se não encontrou, limpar AsyncStorage (dados de outro usuário)
+              await AsyncStorage.multiRemove(['onboarding_church_id', 'onboarding_church_name', 'onboarding_church_address'])
+            }
+          } else {
+            // Se não há igrejas na API, limpar AsyncStorage
+            await AsyncStorage.multiRemove(['onboarding_church_id', 'onboarding_church_name', 'onboarding_church_address'])
+          }
+        } catch (error) {
+          // Se der erro, limpar AsyncStorage e continuar normalmente
+          await AsyncStorage.multiRemove(['onboarding_church_id', 'onboarding_church_name', 'onboarding_church_address'])
+        }
+      }
+
+      // Tenta carregar igreja existente da API
       try {
         const response = await api.get('/churches').catch(() => ({ data: [] }))
         const churches = response.data
@@ -66,28 +103,109 @@ export default function ChurchScreen() {
     try {
       if (churchId) {
         // Atualiza igreja existente
-        await api.put(`/churches/${churchId}`, formData)
-        Toast.show({ type: 'success', text1: 'Igreja atualizada!' })
-      } else {
-        // Cria nova igreja
-        const response = await api.post('/churches', {
-          name: formData.name,
-          address: formData.address || undefined,
-          withBranch: structureType === 'branches',
-          branchName: 'Sede',
-        })
-        
-        // O backend retorna um novo token na resposta quando cria member
+        const response = await api.put(`/churches/${churchId}`, formData)
         if (response.data.token) {
           setUserFromToken(response.data.token)
         }
+        // Atualiza AsyncStorage com os novos dados
+        await AsyncStorage.setItem('onboarding_church_id', churchId)
+        await AsyncStorage.setItem('onboarding_church_name', formData.name)
+        await AsyncStorage.setItem('onboarding_church_address', formData.address || '')
+        Toast.show({ type: 'success', text1: 'Igreja atualizada!' })
         
-        // O backend retorna a igreja em response.data.church
-        const churchId = response.data.church?.id || response.data.id
-        if (churchId) {
-          setChurchId(churchId)
+        // Marcar etapa church como completa
+        try {
+          await api.post('/onboarding/progress/church')
+        } catch (progressError) {
+          console.error('Erro ao marcar progresso:', progressError)
         }
-        Toast.show({ type: 'success', text1: 'Igreja criada!' })
+      } else {
+        // Verificar novamente antes de criar (double check)
+        try {
+          const checkResponse = await api.get('/churches')
+          const existingChurches = checkResponse.data
+          
+          if (existingChurches && Array.isArray(existingChurches) && existingChurches.length > 0) {
+            // Já existe uma igreja, atualizar em vez de criar
+            const existingChurch = existingChurches[0]
+            setChurchId(existingChurch.id)
+            const updateResponse = await api.put(`/churches/${existingChurch.id}`, formData)
+            if (updateResponse.data.token) {
+              setUserFromToken(updateResponse.data.token)
+            }
+            // Atualiza AsyncStorage com os novos dados
+            await AsyncStorage.setItem('onboarding_church_id', existingChurch.id)
+            await AsyncStorage.setItem('onboarding_church_name', formData.name)
+            await AsyncStorage.setItem('onboarding_church_address', formData.address || '')
+            Toast.show({ type: 'success', text1: 'Igreja atualizada!' })
+            
+            // Marcar etapa church como completa
+            try {
+              await api.post('/onboarding/progress/church')
+            } catch (progressError) {
+              console.error('Erro ao marcar progresso:', progressError)
+            }
+          } else {
+            // Não existe igreja, criar nova
+            const response = await api.post('/churches', {
+              name: formData.name,
+              address: formData.address || undefined,
+              withBranch: structureType === 'branches',
+              branchName: 'Sede',
+            })
+            
+            if (response.data.token) {
+              setUserFromToken(response.data.token)
+            }
+            
+            const newChurchId = response.data.church?.id || response.data.id
+            if (newChurchId) {
+              setChurchId(newChurchId)
+              // Atualiza AsyncStorage com os novos dados
+              await AsyncStorage.setItem('onboarding_church_id', newChurchId)
+              await AsyncStorage.setItem('onboarding_church_name', formData.name)
+              await AsyncStorage.setItem('onboarding_church_address', formData.address || '')
+            }
+            Toast.show({ type: 'success', text1: 'Igreja criada!' })
+            
+            // Marcar etapa church como completa
+            try {
+              await api.post('/onboarding/progress/church')
+            } catch (progressError) {
+              console.error('Erro ao marcar progresso:', progressError)
+            }
+          }
+        } catch (checkError: any) {
+          // Se der erro ao verificar, tentar criar mesmo assim
+          // O backend deve validar e retornar erro se já existir
+          const response = await api.post('/churches', {
+            name: formData.name,
+            address: formData.address || undefined,
+            withBranch: structureType === 'branches',
+            branchName: 'Sede',
+          })
+          
+          if (response.data.token) {
+            setUserFromToken(response.data.token)
+          }
+          
+          const newChurchId = response.data.church?.id || response.data.id
+          if (newChurchId) {
+            setChurchId(newChurchId)
+            // Atualiza AsyncStorage com os novos dados
+            await AsyncStorage.setItem('onboarding_church_id', newChurchId)
+            await AsyncStorage.setItem('onboarding_church_name', formData.name)
+            await AsyncStorage.setItem('onboarding_church_address', formData.address || '')
+          }
+          Toast.show({ type: 'success', text1: 'Igreja criada!' })
+          
+          // Marcar etapa church como completa
+          try {
+            await api.post('/onboarding/progress/church')
+          } catch (progressError) {
+            console.error('Erro ao marcar progresso:', progressError)
+          }
+        }
       }
 
       // Navega para próxima etapa
@@ -99,7 +217,48 @@ export default function ChurchScreen() {
         navigation.navigate('SettingsOnboarding')
       }
     } catch (error: unknown) {
-      const apiError = error as { response?: { data?: { message?: string } } }
+      const apiError = error as { response?: { data?: { message?: string; churchId?: string } } }
+      
+      // Verificar se o erro é porque já existe uma igreja
+      if (apiError.response?.status === 400) {
+        const errorMessage = apiError.response?.data?.message || ''
+        if (errorMessage.includes('já possui') || errorMessage.includes('já existe')) {
+          // Tentar carregar e atualizar a igreja existente
+          try {
+            const response = await api.get('/churches')
+            const churches = response.data
+            if (churches && Array.isArray(churches) && churches.length > 0) {
+              const church = churches[0]
+              setChurchId(church.id)
+              await api.put(`/churches/${church.id}`, formData)
+              // Atualiza AsyncStorage com os novos dados
+              await AsyncStorage.setItem('onboarding_church_id', church.id)
+              await AsyncStorage.setItem('onboarding_church_name', formData.name)
+              await AsyncStorage.setItem('onboarding_church_address', formData.address || '')
+              Toast.show({ type: 'success', text1: 'Igreja atualizada!' })
+              
+              // Marcar etapa church como completa
+              try {
+                await api.post('/onboarding/progress/church')
+              } catch (progressError) {
+                console.error('Erro ao marcar progresso:', progressError)
+              }
+              
+              // Navega para próxima etapa
+              if (structureType === 'branches') {
+                navigation.navigate('BranchesOnboarding' as never)
+              } else {
+                navigation.navigate('SettingsOnboarding' as never)
+              }
+              setLoading(false)
+              return
+            }
+          } catch (loadError) {
+            console.error('Erro ao carregar igreja existente:', loadError)
+          }
+        }
+      }
+      
       Toast.show({
         type: 'error',
         text1: 'Erro ao salvar igreja',

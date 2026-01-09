@@ -1,10 +1,11 @@
-import React, { useState } from 'react'
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Switch } from 'react-native'
+import React, { useState, useEffect } from 'react'
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Switch, ActivityIndicator } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import Toast from 'react-native-toast-message'
 import { useAuthStore } from '../../stores/authStore'
+import api from '../../api/api'
 
 type Step = 1 | 2 | 3
 
@@ -17,7 +18,7 @@ interface StepConfig {
 const steps: StepConfig[] = [
   { number: 1, title: 'Roles e Permissões', icon: 'people' },
   { number: 2, title: 'Módulos', icon: 'checkmark-circle' },
-  { number: 3, title: 'Convites', icon: 'people' },
+  { number: 3, title: 'Links de Convite', icon: 'link' },
 ]
 
 export default function SettingsScreen() {
@@ -33,7 +34,29 @@ export default function SettingsScreen() {
     finances: false,
     devotionals: true,
   })
-  const [emails, setEmails] = useState('')
+
+  useEffect(() => {
+    const loadSavedData = async () => {
+      try {
+        // Carregar módulos salvos
+        const savedModules = await AsyncStorage.getItem('onboarding_modules')
+        if (savedModules) {
+          const parsedModules = JSON.parse(savedModules)
+          setModules(parsedModules)
+        }
+        
+        // Verificar se roles já foram criadas
+        const rolesCreatedSaved = await AsyncStorage.getItem('onboarding_roles_created')
+        if (rolesCreatedSaved === 'true') {
+          setRolesCreated(true)
+        }
+      } catch (error) {
+        console.error('Erro ao carregar dados salvos:', error)
+      }
+    }
+
+    loadSavedData()
+  }, [])
 
   const handleStep1 = async () => {
     setLoading(true)
@@ -42,6 +65,7 @@ export default function SettingsScreen() {
       // Por enquanto, apenas marca como criado
       // TODO: Integrar com endpoint de criação de roles quando disponível
       setRolesCreated(true)
+      await AsyncStorage.setItem('onboarding_roles_created', 'true')
       Toast.show({
         type: 'success',
         text1: 'Roles criadas com sucesso!',
@@ -66,55 +90,15 @@ export default function SettingsScreen() {
   }
 
   const handleStep3 = async () => {
-    setLoading(true)
+    // Marcar etapa settings como completa
     try {
-      const emailList = emails
-        .split('\n')
-        .map((email) => email.trim())
-        .filter((email) => email.length > 0)
-
-      if (emailList.length > 0) {
-        const invalidEmails = emailList.filter(
-          (email) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
-        )
-
-        if (invalidEmails.length > 0) {
-          Toast.show({
-            type: 'error',
-            text1: 'Alguns emails são inválidos. Verifique e tente novamente.',
-          })
-          setLoading(false)
-          return
-        }
-
-        // TODO: Integrar com endpoint de convites quando disponível
-        Toast.show({
-          type: 'success',
-          text1: `${emailList.length} convite(s) será(ão) enviado(s)!`,
-        })
-      }
-
-      // Verifica se o token tem branchId e role antes de navegar
-      if (!user?.branchId || !user?.role) {
-        console.warn('⚠️ Token não tem branchId/role.')
-        Toast.show({
-          type: 'info',
-          text1: 'Finalizando configuração...',
-        })
-      }
-
-      // Finaliza onboarding
-      navigation.navigate('Main' as never)
-    } catch (error) {
-      console.error('Erro ao enviar convites:', error)
-      Toast.show({
-        type: 'error',
-        text1: 'Não foi possível enviar convites. Você pode enviar depois.',
-      })
-      navigation.navigate('Main' as never)
-    } finally {
-      setLoading(false)
+      await api.post('/onboarding/progress/settings')
+    } catch (progressError) {
+      console.error('Erro ao marcar progresso:', progressError)
     }
+    
+    // Página apenas informativa - navega para tela de conclusão
+    navigation.navigate('ConcluidoOnboarding' as never)
   }
 
   const renderStepContent = () => {
@@ -258,26 +242,15 @@ export default function SettingsScreen() {
       case 3:
         return (
           <View style={styles.stepContent}>
-            <Text style={styles.stepTitle}>Enviar Convites</Text>
+            <Text style={styles.stepTitle}>Links de Convite</Text>
             <Text style={styles.stepDescription}>
-              Convite pessoas para fazer parte da sua igreja (opcional - você pode pular)
+              Você poderá criar links de convite para adicionar membros à sua igreja a qualquer momento.
             </Text>
 
-            <View style={styles.form}>
-              <Text style={styles.label}>Emails (um por linha)</Text>
-              <View style={styles.textAreaContainer}>
-                <TextInput
-                  style={styles.textArea}
-                  value={emails}
-                  onChangeText={setEmails}
-                  placeholder="email1@exemplo.com&#10;email2@exemplo.com&#10;email3@exemplo.com"
-                  multiline
-                  numberOfLines={6}
-                  textAlignVertical="top"
-                />
-              </View>
-              <Text style={styles.hint}>
-                Digite um email por linha. Os convites serão enviados por email.
+            <View style={styles.infoBox}>
+              <Ionicons name="information-circle" size={24} color="#3b82f6" />
+              <Text style={styles.infoText}>
+                Acesse a seção "Mais" no menu principal e depois "Convites e Cadastro de Membros" para criar links de convite personalizados.
               </Text>
             </View>
 
@@ -289,27 +262,10 @@ export default function SettingsScreen() {
                 <Text style={styles.buttonSecondaryText}>Voltar</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.button, styles.buttonSecondary]}
-                onPress={() => {
-                  Toast.show({
-                    type: 'info',
-                    text1: 'Convites pulados. Você pode enviar depois.',
-                  })
-                  handleStep3()
-                }}
-              >
-                <Text style={styles.buttonSecondaryText}>Pular</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
                 style={[styles.button, styles.buttonPrimary]}
                 onPress={handleStep3}
-                disabled={loading}
               >
-                {loading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.buttonPrimaryText}>Enviar Convites</Text>
-                )}
+                <Text style={styles.buttonPrimaryText}>Continuar</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -526,21 +482,21 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333',
   },
-  textAreaContainer: {
+  infoBox: {
+    flexDirection: 'row',
+    backgroundColor: '#EFF6FF',
+    borderRadius: 12,
+    padding: 16,
+    gap: 12,
+    alignItems: 'flex-start',
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
+    borderColor: '#BFDBFE',
   },
-  textArea: {
-    padding: 12,
-    fontSize: 16,
-    minHeight: 120,
-    textAlignVertical: 'top',
-  },
-  hint: {
-    fontSize: 12,
-    color: '#999',
-    marginTop: -8,
+  infoText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#1E40AF',
+    lineHeight: 20,
   },
   stepButtons: {
     flexDirection: 'row',

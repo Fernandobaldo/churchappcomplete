@@ -41,6 +41,7 @@ async function main() {
       await prisma.plan.create({
         data: {
           name: 'free',
+          code: 'FREE', // Código estável para identificação
           price: 0,
           features: validFreePlanFeatures,
           maxBranches: 1,
@@ -56,6 +57,14 @@ async function main() {
       })
       console.log('✅ Plano Free criado com sucesso.')
     } else {
+      // Atualizar plano existente para garantir que tem code
+      if (!existingPlan.code) {
+        await prisma.plan.update({
+          where: { id: existingPlan.id },
+          data: { code: 'FREE' },
+        })
+        console.log('✅ Plano Free atualizado com código estável.')
+      }
       // Verificar se o plano existente tem features válidas
       const hasInvalidFeatures = existingPlan.features.some(
         (feature: string) => !validFreePlanFeatures.includes(feature)
