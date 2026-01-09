@@ -1,6 +1,6 @@
 // components/FormsComponent.tsx
 
-import React, { useState, useMemo, useCallback } from 'react'
+import React, { useMemo, useCallback } from 'react'
 import {
     View,
     Text,
@@ -11,39 +11,39 @@ import {
     KeyboardTypeOptions,
     Image, Platform,
 } from 'react-native'
-import { BlurView } from 'expo-blur'
 import { LinearGradient } from 'expo-linear-gradient'
 import * as ImagePicker from 'expo-image-picker'
 import {useNavigation} from "@react-navigation/native"
 import ModalSelector from 'react-native-modal-selector'
-import TimePicker from './TimePicker'
 import DateTimePickerComponent from './DateTimePicker'
 import TextInputField from './TextInputField'
 import { colors } from '../theme/colors'
 import { typography } from '../theme/typography'
 import GlassCard from './GlassCard'
 
-type SelectOption = {
+export type SelectOption = {
     key: string
     label: string
     value: string
 }
 
-type Field = {
+export type FieldType = 'string' | 'number' | 'email' | 'password' | 'date' | 'time' | 'image' | 'toggle' | 'select'
+
+export type Field = {
     key: string
     label: string
     placeholder?: string
     secure?: boolean
     required?: boolean
-    type?: 'string' | 'number' | 'email' | 'password' | 'date' | 'time' | 'image' | 'toggle' | 'select'
+    type?: FieldType
     dependsOn?: string // opcional: define de qual campo booleano o campo depende
     options?: SelectOption[] // opções para tipo select
     error?: string // mensagem de erro para validação
 }
 
-type MemberFormProps = {
-    form: any
-    setForm: React.Dispatch<React.SetStateAction<any>>
+export type FormsComponentProps = {
+    form: Record<string, any>
+    setForm: React.Dispatch<React.SetStateAction<Record<string, any>>>
     fields: Field[]
     onSubmit: () => void
     submitLabel?: string
@@ -57,7 +57,7 @@ export default function FormsComponent({
                                            onSubmit,
                                            submitLabel = 'Salvar',
                                            hideButtons = false,
-                                       }: MemberFormProps) {
+                                       }: FormsComponentProps) {
     const navigation = useNavigation()
 
     // Validação: verifica se todos os campos obrigatórios estão preenchidos
@@ -88,7 +88,7 @@ export default function FormsComponent({
     // Memoizar handlers de onChangeText para evitar re-renderizações
     const handleTextChange = useCallback((fieldKey: string) => {
         return (text: string) => {
-            setForm((prev: any) => ({ ...prev, [fieldKey]: text }))
+            setForm((prev: Record<string, any>) => ({ ...prev, [fieldKey]: text }))
         }
     }, [setForm])
 
@@ -106,7 +106,7 @@ export default function FormsComponent({
         })
 
         if (!result.canceled && result.assets?.[0]?.uri) {
-            setForm((prev: any) => ({ ...prev, [key]: result.assets[0].uri }))
+            setForm((prev: Record<string, any>) => ({ ...prev, [key]: result.assets[0].uri }))
         }
     }
 
@@ -132,7 +132,7 @@ export default function FormsComponent({
                 )
 
                 // Determina estilo do input baseado em erro
-                const getInputStyle = (baseStyle: any) => {
+                const getInputStyle = (baseStyle: object | object[]) => {
                     if (field.error) {
                         return [baseStyle, styles.inputError]
                     }
@@ -146,7 +146,7 @@ export default function FormsComponent({
                                 label={field.label}
                                 required={field.required}
                                 value={form[field.key]}
-                                onChange={(value) => setForm((prev: any) => ({ ...prev, [field.key]: value }))}
+                                onChange={(value) => setForm((prev: Record<string, any>) => ({ ...prev, [field.key]: value }))}
                                 mode="date"
                                 placeholder={field.placeholder || 'DD/MM/AAAA'}
                                 error={field.error}
@@ -162,7 +162,7 @@ export default function FormsComponent({
                                 label={field.label}
                                 required={field.required}
                                 value={form[field.key]}
-                                onChange={(value) => setForm((prev: any) => ({ ...prev, [field.key]: value }))}
+                                onChange={(value) => setForm((prev: Record<string, any>) => ({ ...prev, [field.key]: value }))}
                                 mode="time"
                                 placeholder={field.placeholder || 'HH:mm'}
                                 error={field.error}
@@ -209,7 +209,7 @@ export default function FormsComponent({
                             <Switch
                                 value={!!form[field.key]}
                                 onValueChange={(value) =>
-                                    setForm((prev: any) => ({ ...prev, [field.key]: value }))
+                                    setForm((prev: Record<string, any>) => ({ ...prev, [field.key]: value }))
                                 }
                                 trackColor={{ false: '#CBD5E1', true: colors.gradients.primary[1] }}
                                 thumbColor={!!form[field.key] ? '#FFFFFF' : '#F1F5F9'}
@@ -229,7 +229,7 @@ export default function FormsComponent({
                                     data={field.options || []}
                                     initValue={selectedOption?.label || field.placeholder || 'Selecione uma opção'}
                                     onChange={(option) => {
-                                        setForm((prev: any) => ({ ...prev, [field.key]: option.value }))
+                                        setForm((prev: Record<string, any>) => ({ ...prev, [field.key]: option.value }))
                                     }}
                                     style={getInputStyle(styles.input)}
                                     initValueTextStyle={{ color: form[field.key] ? colors.text.primary : colors.text.tertiary }}
@@ -429,29 +429,12 @@ const styles = StyleSheet.create({
         borderColor: colors.status.error,
         borderWidth: 1.5,
     },
-    inputText: {
-        fontSize: typography.fontSize.base,
-        fontWeight: typography.fontWeight.regular,
-        lineHeight: typography.lineHeight.normal * typography.fontSize.base,
-        color: colors.text.primary,
-    },
-    placeholderText: {
-        fontSize: typography.fontSize.base,
-        fontWeight: typography.fontWeight.regular,
-        lineHeight: typography.lineHeight.normal * typography.fontSize.base,
-        color: colors.text.tertiary,
-    },
     errorText: {
         ...typography.styles.captionSmall,
         color: colors.status.error,
         marginTop: 6,
         marginBottom: 4,
         marginLeft: 4,
-    },
-    button: {
-        paddingVertical: 16,
-        borderRadius: 18,
-        marginTop: 24,
     },
     buttonSmall: {
         marginTop: 12,
@@ -491,17 +474,4 @@ const styles = StyleSheet.create({
         borderColor: colors.glass.border,
         borderStyle: 'dashed',
     },
-    inputDescription: {
-        height: 100,
-        borderWidth: 0,
-        padding: 16,
-        borderRadius: 16,
-        marginBottom: 0,
-        backgroundColor: 'transparent',
-        textAlignVertical: 'top',
-        fontSize: 16,
-        fontWeight: '400',
-        color: '#0F172A',
-        includeFontPadding: false,
-    }
 })

@@ -13,7 +13,8 @@ import { useNavigation } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { Picker } from '@react-native-picker/picker'
-import api from '../api/api'
+import { authService } from '../services/auth.service'
+import { membersService } from '../services/members.service'
 import Toast from 'react-native-toast-message'
 import { useAuthStore } from '../stores/authStore'
 import FormScreenLayout from '../components/layouts/FormScreenLayout'
@@ -32,6 +33,7 @@ export default function EditProfileScreen() {
   const { user, setUserFromToken, updateUser } = useAuthStore()
   const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [positions, setPositions] = useState<Position[]>([])
   const [isInitialLoad, setIsInitialLoad] = useState(true)
@@ -143,7 +145,6 @@ export default function EditProfileScreen() {
 
       try {
         const profileResponse = await api.get('/members/me')
-        const profile = profileResponse.data
 
         // Preparar dados do formulário
         const birthDateDisplayValue = profile.birthDate ? formatDateToDisplay(profile.birthDate) : ''
@@ -164,9 +165,10 @@ export default function EditProfileScreen() {
         }
 
         setProfile(profile)
-      } catch (error) {
-        console.error('Erro ao carregar perfil:', error)
-        Toast.show({ type: 'error', text1: 'Erro ao carregar dados do perfil' })
+      } catch (err: any) {
+        console.error('Erro ao carregar perfil:', err)
+        const errorMessage = err.response?.data?.message || 'Não foi possível carregar os dados do perfil.'
+        setError(errorMessage)
       } finally {
         setLoading(false)
       }
@@ -176,6 +178,41 @@ export default function EditProfileScreen() {
       loadProfile()
     }
   }, [user?.memberId, isInitialLoad])
+
+  const handleRetry = async () => {
+    if (!user?.memberId) return
+    setLoading(true)
+    setError(null)
+    try {
+      const profile = await authService.getCurrentUser()
+
+      // Preparar dados do formulário
+      const birthDateDisplayValue = profile.birthDate ? formatDateToDisplay(profile.birthDate) : ''
+      setBirthDateDisplay(birthDateDisplayValue)
+
+      setName(profile.name || user.name || '')
+      setEmail(profile.email || user.email || '')
+      setPhone(profile.phone ?? '')
+      setAddress(profile.address ?? '')
+      
+      const posId = profile.positionId ?? profile.position?.id ?? null
+      setPositionId(posId ? String(posId) : '')
+
+      if (profile.avatarUrl) {
+        setCurrentAvatarUrl(profile.avatarUrl)
+      } else {
+        setCurrentAvatarUrl(null)
+      }
+
+      setProfile(profile)
+    } catch (err: any) {
+      console.error('Erro ao carregar perfil:', err)
+      const errorMessage = err.response?.data?.message || 'Não foi possível carregar os dados do perfil.'
+      setError(errorMessage)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handlePickImage = async () => {
     try {
@@ -284,8 +321,8 @@ export default function EditProfileScreen() {
       let memberId = user.memberId
       if (!memberId) {
         try {
-          const profileResponse = await api.get('/members/me')
-          memberId = profileResponse.data.id
+          const profile = await authService.getCurrentUser()
+          memberId = profile.id
         } catch (error: unknown) {
           Toast.show({ type: 'error', text1: 'Não foi possível obter o ID do membro. Faça login novamente.' })
           setSaving(false)
@@ -339,8 +376,7 @@ export default function EditProfileScreen() {
         updateData.avatarUrl = null
       }
 
-      const response = await api.put(`/members/${memberId}`, updateData)
-      const updatedProfile = response.data
+      const updatedProfile = await membersService.update(memberId, updateData)
 
       Toast.show({ type: 'success', text1: 'Perfil atualizado com sucesso!' })
 
@@ -393,22 +429,16 @@ export default function EditProfileScreen() {
 
   const currentPosition = positions.find(p => String(p.id) === positionId)
 
-  if (loading) {
-    return (
-      <FormScreenLayout
-        headerProps={{ title: "Editar Perfil" }}
-      >
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color={colors.gradients.primary[1]} />
-        </View>
-      </FormScreenLayout>
-    )
-  }
+  // Loading inicial considera tanto isInitialLoad quanto loading do perfil
+  const initialLoading = isInitialLoad || loading
 
   return (
     <FormScreenLayout
       headerProps={{ title: "Editar Perfil" }}
       contentContainerStyle={styles.contentContainer}
+      loading={initialLoading}
+      error={error}
+      onRetry={handleRetry}
     >
         <Text style={styles.subtitle}>Gerencie suas informações pessoais</Text>
 
@@ -559,11 +589,6 @@ export default function EditProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   contentContainer: {
     padding: 16,
   },

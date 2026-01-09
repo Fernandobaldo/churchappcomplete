@@ -48,6 +48,7 @@ export default function EditContributionScreen() {
     const [paymentData, setPaymentData] = useState<Record<string, string>>({})
     const [isLoading, setIsLoading] = useState(false)
     const [loadingData, setLoadingData] = useState(true)
+    const [error, setError] = useState<string | null>(null)
 
     const fields = useMemo(() => [
         { 
@@ -74,6 +75,7 @@ export default function EditContributionScreen() {
     const fetchContribution = async () => {
         try {
             setLoadingData(true)
+            setError(null)
             const res = await api.get(`/contributions/${id}`)
             const contribution = res.data
 
@@ -93,17 +95,17 @@ export default function EditContributionScreen() {
                 }))
                 setPaymentMethods(formattedMethods)
             }
-        } catch (error: any) {
-            console.error('Erro ao carregar contribuição:', error)
-            Toast.show({
-                type: 'error',
-                text1: 'Erro ao carregar campanha',
-                text2: 'Não foi possível carregar os dados da campanha.',
-            })
-            navigation.goBack()
+        } catch (err: any) {
+            console.error('Erro ao carregar contribuição:', err)
+            const errorMessage = err.response?.data?.message || 'Não foi possível carregar os dados da campanha.'
+            setError(errorMessage)
         } finally {
             setLoadingData(false)
         }
+    }
+
+    const handleRetry = async () => {
+        await fetchContribution()
     }
 
     const handleSave = async () => {
@@ -191,26 +193,14 @@ export default function EditContributionScreen() {
 
     const isFormValid = form.title.trim().length > 0
 
-    if (loadingData) {
-        return (
-            <FormScreenLayout
-                headerProps={{
-                    title: "Editar Campanha de Contribuição",
-                }}
-            >
-                <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color={colors.gradients.primary[1]} />
-                    <Text style={styles.loadingText}>Carregando...</Text>
-                </View>
-            </FormScreenLayout>
-        )
-    }
-
     return (
         <FormScreenLayout
             headerProps={{
                 title: "Editar Campanha de Contribuição",
             }}
+            loading={loadingData}
+            error={error}
+            onRetry={handleRetry}
         >
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 <FormsComponent
@@ -487,17 +477,6 @@ const styles = StyleSheet.create({
     scrollContent: {
         padding: 16,
         paddingBottom: 40,
-    },
-    loadingContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 20,
-    },
-    loadingText: {
-        marginTop: 12,
-        fontSize: 16,
-        color: colors.text.secondary,
     },
     helpTextContainer: {
         marginTop: -8,

@@ -12,6 +12,7 @@ import {
 } from 'react-native'
 import PageHeader, { PageHeaderProps } from '../PageHeader'
 import GlassBackground from '../GlassBackground'
+import { LoadingState, ErrorState, EmptyState } from '../states'
 
 type FormScreenLayoutProps = {
   headerProps: PageHeaderProps
@@ -19,6 +20,15 @@ type FormScreenLayoutProps = {
   backgroundColor?: string
   contentContainerStyle?: ViewStyle
   backgroundImageUri?: string
+  topSlot?: React.ReactNode
+  bottomSlot?: React.ReactNode
+  floatingSlot?: React.ReactNode
+  loading?: boolean
+  error?: string | null
+  empty?: boolean
+  emptyTitle?: string
+  emptySubtitle?: string
+  onRetry?: () => void
 }
 
 export default function FormScreenLayout({
@@ -27,6 +37,15 @@ export default function FormScreenLayout({
   backgroundColor,
   contentContainerStyle,
   backgroundImageUri,
+  topSlot,
+  bottomSlot,
+  floatingSlot,
+  loading = false,
+  error = null,
+  empty = false,
+  emptyTitle,
+  emptySubtitle,
+  onRetry,
 }: FormScreenLayoutProps) {
   const [isReady, setIsReady] = useState(false)
 
@@ -36,6 +55,31 @@ export default function FormScreenLayout({
     })
     return () => interaction.cancel()
   }, [])
+
+  // Priority logic: loading > error > empty > children
+  const renderContent = () => {
+    if (loading) {
+      return <LoadingState />
+    }
+    if (error) {
+      return <ErrorState message={error} onRetry={onRetry} />
+    }
+    if (empty) {
+      return (
+        <EmptyState
+          title={emptyTitle || 'Nenhum item encontrado'}
+          subtitle={emptySubtitle}
+        />
+      )
+    }
+    return (
+      <>
+        {topSlot}
+        {children}
+        {bottomSlot}
+      </>
+    )
+  }
 
   return (
     <GlassBackground
@@ -58,12 +102,17 @@ export default function FormScreenLayout({
             showsVerticalScrollIndicator={false}
             nestedScrollEnabled
           >
-            {children}
+            {renderContent()}
           </ScrollView>
         ) : (
           <View style={styles.scrollView} />
         )}
       </KeyboardAvoidingView>
+      {floatingSlot && (
+        <View style={styles.floatingSlot} pointerEvents="box-none">
+          {floatingSlot}
+        </View>
+      )}
     </GlassBackground>
   )
 }
@@ -82,6 +131,13 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 16, // Padding aumentado para sensação premium
     paddingBottom: 40,
+  },
+  floatingSlot: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
 })
 

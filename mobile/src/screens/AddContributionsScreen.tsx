@@ -6,17 +6,15 @@ import {
     TouchableOpacity,
     StyleSheet,
     ScrollView,
-    Modal,
     Switch,
     ActivityIndicator,
-    KeyboardAvoidingView,
-    Platform,
 } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import FormScreenLayout from '../components/layouts/FormScreenLayout'
 import FormsComponent from '../components/FormsComponent'
 import TextInputField from '../components/TextInputField'
 import GlassCard from '../components/GlassCard'
+import GlassFormModal from '../components/GlassFormModal'
 import { colors } from '../theme/colors'
 import { typography } from '../theme/typography'
 import api from '../api/api'
@@ -253,171 +251,121 @@ export default function AddContributionScreen() {
             </ScrollView>
 
             {/* Modal para adicionar forma de pagamento */}
-            <Modal
+            <GlassFormModal
                 visible={showPaymentModal}
-                transparent
-                animationType="slide"
-                onRequestClose={() => {
+                title="Adicionar Forma de Pagamento"
+                onClose={() => {
                     setShowPaymentModal(false)
                     setPaymentData({})
                 }}
+                onSubmit={addPaymentMethod}
+                submitLabel="Adicionar"
+                position="bottom"
+                submitDisabled={
+                    (paymentMethodType === 'PIX' && !paymentData.chave) ||
+                    (paymentMethodType === 'CONTA_BR' && (!paymentData.banco || !paymentData.agencia || !paymentData.conta)) ||
+                    (paymentMethodType === 'IBAN' && !paymentData.iban)
+                }
             >
-                <KeyboardAvoidingView
-                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                    style={styles.modalOverlay}
-                    keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-                >
-                    <View style={styles.modalOverlayInner}>
-                        <GlassCard opacity={0.45} blurIntensity={25} borderRadius={20} style={styles.modalContent}>
-                            <ScrollView 
-                                style={styles.modalScrollView}
-                                contentContainerStyle={styles.modalScrollContent}
-                                showsVerticalScrollIndicator={false}
-                                keyboardShouldPersistTaps="handled"
-                            >
-                            <Text style={styles.modalTitle}>Adicionar Forma de Pagamento</Text>
-
-                            <Text style={styles.label}>Tipo *</Text>
-                            <View style={styles.pickerContainer}>
-                                <TouchableOpacity
-                                    style={[styles.pickerOption, paymentMethodType === 'PIX' && styles.pickerOptionActive]}
-                                    onPress={() => {
-                                        setPaymentMethodType('PIX')
-                                        setPaymentData({})
-                                    }}
-                                    activeOpacity={0.8}
-                                >
-                                    <Text style={paymentMethodType === 'PIX' ? styles.pickerOptionTextActive : styles.pickerOptionText}>PIX</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={[styles.pickerOption, paymentMethodType === 'CONTA_BR' && styles.pickerOptionActive]}
-                                    onPress={() => {
-                                        setPaymentMethodType('CONTA_BR')
-                                        setPaymentData({})
-                                    }}
-                                    activeOpacity={0.8}
-                                >
-                                    <Text style={paymentMethodType === 'CONTA_BR' ? styles.pickerOptionTextActive : styles.pickerOptionText}>Conta BR</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={[styles.pickerOption, paymentMethodType === 'IBAN' && styles.pickerOptionActive]}
-                                    onPress={() => {
-                                        setPaymentMethodType('IBAN')
-                                        setPaymentData({})
-                                    }}
-                                    activeOpacity={0.8}
-                                >
-                                    <Text style={paymentMethodType === 'IBAN' ? styles.pickerOptionTextActive : styles.pickerOptionText}>IBAN</Text>
-                                </TouchableOpacity>
-                            </View>
-
-                            {paymentMethodType === 'PIX' && (
-                                <TextInputField
-                                    fieldKey="chave"
-                                    label="Chave PIX *"
-                                    value={paymentData.chave || ''}
-                                    onChangeText={(text) => setPaymentData((prev) => ({ ...prev, chave: text }))}
-                                    placeholder="CPF, Email, Telefone ou Chave Aleatória"
-                                    required
-                                />
-                            )}
-
-                        {paymentMethodType === 'CONTA_BR' && (
-                            <>
-                                <TextInputField
-                                    fieldKey="banco"
-                                    label="Banco *"
-                                    value={paymentData.banco || ''}
-                                    onChangeText={(text) => setPaymentData((prev) => ({ ...prev, banco: text }))}
-                                    placeholder="Nome do banco"
-                                    required
-                                />
-                                <TextInputField
-                                    fieldKey="agencia"
-                                    label="Agência *"
-                                    value={paymentData.agencia || ''}
-                                    onChangeText={(text) => {
-                                        // Aceita números, hífen e X (dígito verificador)
-                                        // Formato: 1234-5 ou 1234-X
-                                        const allowedText = text.replace(/[^0-9X-]/gi, '').slice(0, 6)
-                                        setPaymentData((prev) => ({ ...prev, agencia: allowedText }))
-                                    }}
-                                    placeholder="1234-5"
-                                    keyboardType="default"
-                                    maxLength={6}
-                                    required
-                                />
-                                <TextInputField
-                                    fieldKey="conta"
-                                    label="Conta *"
-                                    value={paymentData.conta || ''}
-                                    onChangeText={(text) => {
-                                        // Aceita números, hífen e X (dígito verificador)
-                                        // Formato: 12345678-9 ou 12345678-X
-                                        const allowedText = text.replace(/[^0-9X-]/gi, '').slice(0, 10)
-                                        setPaymentData((prev) => ({ ...prev, conta: allowedText }))
-                                    }}
-                                    placeholder="12345678-9"
-                                    keyboardType="default"
-                                    maxLength={10}
-                                    required
-                                />
-                            </>
-                        )}
-
-                            {paymentMethodType === 'IBAN' && (
-                                <TextInputField
-                                    fieldKey="iban"
-                                    label="IBAN *"
-                                    value={paymentData.iban || ''}
-                                    onChangeText={(text) => setPaymentData((prev) => ({ ...prev, iban: text }))}
-                                    placeholder="GB82 WEST 1234 5698 7654 32"
-                                    required
-                                />
-                            )}
-
-                            <View style={styles.modalButtons}>
-                                <TouchableOpacity
-                                    style={styles.modalCancelButton}
-                                    onPress={() => {
-                                        setShowPaymentModal(false)
-                                        setPaymentData({})
-                                    }}
-                                    activeOpacity={0.8}
-                                >
-                                    <Text style={styles.modalCancelText}>Cancelar</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={styles.modalSaveButton}
-                                    onPress={addPaymentMethod}
-                                    disabled={
-                                        (paymentMethodType === 'PIX' && !paymentData.chave) ||
-                                        (paymentMethodType === 'CONTA_BR' && (!paymentData.banco || !paymentData.agencia || !paymentData.conta)) ||
-                                        (paymentMethodType === 'IBAN' && !paymentData.iban)
-                                    }
-                                    activeOpacity={0.8}
-                                >
-                                    <LinearGradient
-                                        colors={
-                                            (paymentMethodType === 'PIX' && !paymentData.chave) ||
-                                            (paymentMethodType === 'CONTA_BR' && (!paymentData.banco || !paymentData.agencia || !paymentData.conta)) ||
-                                            (paymentMethodType === 'IBAN' && !paymentData.iban)
-                                                ? ['#94A3B8', '#94A3B8'] 
-                                                : colors.gradients.primary as [string, string]
-                                        }
-                                        start={{ x: 0, y: 0 }}
-                                        end={{ x: 1, y: 1 }}
-                                        style={styles.modalSaveButtonGradient}
-                                    >
-                                        <Text style={styles.modalSaveText}>Adicionar</Text>
-                                    </LinearGradient>
-                                </TouchableOpacity>
-                            </View>
-                        </ScrollView>
-                    </GlassCard>
+                <Text style={styles.label}>Tipo *</Text>
+                <View style={styles.pickerContainer}>
+                    <TouchableOpacity
+                        style={[styles.pickerOption, paymentMethodType === 'PIX' && styles.pickerOptionActive]}
+                        onPress={() => {
+                            setPaymentMethodType('PIX')
+                            setPaymentData({})
+                        }}
+                        activeOpacity={0.8}
+                    >
+                        <Text style={paymentMethodType === 'PIX' ? styles.pickerOptionTextActive : styles.pickerOptionText}>PIX</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.pickerOption, paymentMethodType === 'CONTA_BR' && styles.pickerOptionActive]}
+                        onPress={() => {
+                            setPaymentMethodType('CONTA_BR')
+                            setPaymentData({})
+                        }}
+                        activeOpacity={0.8}
+                    >
+                        <Text style={paymentMethodType === 'CONTA_BR' ? styles.pickerOptionTextActive : styles.pickerOptionText}>Conta BR</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.pickerOption, paymentMethodType === 'IBAN' && styles.pickerOptionActive]}
+                        onPress={() => {
+                            setPaymentMethodType('IBAN')
+                            setPaymentData({})
+                        }}
+                        activeOpacity={0.8}
+                    >
+                        <Text style={paymentMethodType === 'IBAN' ? styles.pickerOptionTextActive : styles.pickerOptionText}>IBAN</Text>
+                    </TouchableOpacity>
                 </View>
-            </KeyboardAvoidingView>
-        </Modal>
+
+                {paymentMethodType === 'PIX' && (
+                    <TextInputField
+                        fieldKey="chave"
+                        label="Chave PIX *"
+                        value={paymentData.chave || ''}
+                        onChangeText={(text) => setPaymentData((prev) => ({ ...prev, chave: text }))}
+                        placeholder="CPF, Email, Telefone ou Chave Aleatória"
+                        required
+                    />
+                )}
+
+                {paymentMethodType === 'CONTA_BR' && (
+                    <>
+                        <TextInputField
+                            fieldKey="banco"
+                            label="Banco *"
+                            value={paymentData.banco || ''}
+                            onChangeText={(text) => setPaymentData((prev) => ({ ...prev, banco: text }))}
+                            placeholder="Nome do banco"
+                            required
+                        />
+                        <TextInputField
+                            fieldKey="agencia"
+                            label="Agência *"
+                            value={paymentData.agencia || ''}
+                            onChangeText={(text) => {
+                                // Aceita números, hífen e X (dígito verificador)
+                                // Formato: 1234-5 ou 1234-X
+                                const allowedText = text.replace(/[^0-9X-]/gi, '').slice(0, 6)
+                                setPaymentData((prev) => ({ ...prev, agencia: allowedText }))
+                            }}
+                            placeholder="1234-5"
+                            keyboardType="default"
+                            maxLength={6}
+                            required
+                        />
+                        <TextInputField
+                            fieldKey="conta"
+                            label="Conta *"
+                            value={paymentData.conta || ''}
+                            onChangeText={(text) => {
+                                // Aceita números, hífen e X (dígito verificador)
+                                // Formato: 12345678-9 ou 12345678-X
+                                const allowedText = text.replace(/[^0-9X-]/gi, '').slice(0, 10)
+                                setPaymentData((prev) => ({ ...prev, conta: allowedText }))
+                            }}
+                            placeholder="12345678-9"
+                            keyboardType="default"
+                            maxLength={10}
+                            required
+                        />
+                    </>
+                )}
+
+                {paymentMethodType === 'IBAN' && (
+                    <TextInputField
+                        fieldKey="iban"
+                        label="IBAN *"
+                        value={paymentData.iban || ''}
+                        onChangeText={(text) => setPaymentData((prev) => ({ ...prev, iban: text }))}
+                        placeholder="GB82 WEST 1234 5698 7654 32"
+                        required
+                    />
+                )}
+            </GlassFormModal>
         </FormScreenLayout>
     )
 }
@@ -533,36 +481,6 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         lineHeight: 24,
     },
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.5)',
-    },
-    modalOverlayInner: {
-        flex: 1,
-        justifyContent: 'flex-end',
-    },
-    modalContent: {
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
-        maxHeight: '80%',
-        minHeight: 300,
-        overflow: 'hidden',
-        width: '100%',
-    },
-    modalScrollView: {
-        maxHeight: '100%',
-    },
-    modalScrollContent: {
-        padding: 24,
-        paddingBottom: 40,
-        flexGrow: 1,
-    },
-    modalTitle: {
-        fontSize: 20,
-        fontWeight: '700',
-        marginBottom: 20,
-        color: colors.text.primary,
-    },
     label: {
         fontSize: 16,
         fontWeight: '600',
@@ -598,43 +516,5 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
         fontSize: 14,
         fontWeight: '600',
-    },
-    modalButtons: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginTop: 24,
-        gap: 10,
-    },
-    modalCancelButton: {
-        flex: 1,
-        backgroundColor: colors.glass.overlay,
-        padding: 14,
-        borderRadius: 16,
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: colors.glass.border,
-    },
-    modalCancelText: { 
-        color: colors.text.primary, 
-        fontSize: 16,
-        fontWeight: '600',
-        lineHeight: 24,
-    },
-    modalSaveButton: {
-        flex: 1,
-        borderRadius: 16,
-        overflow: 'hidden',
-    },
-    modalSaveButtonGradient: {
-        padding: 14,
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: 48,
-    },
-    modalSaveText: { 
-        color: '#FFFFFF', 
-        fontSize: 16,
-        fontWeight: '600',
-        lineHeight: 24,
     },
 })

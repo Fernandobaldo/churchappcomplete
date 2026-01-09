@@ -1,16 +1,21 @@
-import React, {useEffect, useState} from 'react'
+import React from 'react'
 import { View, Text, Image, StyleSheet } from 'react-native'
-import api from "../api/api";
+import { useMe } from '../hooks/useMe'
+import { useNextEvent } from '../hooks/useNextEvent'
 
+// Note: user and nextEvent data are fetched but not currently used in the render.
+// They are available for future enhancements to the Header component.
 
-
+/**
+ * Header Component
+ * 
+ * Presentational component that displays church logo, title, and user avatar.
+ * Uses hooks internally to fetch user and next event data (for future use).
+ */
 export default function Header() {
-    const [user, setUser] = useState<any>({})
-
-    useEffect(() => {
-        api.get('/auth/me').then((res) => setUser(res.data))
-        api.get('/events/next').then((res) => setNextEvent(res.data))
-    }, [])
+    // Fetch user and next event data (currently not used in render, but available for future use)
+    useMe()
+    useNextEvent()
 
     return (
         <View style={styles.headerContainer}>

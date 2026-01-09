@@ -99,6 +99,7 @@ api.interceptors.response.use(
     // Tratamento de erros de autenticação
     if (error.response?.status === 401) {
       // Token inválido ou expirado
+      removeToken()
       useAuthStore.getState().logout()
     }
     

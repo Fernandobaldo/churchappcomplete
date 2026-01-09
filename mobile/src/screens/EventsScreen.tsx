@@ -1,23 +1,23 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react'
-import {View, Text, FlatList, StyleSheet, ActivityIndicator, RefreshControl} from 'react-native'
+import {View, Text, FlatList, StyleSheet, ActivityIndicator} from 'react-native'
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5'
 import { Ionicons } from '@expo/vector-icons'
-import api from '../api/api'
-import { useNavigation } from '@react-navigation/native'
+import { eventsService } from '../services/events.service'
+import { useNavigation, useFocusEffect } from '@react-navigation/native'
 import { useAuthStore } from '../stores/authStore'
 import Tabs from '../components/Tabs'
 import ViewScreenLayout from '../components/layouts/ViewScreenLayout'
 import GlassCard from '../components/GlassCard'
 import { Event } from '../types'
 import { colors } from '../theme/colors'
-import { typography } from '../theme/typography'
 import { useBackToDashboard } from '../hooks/useBackToDashboard'
-import EmptyState from '../components/EmptyState'
+import { EmptyState } from '../components/states'
 
 export default function EventsScreen() {
     const [tab, setTab] = useState<'proximos' | 'passados'>('proximos')
-    const [events, setEvents] = useState<Event[]>([])
+    const [allEvents, setAllEvents] = useState<Event[]>([])
     const [loading, setLoading] = useState(true)
+    const [error, setError] = useState<string | null>(null)
     const [refreshing, setRefreshing] = useState(false)
     const [page, setPage] = useState(1)
     const [loadingMore, setLoadingMore] = useState(false)
@@ -29,59 +29,53 @@ export default function EventsScreen() {
     // Intercepta gesto de voltar para navegar ao Dashboard quando não há página anterior
     useBackToDashboard()
 
-    const fetchEvents = useCallback(async () => {
-        // Função para obter data/hora completa do evento considerando time
-        const getEventDateTime = (event: Event): Date => {
-            const startDate = new Date(event.startDate)
-            
-            // Se houver campo time, usa ele
-            if (event.time && event.time.trim() !== '' && event.time !== '00:00') {
-                const [hours, minutes] = event.time.split(':').map(Number)
-                if (!isNaN(hours) && !isNaN(minutes)) {
-                    startDate.setHours(hours, minutes, 0, 0)
-                }
-            } else {
-                // Se não houver time ou for 00:00, mantém o horário do startDate
-                // (já vem do backend com horário se foi definido)
+    // Função para obter data/hora completa do evento considerando time
+    const getEventDateTime = useCallback((event: Event): Date => {
+        const startDate = new Date(event.startDate)
+        
+        // Se houver campo time, usa ele
+        if (event.time && event.time.trim() !== '' && event.time !== '00:00') {
+            const [hours, minutes] = event.time.split(':').map(Number)
+            if (!isNaN(hours) && !isNaN(minutes)) {
+                startDate.setHours(hours, minutes, 0, 0)
             }
-            
-            return startDate
         }
+        
+        return startDate
+    }, [])
 
+    const fetchEvents = useCallback(async () => {
         try {
-            const res = await api.get('/events')
-            const now = new Date()
-
-            const data: Event[] = res.data || []
-            const filtered = tab === 'proximos'
-                ? data.filter((e: Event) => getEventDateTime(e) >= now)
-                : data.filter((e: Event) => getEventDateTime(e) < now)
-
-            // Ordena os eventos considerando data e horário
-            const sorted = filtered.sort((a: Event, b: Event) => {
-                const dateA = getEventDateTime(a)
-                const dateB = getEventDateTime(b)
-                
-                if (tab === 'proximos') {
-                    // Próximos: do mais próximo para o mais distante (crescente)
-                    return dateA.getTime() - dateB.getTime()
-                } else {
-                    // Passados: do mais recente para o mais antigo (decrescente)
-                    return dateB.getTime() - dateA.getTime()
-                }
-            })
-
-            // Só atualiza se os dados realmente mudarem
-            setEvents((prev) => {
-                if (JSON.stringify(prev) !== JSON.stringify(sorted)) {
-                    return sorted
-                }
-                return prev
-            })
-        } catch (error) {
-            console.error('Erro ao carregar eventos:', error)
+            const data = await eventsService.getAll()
+            setAllEvents(data || [])
+            setError(null)
+        } catch (err: any) {
+            console.error('Erro ao carregar eventos:', err)
+            setError(err.response?.data?.message || 'Erro ao carregar eventos')
         }
-    }, [tab])
+    }, [])
+
+    // Filtra eventos baseado na tab selecionada
+    const events = useMemo(() => {
+        const now = new Date()
+        const filtered = tab === 'proximos'
+            ? allEvents.filter((e: Event) => getEventDateTime(e) >= now)
+            : allEvents.filter((e: Event) => getEventDateTime(e) < now)
+
+        // Ordena os eventos considerando data e horário
+        return filtered.sort((a: Event, b: Event) => {
+            const dateA = getEventDateTime(a)
+            const dateB = getEventDateTime(b)
+            
+            if (tab === 'proximos') {
+                // Próximos: do mais próximo para o mais distante (crescente)
+                return dateA.getTime() - dateB.getTime()
+            } else {
+                // Passados: do mais recente para o mais antigo (decrescente)
+                return dateB.getTime() - dateA.getTime()
+            }
+        })
+    }, [allEvents, tab, getEventDateTime])
 
     const handleRefresh = useCallback(async () => {
         setRefreshing(true)
@@ -127,24 +121,25 @@ export default function EventsScreen() {
         loadEvents()
     }, [fetchEvents])
 
-    if (loading) {
-        return (
-            <ViewScreenLayout
-                headerProps={{
-                    title: "Eventos e Cultos",
-                    Icon: FontAwesome5,
-                    iconName: "calendar",
-                    rightButtonIcon: canManageEvents ? <Ionicons name="add" size={24} color="white" /> : undefined,
-                    onRightButtonPress: canManageEvents ? () => navigation.navigate('AddEvent' as never) : undefined,
-                }}
-                scrollable={false}
-            >
-                <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color={colors.gradients.primary[1]} />
-                </View>
-            </ViewScreenLayout>
-        )
-    }
+    // Recarrega quando a tela ganha foco (após voltar de criar/editar evento)
+    useFocusEffect(
+        useCallback(() => {
+            // Evita requisições duplicadas se já estiver carregando ou refrescando
+            if (!loading && !refreshing) {
+                fetchEvents()
+            }
+        }, [fetchEvents, loading, refreshing])
+    )
+
+    const handleRetry = useCallback(() => {
+        setLoading(true)
+        fetchEvents().finally(() => setLoading(false))
+    }, [fetchEvents])
+
+    // Global empty: verifica se TODAS as tabs estão vazias
+    const isGlobalEmpty = !loading && allEvents.length === 0 && !error
+    // Tab empty: verifica se apenas a tab atual está vazia
+    const isTabEmpty = !loading && events.length === 0 && !error && allEvents.length > 0
 
     return (
         <ViewScreenLayout
@@ -156,7 +151,15 @@ export default function EventsScreen() {
                 onRightButtonPress: canManageEvents ? () => navigation.navigate('AddEvent' as never) : undefined,
             }}
             scrollable={false}
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
             contentContainerStyle={styles.viewContent}
+            loading={loading}
+            error={error}
+            empty={isGlobalEmpty}
+            emptyTitle="Nenhum evento encontrado"
+            emptySubtitle="Quando houver eventos disponíveis, eles aparecerão aqui"
+            onRetry={handleRetry}
         >
             <Tabs
                 tabs={[
@@ -172,14 +175,8 @@ export default function EventsScreen() {
                 keyExtractor={(item) => item.id}
                 contentContainerStyle={styles.listContent}
                 style={styles.list}
-                refreshControl={
-                    <RefreshControl 
-                        refreshing={refreshing} 
-                        onRefresh={handleRefresh}
-                        colors={colors.gradients.primary}
-                        tintColor={colors.gradients.primary[1]}
-                    />
-                }
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
                 onEndReached={loadMore}
                 onEndReachedThreshold={0.5}
                 ListFooterComponent={
@@ -187,6 +184,14 @@ export default function EventsScreen() {
                         <View style={styles.loadingMore}>
                             <ActivityIndicator size="small" color={colors.gradients.primary[1]} />
                         </View>
+                    ) : null
+                }
+                ListEmptyComponent={
+                    isTabEmpty ? (
+                        <EmptyState
+                            title={tab === 'proximos' ? 'Nenhum evento próximo' : 'Nenhum evento passado'}
+                            subtitle="Quando houver eventos nesta categoria, eles aparecerão aqui"
+                        />
                     ) : null
                 }
                 renderItem={({ item }) => (
@@ -212,14 +217,6 @@ export default function EventsScreen() {
                         )}
                     </GlassCard>
                 )}
-                ListEmptyComponent={
-                    <EmptyState
-                        icon="calendar-outline"
-                        message={tab === 'proximos' 
-                            ? 'Nenhum evento próximo' 
-                            : 'Nenhum evento passado'}
-                    />
-                }
             />
         </ViewScreenLayout>
     )
@@ -227,11 +224,6 @@ export default function EventsScreen() {
 
 
 const styles = StyleSheet.create({
-    loadingContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
     viewContent: {
         flex: 1,
         padding: 0,

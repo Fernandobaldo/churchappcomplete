@@ -1,5 +1,5 @@
-import React, { useState, useCallback } from 'react'
-import { View, Text, StyleSheet, ScrollView, Image, Linking, TouchableOpacity, Clipboard } from 'react-native'
+import React, { useState, useCallback, useEffect } from 'react'
+import { View, Text, StyleSheet, Image, Linking, TouchableOpacity, Clipboard } from 'react-native'
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
 import DetailScreenLayout from '../components/layouts/DetailScreenLayout'
@@ -22,49 +22,59 @@ export default function ContributionDetailScreen() {
     const { contribution: initialContribution } = (route.params as { contribution?: any }) || {}
     const { user } = useAuthStore()
     const [contribution, setContribution] = useState(initialContribution)
+    const [loading, setLoading] = useState(!initialContribution)
+    const [error, setError] = useState<string | null>(null)
     const [refreshing, setRefreshing] = useState(false)
 
     const fetchContribution = useCallback(async () => {
-        if (!initialContribution?.id) return
+        if (!initialContribution?.id) {
+            setError('Contribuição não encontrada')
+            setLoading(false)
+            return
+        }
         try {
-            setRefreshing(true)
+            setError(null)
             const response = await api.get(`/contributions/${initialContribution.id}`)
             setContribution(response.data)
-        } catch (error) {
-            console.error('Erro ao carregar contribuição:', error)
+        } catch (err: any) {
+            console.error('Erro ao carregar detalhes da contribuição:', err)
+            const errorMessage = err.response?.data?.message || 'Não foi possível carregar os detalhes da contribuição.'
+            setError(errorMessage)
         } finally {
+            setLoading(false)
             setRefreshing(false)
         }
     }, [initialContribution?.id])
 
+    useEffect(() => {
+        if (initialContribution?.id) {
+            fetchContribution()
+        } else {
+            setLoading(false)
+            setError('Contribuição não encontrada')
+        }
+    }, [initialContribution?.id, fetchContribution])
+
     // Recarrega quando a tela recebe foco (após editar)
     useFocusEffect(
         useCallback(() => {
-            if (initialContribution?.id) {
+            if (initialContribution?.id && !loading && !refreshing) {
                 fetchContribution()
             }
-        }, [initialContribution?.id, fetchContribution])
+        }, [initialContribution?.id, fetchContribution, loading, refreshing])
     )
 
     const handleRefresh = useCallback(() => {
+        setRefreshing(true)
         fetchContribution()
     }, [fetchContribution])
-    
-    if (!contribution) {
-        return (
-            <DetailScreenLayout
-                headerProps={{
-                    title: "Detalhes da Contribuição",
-                    Icon: FontAwesome5,
-                    iconName: "heart",
-                }}
-            >
-                <View style={styles.errorContainer}>
-                    <Text style={styles.errorText}>Erro: campanha não encontrada.</Text>
-                </View>
-            </DetailScreenLayout>
-        )
-    }
+
+    const handleRetry = useCallback(() => {
+        setLoading(true)
+        fetchContribution().finally(() => setLoading(false))
+    }, [fetchContribution])
+
+    const isEmpty = !loading && !contribution && !error
 
     const hasPermissionToEdit =
         user?.role === 'ADMINGERAL' ||
@@ -114,19 +124,27 @@ export default function ContributionDetailScreen() {
                 title: "Detalhes da Contribuição",
                 Icon: FontAwesome5,
                 iconName: "heart",
-                rightButtonIcon: hasPermissionToEdit ? (
+                rightButtonIcon: hasPermissionToEdit && contribution ? (
                     <Ionicons name="create-outline" size={24} color="white" />
                 ) : undefined,
-                onRightButtonPress: hasPermissionToEdit
+                onRightButtonPress: hasPermissionToEdit && contribution
                     ? () => (navigation as any).navigate('EditContributionScreen', { id: contribution.id })
                     : undefined,
             }}
+            loading={loading}
+            error={error}
+            empty={isEmpty}
+            emptyTitle="Contribuição não encontrada"
+            emptySubtitle="A contribuição solicitada não existe ou foi removida"
             refreshing={refreshing}
             onRefresh={handleRefresh}
+            onRetry={handleRetry}
         >
-            <GlassCard opacity={0.4} blurIntensity={20} borderRadius={20} style={styles.titleCard}>
-                <Text style={styles.title}>{contribution.title}</Text>
-            </GlassCard>
+            {contribution && (
+                <>
+                    <GlassCard opacity={0.4} blurIntensity={20} borderRadius={20} style={styles.titleCard}>
+                        <Text style={styles.title}>{contribution.title}</Text>
+                    </GlassCard>
 
             {contribution.description && (
                 <GlassCard opacity={0.4} blurIntensity={20} borderRadius={20} style={styles.descriptionCard}>
@@ -218,10 +236,12 @@ export default function ContributionDetailScreen() {
                 </>
             )}
 
-            {(!contribution.PaymentMethods || contribution.PaymentMethods.length === 0) && (
-                <GlassCard opacity={0.4} blurIntensity={20} borderRadius={20} style={styles.card}>
-                    <Text style={styles.text}>Nenhuma forma de pagamento cadastrada.</Text>
-                </GlassCard>
+                    {(!contribution.PaymentMethods || contribution.PaymentMethods.length === 0) && (
+                        <GlassCard opacity={0.4} blurIntensity={20} borderRadius={20} style={styles.card}>
+                            <Text style={styles.text}>Nenhuma forma de pagamento cadastrada.</Text>
+                        </GlassCard>
+                    )}
+                </>
             )}
         </DetailScreenLayout>
     )
@@ -279,17 +299,6 @@ const styles = StyleSheet.create({
         backgroundColor: colors.glass.overlay,
         borderWidth: 1,
         borderColor: colors.glass.border,
-    },
-    errorContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 20,
-    },
-    errorText: {
-        color: colors.status.error,
-        fontSize: 16,
-        fontWeight: '600',
     },
     stats: {
         flexDirection: 'row',

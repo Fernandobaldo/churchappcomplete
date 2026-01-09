@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react'
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ScrollView, Modal, ActivityIndicator, RefreshControl } from 'react-native'
-import { useNavigation } from '@react-navigation/native'
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ScrollView, Modal, ActivityIndicator } from 'react-native'
+import { useNavigation, useFocusEffect } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
 import api from '../api/api'
 import Protected from '../components/Protected'
@@ -16,7 +16,6 @@ import ptBR from 'date-fns/locale/pt-BR'
 import Toast from 'react-native-toast-message'
 import { Transaction, FinanceSummary, FinanceResponse, MonthPreset, FilterType, ActiveFilter } from '../types'
 import { colors } from '../theme/colors'
-import EmptyState from '../components/EmptyState'
 
 export default function FinancesScreen() {
     const [transactions, setTransactions] = useState<Transaction[]>([])
@@ -29,6 +28,7 @@ export default function FinancesScreen() {
     const [endDate, setEndDate] = useState<string>(format(endOfMonth(new Date()), 'yyyy-MM-dd'))
     const [showFilters, setShowFilters] = useState(false)
     const [loading, setLoading] = useState(true)
+    const [error, setError] = useState<string | null>(null)
     const [refreshing, setRefreshing] = useState(false)
     const [searchDebounce, setSearchDebounce] = useState<NodeJS.Timeout | null>(null)
     const [page, setPage] = useState(1)
@@ -89,7 +89,7 @@ export default function FinancesScreen() {
 
     const fetchTransactions = useCallback(async () => {
         try {
-            setLoading(true)
+            setError(null)
             const params: Record<string, string | number> = {}
             
             params.monthPreset = monthPreset
@@ -113,13 +113,15 @@ export default function FinancesScreen() {
             const res = await api.get('/finances', { params })
             setTransactions(res.data.transactions || [])
             setSummary(res.data.summary || { total: 0, entries: 0, exits: 0 })
-        } catch (error: unknown) {
-            console.error('Erro ao buscar transações:', error)
-            const apiError = error as { response?: { data?: { message?: string } } }
+        } catch (err: unknown) {
+            console.error('Erro ao buscar transações:', err)
+            const apiError = err as { response?: { data?: { message?: string } } }
+            const errorMessage = apiError.response?.data?.message || 'Erro ao carregar finanças'
+            setError(errorMessage)
             Toast.show({ 
                 type: 'error', 
                 text1: 'Erro ao carregar finanças',
-                text2: apiError.response?.data?.message || 'Tente novamente'
+                text2: errorMessage
             })
         } finally {
             setLoading(false)
@@ -127,14 +129,33 @@ export default function FinancesScreen() {
     }, [startDate, endDate, categoryFilter, typeFilter, search, monthPreset])
 
     useEffect(() => {
-        fetchTransactions()
+        const loadTransactions = async () => {
+            setLoading(true)
+            await fetchTransactions()
+        }
+        loadTransactions()
     }, [fetchTransactions])
+
+    // Recarrega quando a tela ganha foco (após voltar de criar/editar transação)
+    useFocusEffect(
+        useCallback(() => {
+            // Evita requisições duplicadas se já estiver carregando ou refrescando
+            if (!loading && !refreshing) {
+                fetchTransactions()
+            }
+        }, [fetchTransactions, loading, refreshing])
+    )
 
     const handleRefresh = useCallback(async () => {
         setRefreshing(true)
         setPage(1)
         await fetchTransactions()
         setRefreshing(false)
+    }, [fetchTransactions])
+
+    const handleRetry = useCallback(() => {
+        setLoading(true)
+        fetchTransactions().finally(() => setLoading(false))
     }, [fetchTransactions])
     
     // Paginação: mostra apenas os primeiros N itens
@@ -242,6 +263,8 @@ export default function FinancesScreen() {
         Array.from(new Set(transactions.map(t => t.category).filter(Boolean))) as string[],
         [transactions]
     )
+
+    const isEmpty = !loading && transactions.length === 0 && !error
 
     const getEntryTypeLabel = (type: string | null | undefined) => {
         const labels: Record<string, string> = {
@@ -370,66 +393,54 @@ export default function FinancesScreen() {
                 refreshing={refreshing}
                 onRefresh={handleRefresh}
                 contentContainerStyle={styles.viewContent}
+                loading={loading}
+                error={error}
+                empty={isEmpty}
+                emptyTitle="Nenhuma transação encontrada"
+                emptySubtitle="Quando houver transações no período selecionado, elas aparecerão aqui"
+                onRetry={handleRetry}
             >
-                {loading ? (
-                    <View style={styles.loadingContainer}>
-                        <ActivityIndicator size="large" color={colors.gradients.primary[1]} />
-                    </View>
-                ) : (
-                    <FlatList
-                        data={paginatedTransactions}
-                        keyExtractor={(item) => item.id}
-                        onEndReached={loadMore}
-                        onEndReachedThreshold={0.5}
-                        ListFooterComponent={
-                            loadingMore ? (
-                                <View style={styles.loadingMore}>
-                                    <ActivityIndicator size="small" color={colors.gradients.primary[1]} />
-                                </View>
-                            ) : null
-                        }
-                        renderItem={({ item }) => (
-                            <GlassCard
-                                onPress={() => navigation.navigate('TransactionDetails' as never, { id: item.id } as never)}
-                                opacity={0.4}
-                                blurIntensity={20}
-                                borderRadius={20}
-                                style={styles.transactionItem}
-                            >
-                                <View style={styles.transactionContent}>
-                                    <Text style={styles.transactionTitle}>{item.title}</Text>
-                                    <Text style={styles.transactionCategory}>
-                                        {item.category || (item.type === 'ENTRY' && item.entryType ? getEntryTypeLabel(item.entryType) : item.type === 'EXIT' && item.exitType ? getExitTypeLabel(item.exitType) : 'Sem categoria')}
-                                    </Text>
-                                </View>
-                                <View style={styles.transactionAmountContainer}>
-                                    <Text style={[styles.transactionAmount, item.type === 'ENTRY' ? styles.transactionAmountEntry : styles.transactionAmountExit]}>
-                                        {item.type === 'ENTRY' ? '+' : '-'}R$ {Math.abs(item.amount).toFixed(2).replace('.', ',')}
-                                    </Text>
-                                    <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
-                                </View>
-                            </GlassCard>
-                        )}
-                        ListHeaderComponent={renderListHeader}
-                        ListEmptyComponent={
-                            <EmptyState
-                                icon="receipt-outline"
-                                message="Nenhuma transação encontrada"
-                            />
-                        }
-                        style={styles.flatList}
-                        contentContainerStyle={styles.listContent}
-                        refreshControl={
-                            <RefreshControl
-                                refreshing={refreshing}
-                                onRefresh={handleRefresh}
-                                colors={['#3366FF']}
-                                tintColor="#3366FF"
-                            />
-                        }
-                        nestedScrollEnabled={true}
-                    />
-                )}
+                <FlatList
+                    data={paginatedTransactions}
+                    keyExtractor={(item) => item.id}
+                    onEndReached={loadMore}
+                    onEndReachedThreshold={0.5}
+                    ListFooterComponent={
+                        loadingMore ? (
+                            <View style={styles.loadingMore}>
+                                <ActivityIndicator size="small" color={colors.gradients.primary[1]} />
+                            </View>
+                        ) : null
+                    }
+                    renderItem={({ item }) => (
+                        <GlassCard
+                            onPress={() => navigation.navigate('TransactionDetails' as never, { id: item.id } as never)}
+                            opacity={0.4}
+                            blurIntensity={20}
+                            borderRadius={20}
+                            style={styles.transactionItem}
+                        >
+                            <View style={styles.transactionContent}>
+                                <Text style={styles.transactionTitle}>{item.title}</Text>
+                                <Text style={styles.transactionCategory}>
+                                    {item.category || (item.type === 'ENTRY' && item.entryType ? getEntryTypeLabel(item.entryType) : item.type === 'EXIT' && item.exitType ? getExitTypeLabel(item.exitType) : 'Sem categoria')}
+                                </Text>
+                            </View>
+                            <View style={styles.transactionAmountContainer}>
+                                <Text style={[styles.transactionAmount, item.type === 'ENTRY' ? styles.transactionAmountEntry : styles.transactionAmountExit]}>
+                                    {item.type === 'ENTRY' ? '+' : '-'}R$ {Math.abs(item.amount).toFixed(2).replace('.', ',')}
+                                </Text>
+                                <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
+                            </View>
+                        </GlassCard>
+                    )}
+                    ListHeaderComponent={renderListHeader}
+                    style={styles.flatList}
+                    contentContainerStyle={styles.listContent}
+                    refreshing={refreshing}
+                    onRefresh={handleRefresh}
+                    nestedScrollEnabled={true}
+                />
 
                 {/* Modal de Filtros Avançados */}
                 <Modal
@@ -696,12 +707,6 @@ const styles = StyleSheet.create({
     },
     transactionAmountExit: {
         color: colors.status.error,
-    },
-    loadingContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginTop: 110,
     },
     searchRow: {
         flexDirection: 'row',

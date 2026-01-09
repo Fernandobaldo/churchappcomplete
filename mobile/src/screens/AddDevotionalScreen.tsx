@@ -3,7 +3,7 @@ import { useNavigation } from '@react-navigation/native'
 import Toast from 'react-native-toast-message'
 import FormScreenLayout from '../components/layouts/FormScreenLayout'
 import FormsComponent from '../components/FormsComponent'
-import api from '../api/api'
+import { devotionalsService } from '../services/devotionals.service'
 import { bookTranslation } from '../utils/translateBooks'
 
 export default function AddDevotionalScreen() {
@@ -83,7 +83,7 @@ export default function AddDevotionalScreen() {
         const passage = `${form.selectedBook} ${form.chapter}:${form.verse}`
 
         try {
-            await api.post('/devotionals', {
+            await devotionalsService.create({
                 title: form.title,
                 passage,
                 content: form.content,

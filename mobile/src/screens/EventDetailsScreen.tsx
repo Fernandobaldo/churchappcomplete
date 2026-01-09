@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useCallback } from 'react'
-import {View, Text, TouchableOpacity, Linking, Alert, ActivityIndicator, StyleSheet} from 'react-native'
+import {View, Text, TouchableOpacity, Linking, StyleSheet} from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import api from '../api/api'
+import { eventsService } from '../services/events.service'
 import { useAuthStore } from '../stores/authStore'
 import DetailScreenLayout from '../components/layouts/DetailScreenLayout'
 import GlassCard from '../components/GlassCard'
@@ -19,14 +19,18 @@ export default function EventDetailsScreen() {
     const { user } = useAuthStore()
     const [event, setEvent] = useState<any>(null)
     const [loading, setLoading] = useState(true)
+    const [error, setError] = useState<string | null>(null)
     const [refreshing, setRefreshing] = useState(false)
 
     const fetchEvent = useCallback(async () => {
         try {
-            const res = await api.get(`/events/${id}`)
-            setEvent(res.data)
-        } catch (error) {
-            Alert.alert('Erro', 'Não foi possível carregar os detalhes do evento.')
+            setError(null)
+            const data = await eventsService.getById(id)
+            setEvent(data)
+        } catch (err: any) {
+            console.error('Erro ao carregar detalhes do evento:', err)
+            const errorMessage = err.response?.data?.message || 'Não foi possível carregar os detalhes do evento.'
+            setError(errorMessage)
         } finally {
             setLoading(false)
             setRefreshing(false)
@@ -40,14 +44,23 @@ export default function EventDetailsScreen() {
     // Recarrega quando a tela recebe foco (após editar)
     useFocusEffect(
         useCallback(() => {
-            fetchEvent()
-        }, [fetchEvent])
+            if (!loading && !refreshing) {
+                fetchEvent()
+            }
+        }, [fetchEvent, loading, refreshing])
     )
 
     const handleRefresh = useCallback(() => {
         setRefreshing(true)
         fetchEvent()
     }, [fetchEvent])
+
+    const handleRetry = useCallback(() => {
+        setLoading(true)
+        fetchEvent().finally(() => setLoading(false))
+    }, [fetchEvent])
+
+    const isEmpty = !loading && !event && !error
 
     const hasPermissionToEdit =
         user?.role === 'ADMINGERAL' ||
@@ -66,29 +79,16 @@ export default function EventDetailsScreen() {
         }
     }
 
-    if (loading) {
-        return (
-            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                <ActivityIndicator size="large" color={colors.gradients.primary[1]} />
-            </View>
-        )
-    }
-
-    if (!event) {
-        return (
-            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                <Text>Evento não encontrado.</Text>
-            </View>
-        )
-    }
-
-    const formatDate = (dateStr: string) => {
+    const formatDate = (dateStr: string | undefined | null) => {
+        if (!dateStr) return 'Data inválida'
         const date = new Date(dateStr)
         if (isNaN(date.getTime())) return 'Data inválida'
         return format(date, "EEEE, dd 'de' MMMM 'de' yyyy", { locale: ptBR })
     }
 
     const getTimeDisplay = () => {
+        if (!event) return null
+        
         // Se há um campo time específico e não é 00:00
         if (event.time && event.time !== '00:00' && event.time.trim() !== '') {
             return event.time
@@ -120,7 +120,7 @@ export default function EventDetailsScreen() {
         } else {
             // URL relativa, adicionar baseURL
             const cleanUrl = imageUrl.startsWith('/') ? imageUrl.substring(1) : imageUrl
-            return `${api.defaults.baseURL}/${cleanUrl}`
+            return `${process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000'}/${cleanUrl}`
         }
     })() : undefined
 
@@ -130,75 +130,85 @@ export default function EventDetailsScreen() {
                 title: "Detalhes do Evento",
                 Icon: FontAwesome5,
                 iconName: "calendar",
-                rightButtonIcon: hasPermissionToEdit ? (
+                rightButtonIcon: hasPermissionToEdit && event ? (
                     <Ionicons name="create-outline" size={24} color="white" />
                 ) : undefined,
-                onRightButtonPress: hasPermissionToEdit
+                onRightButtonPress: hasPermissionToEdit && event
                     ? () => (navigation as any).navigate('EditEventScreen', { id: event.id })
                     : undefined,
             }}
             imageUrl={bannerImageUrl}
+            loading={loading}
+            error={error}
+            empty={isEmpty}
+            emptyTitle="Evento não encontrado"
+            emptySubtitle="O evento solicitado não existe ou foi removido"
             refreshing={refreshing}
             onRefresh={handleRefresh}
+            onRetry={handleRetry}
         >
-            <GlassCard opacity={0.4} blurIntensity={20} borderRadius={20} style={styles.card}>
-                <Text style={styles.eventName}>{event.title}</Text>
-                
-                <View style={styles.infoRow}>
-                    <Ionicons name="calendar-outline" size={20} color={colors.text.secondary} />
-                    <View style={styles.infoContent}>
-                        <Text style={styles.infoLabel}>Data e Hora</Text>
-                        <Text style={styles.infoValue}>
-                            {formatDate(event.startDate)}
-                            {getTimeDisplay() && ` ${getTimeDisplay()}`}
-                        </Text>
-                    </View>
-                </View>
-
-                {event.location && (
-                    <View style={styles.infoRow}>
-                        <Ionicons name="location-outline" size={20} color={colors.text.secondary} />
-                        <View style={styles.infoContent}>
-                            <Text style={styles.infoLabel}>Local</Text>
-                            <Text style={styles.infoValue}>{event.location}</Text>
+            {event && (
+                <>
+                    <GlassCard opacity={0.4} blurIntensity={20} borderRadius={20} style={styles.card}>
+                        <Text style={styles.eventName}>{event.title}</Text>
+                        
+                        <View style={styles.infoRow}>
+                            <Ionicons name="calendar-outline" size={20} color={colors.text.secondary} />
+                            <View style={styles.infoContent}>
+                                <Text style={styles.infoLabel}>Data e Hora</Text>
+                                <Text style={styles.infoValue}>
+                                    {event.startDate ? formatDate(event.startDate) : 'Data não informada'}
+                                    {getTimeDisplay() && ` ${getTimeDisplay()}`}
+                                </Text>
+                            </View>
                         </View>
-                    </View>
-                )}
 
-                {event.description && (
-                    <View style={styles.descriptionSection}>
-                        <Text style={styles.descriptionHeader}>Descrição</Text>
-                        <Text style={styles.descriptionText}>{event.description}</Text>
-                    </View>
-                )}
-            </GlassCard>
+                        {event.location && (
+                            <View style={styles.infoRow}>
+                                <Ionicons name="location-outline" size={20} color={colors.text.secondary} />
+                                <View style={styles.infoContent}>
+                                    <Text style={styles.infoLabel}>Local</Text>
+                                    <Text style={styles.infoValue}>{event.location}</Text>
+                                </View>
+                            </View>
+                        )}
 
-            {event.hasDonation && (
-                <GlassCard opacity={0.45} blurIntensity={20} borderRadius={20} style={styles.donationCard}>
-                    <View style={styles.donationHeader}>
-                        <Ionicons name="heart" size={24} color={colors.status.error} />
-                        <Text style={styles.donationTitle}>Contribuição</Text>
-                    </View>
-                    {event.donationReason && (
-                        <View style={styles.donationInfo}>
-                            <Text style={styles.donationLabel}>Motivo:</Text>
-                            <Text style={styles.donationValue}>{event.donationReason}</Text>
-                        </View>
+                        {event.description && (
+                            <View style={styles.descriptionSection}>
+                                <Text style={styles.descriptionHeader}>Descrição</Text>
+                                <Text style={styles.descriptionText}>{event.description}</Text>
+                            </View>
+                        )}
+                    </GlassCard>
+
+                    {event.hasDonation && (
+                        <GlassCard opacity={0.45} blurIntensity={20} borderRadius={20} style={styles.donationCard}>
+                            <View style={styles.donationHeader}>
+                                <Ionicons name="heart" size={24} color={colors.status.error} />
+                                <Text style={styles.donationTitle}>Contribuição</Text>
+                            </View>
+                            {event.donationReason && (
+                                <View style={styles.donationInfo}>
+                                    <Text style={styles.donationLabel}>Motivo:</Text>
+                                    <Text style={styles.donationValue}>{event.donationReason}</Text>
+                                </View>
+                            )}
+                            {event.donationLink && (
+                                <TouchableOpacity onPress={openDonationLink} style={styles.donationLinkBtn} activeOpacity={0.8}>
+                                    <LinearGradient
+                                        colors={[colors.status.error, '#DC2626'] as [string, string]}
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 1, y: 1 }}
+                                        style={styles.donationLinkBtnGradient}
+                                    >
+                                        <Ionicons name="link-outline" size={20} color="#fff" />
+                                        <Text style={styles.donationBtnText}>Abrir link de contribuição</Text>
+                                    </LinearGradient>
+                                </TouchableOpacity>
+                            )}
+                        </GlassCard>
                     )}
-                    {event.donationLink && (
-                        <TouchableOpacity onPress={openDonationLink} style={styles.donationLinkBtn} activeOpacity={0.8}>
-                            <LinearGradient
-                                colors={[colors.status.error, '#DC2626'] as [string, string]}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 1 }}
-                                style={styles.donationLinkBtnGradient}
-                            >
-                                <Ionicons name="link-outline" size={20} color="#fff" />
-                                <Text style={styles.donationBtnText}>Abrir link de contribuição</Text>
-                            </LinearGradient>
-                        </TouchableOpacity>
-                    )}
-                </GlassCard>
+                </>
             )}
         </DetailScreenLayout>
     )

@@ -1,37 +1,41 @@
 import { View, Text, TouchableOpacity, StyleSheet, Share } from 'react-native'
 import { useNavigation } from '@react-navigation/native';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons'
 
-import api from '../api/api'
 import { BibleText } from './BibleText';
 import GlassCard from './GlassCard'
 import { colors } from '../theme/colors'
 import { typography } from '../theme/typography'
 
+interface DevotionalCardProps {
+    devotional: {
+        id: string
+        title: string
+        passage: string
+        content: string
+        author: {
+            name: string
+        }
+        likesCount?: number
+        liked?: boolean
+    }
+    onLike?: (devotionalId: string, liked: boolean) => void
+}
 
-export default function DevotionalCard({ devotional, refreshDevotionals }) {
+export default function DevotionalCard({ devotional, onLike }: DevotionalCardProps) {
     const navigation = useNavigation();
     const [likes, setLikes] = useState(devotional?.likesCount ?? 0);
     const [liked, setLiked] = useState(devotional?.liked ?? false);
 
-    const handleLike = async () => {
-        try {
-        if (liked) {
-            await api.delete(`/devotionals/${devotional.id}/unlike`)
-            setLikes(likes - 1)
-
-        } else {
-            await api.post(`/devotionals/${devotional.id}/like`)
-            setLikes(likes + 1)
-
+    const handleLike = () => {
+        if (onLike) {
+            const newLiked = !liked
+            setLiked(newLiked)
+            setLikes(newLiked ? likes + 1 : likes - 1)
+            onLike(devotional.id, newLiked)
         }
-        setLiked(!liked)
-        refreshDevotionals()
-    } catch (error) {
-        console.error('Erro ao curtir:', error.response?.data || error.message);
     }
-}
 
     const handleShare = async () => {
         const text = `📖 ${devotional.passage}\n\n🇧🇷 ${devotional.textPt}\n\n🇫🇷 ${devotional.textFr}`

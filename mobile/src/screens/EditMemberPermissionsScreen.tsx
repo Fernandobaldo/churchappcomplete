@@ -10,6 +10,8 @@ import {
     Alert,
     ScrollView,
     TouchableOpacity,
+    KeyboardAvoidingView,
+    Platform,
 } from 'react-native'
 import PageHeader from '../components/PageHeader'
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5'
@@ -97,47 +99,57 @@ export default function EditMemberPermissionsScreen({ route, navigation }: any) 
                 Icon={FontAwesome5}
                 iconName="lock"
             />
-            <ScrollView 
-                contentContainerStyle={{ padding: 20 }}
-                style={styles.scrollView}
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                style={styles.keyboardView}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
             >
-                {PERMISSIONS.map((perm) => {
-                    const restrictedPermissions = ['finances_manage', 'church_manage', 'contributions_manage']
-                    const isRestrictedPermission = restrictedPermissions.includes(perm.key)
-                    const isMemberRole = member?.role === 'MEMBER'
-                    const hasPermission = permissions.includes(perm.key)
-                    const shouldDisableSwitch = isRestrictedPermission && isMemberRole && !hasPermission
+                <ScrollView 
+                    contentContainerStyle={{ padding: 20 }}
+                    style={styles.scrollView}
+                    keyboardShouldPersistTaps="handled"
+                >
+                    {PERMISSIONS.map((perm) => {
+                        const restrictedPermissions = ['finances_manage', 'church_manage', 'contributions_manage']
+                        const isRestrictedPermission = restrictedPermissions.includes(perm.key)
+                        const isMemberRole = member?.role === 'MEMBER'
+                        const hasPermission = permissions.includes(perm.key)
+                        const shouldDisableSwitch = isRestrictedPermission && isMemberRole && !hasPermission
 
-                    return (
-                        <View key={perm.key} style={styles.permissionContainer}>
-                            <View style={styles.row}>
-                                <Text style={[styles.label, shouldDisableSwitch && styles.disabledLabel]}>
-                                    {perm.label}
-                                </Text>
-                                <Switch
-                                    value={hasPermission}
-                                    onValueChange={() => togglePermission(perm.key)}
-                                    disabled={shouldDisableSwitch}
-                                />
+                        return (
+                            <View key={perm.key} style={styles.permissionContainer}>
+                                <View style={styles.row}>
+                                    <Text style={[styles.label, shouldDisableSwitch && styles.disabledLabel]}>
+                                        {perm.label}
+                                    </Text>
+                                    <Switch
+                                        value={hasPermission}
+                                        onValueChange={() => togglePermission(perm.key)}
+                                        disabled={shouldDisableSwitch}
+                                    />
+                                </View>
+                                {shouldDisableSwitch && (
+                                    <Text style={styles.alertText}>
+                                        Esta permissão requer pelo menos a role de Coordenador
+                                    </Text>
+                                )}
                             </View>
-                            {shouldDisableSwitch && (
-                                <Text style={styles.alertText}>
-                                    Esta permissão requer pelo menos a role de Coordenador
-                                </Text>
-                            )}
-                        </View>
-                    )
-                })}
-                <TouchableOpacity style={styles.button} onPress={handleSave}>
-                    <Text style={styles.buttonText}>Salvar Permissões</Text>
-                </TouchableOpacity>
-            </ScrollView>
+                        )
+                    })}
+                    <TouchableOpacity style={styles.button} onPress={handleSave}>
+                        <Text style={styles.buttonText}>Salvar Permissões</Text>
+                    </TouchableOpacity>
+                </ScrollView>
+            </KeyboardAvoidingView>
         </View>
     )
 }
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#fff' },
+    keyboardView: {
+        flex: 1,
+    },
     scrollView: {
         marginTop: 110, // Altura do header fixo
     },

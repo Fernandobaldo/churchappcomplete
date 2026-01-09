@@ -68,10 +68,10 @@ export default function LoginScreen() {
 
     setLoading(true)
     try {
-      const response = await api.post('auth/login', { email, password })
+      const data = await authService.login(email, password)
       
       // Extrai os dados da resposta
-      const { token, user } = response.data
+      const { token, user } = data
       
       if (!token) {
         Toast.show({ type: 'error', text1: 'Erro ao fazer login', text2: 'Token não recebido.' })

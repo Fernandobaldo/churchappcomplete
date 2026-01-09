@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react'
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native'
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
 import DetailScreenLayout from '../components/layouts/DetailScreenLayout'
@@ -9,7 +9,7 @@ import { colors } from '../theme/colors'
 import api from '../api/api'
 import Toast from 'react-native-toast-message'
 import { format } from 'date-fns'
-import ptBR from 'date-fns/locale/pt-BR'
+import { ptBR } from 'date-fns/locale/pt-BR'
 
 interface Transaction {
   id: string
@@ -51,25 +51,23 @@ export default function TransactionDetailsScreen() {
   const { id } = route.params as { id: string }
   const [transaction, setTransaction] = useState<Transaction | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
 
   const fetchTransaction = useCallback(async () => {
     try {
+      setError(null)
       const response = await api.get(`/finances/${id}`)
       setTransaction(response.data)
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.message || 'Erro ao carregar transação'
-      Toast.show({
-        type: 'error',
-        text1: errorMessage,
-      })
-      console.error('Erro ao carregar transação:', error)
-      navigation.goBack()
+    } catch (err: any) {
+      console.error('Erro ao carregar detalhes da transação:', err)
+      const errorMessage = err.response?.data?.message || 'Não foi possível carregar os detalhes da transação.'
+      setError(errorMessage)
     } finally {
       setLoading(false)
       setRefreshing(false)
     }
-  }, [id, navigation])
+  }, [id])
 
   useEffect(() => {
     if (id) {
@@ -80,16 +78,23 @@ export default function TransactionDetailsScreen() {
   // Recarrega quando a tela recebe foco (após editar)
   useFocusEffect(
     useCallback(() => {
-      if (id) {
+      if (id && !loading && !refreshing) {
         fetchTransaction()
       }
-    }, [id, fetchTransaction])
+    }, [id, fetchTransaction, loading, refreshing])
   )
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true)
     fetchTransaction()
   }, [fetchTransaction])
+
+  const handleRetry = useCallback(() => {
+    setLoading(true)
+    fetchTransaction().finally(() => setLoading(false))
+  }, [fetchTransaction])
+
+  const isEmpty = !loading && !transaction && !error
 
   const getEntryTypeLabel = (type: string | null | undefined) => {
     const labels: Record<string, string> = {
@@ -111,38 +116,6 @@ export default function TransactionDetailsScreen() {
     return labels[type || ''] || type
   }
 
-  if (loading) {
-    return (
-      <DetailScreenLayout
-        headerProps={{
-          title: "Detalhes da Transação",
-          Icon: FontAwesome5,
-          iconName: "dollar-sign",
-        }}
-      >
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.gradients.primary[1]} />
-          <Text style={styles.loadingText}>Carregando...</Text>
-        </View>
-      </DetailScreenLayout>
-    )
-  }
-
-  if (!transaction) {
-    return (
-      <DetailScreenLayout
-        headerProps={{
-          title: "Detalhes da Transação",
-          Icon: FontAwesome5,
-          iconName: "dollar-sign",
-        }}
-      >
-        <View style={styles.loadingContainer}>
-          <Text style={styles.errorText}>Transação não encontrada</Text>
-        </View>
-      </DetailScreenLayout>
-    )
-  }
 
   return (
     <DetailScreenLayout
@@ -150,15 +123,23 @@ export default function TransactionDetailsScreen() {
         title: "Detalhes da Transação",
         Icon: FontAwesome5,
         iconName: "dollar-sign",
-        rightButtonIcon: (
+        rightButtonIcon: transaction ? (
           <Ionicons name="create-outline" size={24} color="white" />
-        ),
-        onRightButtonPress: () => navigation.navigate('EditTransaction' as never, { id: transaction.id } as never),
+        ) : undefined,
+        onRightButtonPress: transaction
+          ? () => navigation.navigate('EditTransaction' as never, { id: transaction.id } as never)
+          : undefined,
       }}
+      loading={loading}
+      error={error}
+      empty={isEmpty}
+      emptyTitle="Transação não encontrada"
+      emptySubtitle="A transação solicitada não existe ou foi removida"
       refreshing={refreshing}
       onRefresh={handleRefresh}
+      onRetry={handleRetry}
     >
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      {transaction && (
         <GlassCard opacity={0.4} blurIntensity={20} borderRadius={20} style={styles.card}>
           <View style={styles.row}>
             <Text style={styles.label}>Valor</Text>
@@ -261,35 +242,12 @@ export default function TransactionDetailsScreen() {
             </View>
           )}
         </GlassCard>
-      </ScrollView>
+      )}
     </DetailScreenLayout>
   )
 }
 
 const styles = StyleSheet.create({
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 110,
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    fontWeight: '400',
-    lineHeight: 24,
-    color: '#475569',
-  },
-  errorText: {
-    fontSize: 16,
-    fontWeight: '400',
-    lineHeight: 24,
-    color: '#64748B',
-  },
-  content: {
-    padding: 16,
-    paddingBottom: 100,
-  },
   card: {
     padding: 20,
   },

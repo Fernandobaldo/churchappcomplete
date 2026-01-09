@@ -7,51 +7,68 @@ import {
     StyleSheet,
     FlatList,
     Image,
-    RefreshControl,
     ActivityIndicator,
 } from 'react-native'
-import { useNavigation } from '@react-navigation/native'
-import api from '../api/api'
+import { useNavigation, useFocusEffect } from '@react-navigation/native'
+import { membersService } from '../services/members.service'
 import { Ionicons } from '@expo/vector-icons'
 import ViewScreenLayout from '../components/layouts/ViewScreenLayout'
 import GlassCard from '../components/GlassCard'
 import TextInputField from '../components/TextInputField'
 import FontAwesome5 from "@expo/vector-icons/FontAwesome5";
 import { colors } from '../theme/colors'
-import EmptyState from '../components/EmptyState'
 
 
 interface Member {
     id: string
     name: string
-    email: string
-    role: string
+    email?: string
+    role?: string
     avatarUrl?: string
-    branchId: string
+    branchId?: string
 
 }
 
 export default function MembersListScreen() {
     const navigation = useNavigation()
     const [members, setMembers] = useState<Member[]>([])
+    const [loading, setLoading] = useState(true)
+    const [error, setError] = useState<string | null>(null)
     const [search, setSearch] = useState('')
     const [refreshing, setRefreshing] = useState(false)
     const [page, setPage] = useState(1)
     const [loadingMore, setLoadingMore] = useState(false)
     const ITEMS_PER_PAGE = 10
 
+    const fetchMembers = useCallback(async () => {
+        try {
+            setError(null)
+            const data = await membersService.getAll()
+            setMembers(data || [])
+        } catch (err: any) {
+            console.error('Erro ao buscar membros:', err)
+            setError(err.response?.data?.message || 'Erro ao buscar membros')
+        }
+    }, [])
 
     useEffect(() => {
-        async function fetchMembers() {
-            try {
-                const res = await api.get('/members')
-                setMembers(res.data)
-            } catch (err) {
-                console.error('Erro ao buscar membros:', err)
-            }
+        const loadMembers = async () => {
+            setLoading(true)
+            await fetchMembers()
+            setLoading(false)
         }
-        fetchMembers()
-    }, [])
+        loadMembers()
+    }, [fetchMembers])
+
+    // Recarrega quando a tela ganha foco (após voltar de criar/editar membro)
+    useFocusEffect(
+        useCallback(() => {
+            // Evita requisições duplicadas se já estiver carregando ou refrescando
+            if (!loading && !refreshing) {
+                fetchMembers()
+            }
+        }, [fetchMembers, loading, refreshing])
+    )
 
     const filteredMembers = useMemo(() => 
         members.filter((m) =>
@@ -81,17 +98,19 @@ export default function MembersListScreen() {
         setPage(1)
     }, [search])
 
-    const handleRefresh = async () => {
+    const handleRefresh = useCallback(async () => {
         setRefreshing(true)
         setPage(1)
-        try {
-            const res = await api.get('/members')
-            setMembers(res.data)
-        } catch (err) {
-            console.error('Erro ao buscar membros:', err)
-        }
+        await fetchMembers()
         setRefreshing(false)
-    }
+    }, [fetchMembers])
+
+    const handleRetry = useCallback(() => {
+        setLoading(true)
+        fetchMembers().finally(() => setLoading(false))
+    }, [fetchMembers])
+
+    const isEmpty = !loading && filteredMembers.length === 0 && !error
 
     return (
         <ViewScreenLayout
@@ -100,12 +119,18 @@ export default function MembersListScreen() {
                 Icon: FontAwesome5,
                 iconName: "user",
                 rightButtonIcon: <Ionicons name="add" size={24} color="white" />,
-                onRightButtonPress: () => navigation.navigate('MemberRegistrationScreen'),
+                onRightButtonPress: () => (navigation as any).navigate('MemberRegistrationScreen'),
             }}
             scrollable={false}
             refreshing={refreshing}
             onRefresh={handleRefresh}
             contentContainerStyle={styles.viewContent}
+            loading={loading}
+            error={error}
+            empty={isEmpty}
+            emptyTitle="Nenhum membro encontrado"
+            emptySubtitle={search ? 'Tente buscar com outro termo' : 'Quando houver membros cadastrados, eles aparecerão aqui'}
+            onRetry={handleRetry}
         >
             <View style={styles.actionsContainer}>
                 <GlassCard
@@ -134,14 +159,8 @@ export default function MembersListScreen() {
                 keyExtractor={(item) => item.id}
                 style={styles.list}
                 contentContainerStyle={styles.listContent}
-                refreshControl={
-                    <RefreshControl
-                        refreshing={refreshing}
-                        onRefresh={handleRefresh}
-                        colors={colors.gradients.primary}
-                        tintColor={colors.gradients.primary[1]}
-                    />
-                }
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
                 onEndReached={loadMore}
                 onEndReachedThreshold={0.5}
                 ListFooterComponent={
@@ -151,15 +170,9 @@ export default function MembersListScreen() {
                         </View>
                     ) : null
                 }
-                ListEmptyComponent={
-                    <EmptyState
-                        icon="people-outline"
-                        message="Nenhum membro encontrado"
-                    />
-                }
                 renderItem={({ item }) => (
                     <GlassCard
-                        onPress={() => navigation.navigate('MemberDetails' as never, { id: item.id } as never)}
+                        onPress={() => (navigation as any).navigate('MemberDetails', { id: item.id })}
                         opacity={0.4}
                         blurIntensity={20}
                         borderRadius={20}
