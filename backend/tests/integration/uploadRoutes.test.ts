@@ -11,8 +11,14 @@ import fastifyJwt from '@fastify/jwt'
 import fastifyStatic from '@fastify/static'
 import request from 'supertest'
 import { prisma } from '../../src/lib/prisma'
-import bcrypt from 'bcryptjs'
-import { resetTestDatabase } from '../utils/resetTestDatabase'
+import { resetTestDatabase } from '../utils/db'
+import { 
+  createTestUser,
+  createTestPlan,
+  createTestChurch,
+  createTestBranch,
+  createTestMember,
+} from '../utils/testFactories'
 import { registerRoutes } from '../../src/routes/registerRoutes'
 import { authenticate } from '../../src/middlewares/authenticate'
 import path from 'path'
@@ -54,67 +60,64 @@ describe('Upload Routes', () => {
 
     // Criar plano
     await prisma.plan.findFirst({ where: { name: 'Free Plan' } }) || 
-      await prisma.plan.create({
-        data: {
-          name: 'Free Plan',
-          price: 0,
-          features: ['basic'],
-          maxMembers: 10,
-          maxBranches: 1,
-        },
+      await createTestPlan({
+        name: 'Free Plan',
+        price: 0,
+        features: ['basic'],
+        maxMembers: 10,
+        maxBranches: 1,
       })
 
     // Criar igreja
-    const church = await prisma.church.create({
-      data: {
-        name: 'Igreja Teste',
-      },
+    const church = await createTestChurch({
+      name: 'Igreja Teste',
     })
     churchId = church.id
 
     // Criar filial
-    const branch = await prisma.branch.create({
-      data: {
-        name: 'Filial Teste',
-        churchId: church.id,
-      },
+    const branch = await createTestBranch({
+      name: 'Filial Teste',
+      churchId: church.id,
     })
     branchId = branch.id
 
     // Criar usuário
-    const user = await prisma.user.create({
-      data: {
-        name: 'Test User',
-        email: 'test@example.com',
-        password: await bcrypt.hash('password123', 10),
-      },
+    const user = await createTestUser({
+      firstName: 'Test',
+      lastName: 'User',
+      email: 'test@example.com',
+      password: 'password123',
     })
     userId = user.id
 
     // Criar membro
-    const member = await prisma.member.create({
-      data: {
-        name: 'Test Member',
-        email: 'member@example.com',
-        branchId: branch.id,
-        role: 'ADMINGERAL',
-        userId: user.id,
-      },
+    const member = await createTestMember({
+      name: 'Test Member',
+      email: 'member@example.com',
+      branchId: branch.id,
+      role: 'ADMINGERAL',
+      userId: user.id,
+    })
+
+    // Buscar member com Permission incluída
+    const memberWithPermission = await prisma.member.findUnique({
+      where: { id: member.id },
       include: { Permission: true },
     })
-    memberId = member.id
+    memberId = memberWithPermission!.id
 
     // Gerar token
+    const fullName = `${user.firstName} ${user.lastName}`.trim()
     userToken = app.jwt.sign({
       sub: user.id,
       email: user.email,
-      name: user.name,
+      name: fullName,
       type: 'user',
-      memberId: member.id,
-      role: member.role,
-      branchId: member.branchId,
+      memberId: memberWithPermission!.id,
+      role: memberWithPermission!.role,
+      branchId: memberWithPermission!.branchId,
       churchId: church.id,
-      permissions: member.Permission.map(p => p.type),
+      permissions: memberWithPermission!.Permission.map(p => p.type),
     })
 
     // Garantir que o diretório de uploads existe

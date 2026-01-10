@@ -15,6 +15,13 @@ import { resetTestDatabase } from '../utils/resetTestDatabase'
 import { registerRoutes } from '../../src/routes/registerRoutes'
 import { authenticate } from '../../src/middlewares/authenticate'
 import { logTestResponse } from '../utils/testResponseHelper'
+import { 
+  createTestUser,
+  createTestPlan,
+  createTestChurch,
+  createTestBranch,
+  createTestMember,
+} from '../utils/testFactories'
 
 describe('Finances Routes', () => {
   const app = Fastify()
@@ -42,71 +49,72 @@ describe('Finances Routes', () => {
 
     // Criar plano
     const plan = await prisma.plan.findFirst({ where: { name: 'Free Plan' } }) || 
-      await prisma.plan.create({
-        data: {
-          name: 'Free Plan',
-          price: 0,
-          features: ['basic'],
-          maxMembers: 10,
-          maxBranches: 1,
-        },
+      await createTestPlan({
+        name: 'Free Plan',
+        price: 0,
+        features: ['basic'],
+        maxMembers: 10,
+        maxBranches: 1,
       })
 
     // Criar igreja
-    const church = await prisma.church.create({
-      data: {
-        name: 'Igreja Teste',
-      },
+    const church = await createTestChurch({
+      name: 'Igreja Teste',
     })
     churchId = church.id
 
     // Criar filial
-    const branch = await prisma.branch.create({
-      data: {
-        name: 'Filial Teste',
-        churchId: church.id,
-      },
+    const branch = await createTestBranch({
+      name: 'Filial Teste',
+      churchId: church.id,
     })
     branchId = branch.id
 
     // Criar usuário
-    const hashedPassword = await bcrypt.hash('password123', 10)
-    const user = await prisma.user.create({
-      data: {
-        name: 'Test User',
-        email: 'test@example.com',
-        password: hashedPassword,
-      },
+    const user = await createTestUser({
+      firstName: 'Test',
+      lastName: 'User',
+      email: 'test@example.com',
+      password: 'password123',
     })
     userId = user.id
 
     // Criar membro com permissão finances_manage
-    const member = await prisma.member.create({
+    const member = await createTestMember({
+      name: 'Test Member',
+      email: 'member@example.com',
+      branchId: branch.id,
+      role: 'ADMINFILIAL',
+      userId: user.id,
+    })
+    
+    // Criar permissão para o membro
+    await prisma.permission.create({
       data: {
-        name: 'Test Member',
-        email: 'member@example.com',
-        branchId: branch.id,
-        role: 'ADMINFILIAL',
-        userId: user.id,
-        Permission: {
-          create: { type: 'finances_manage' },
-        },
+        memberId: member.id,
+        type: 'finances_manage',
       },
+    })
+    
+    // Buscar member com Permission incluída
+    const memberWithPermission = await prisma.member.findUnique({
+      where: { id: member.id },
       include: { Permission: true },
     })
-    memberId = member.id
+    memberId = memberWithPermission!.id
 
     // Gerar token
+    const fullName = `${user.firstName} ${user.lastName}`.trim()
     userToken = app.jwt.sign({
       sub: user.id,
       email: user.email,
-      name: user.name,
+      name: fullName,
       type: 'user',
-      memberId: member.id,
-      role: member.role,
-      branchId: member.branchId,
+      memberId: memberWithPermission!.id,
+      role: memberWithPermission!.role,
+      branchId: memberWithPermission!.branchId,
       churchId: church.id,
-      permissions: member.Permission.map(p => p.type),
+      permissions: memberWithPermission!.Permission.map(p => p.type),
     })
   })
 
@@ -172,18 +180,18 @@ describe('Finances Routes', () => {
     })
 
     it('deve retornar 400 quando usuário não tem branchId', async () => {
-      const userWithoutMember = await prisma.user.create({
-        data: {
-          name: 'User Without Member',
-          email: 'nowmember@example.com',
-          password: await bcrypt.hash('password123', 10),
-        },
+      const userWithoutMember = await createTestUser({
+        firstName: 'User',
+        lastName: 'Without Member',
+        email: 'nowmember@example.com',
+        password: 'password123',
       })
 
+      const fullNameWithoutMember = `${userWithoutMember.firstName} ${userWithoutMember.lastName}`.trim()
       const tokenWithoutMember = app.jwt.sign({
         sub: userWithoutMember.id,
         email: userWithoutMember.email,
-        name: userWithoutMember.name,
+        name: fullNameWithoutMember,
         type: 'user',
       })
 
@@ -225,13 +233,11 @@ describe('Finances Routes', () => {
 
     it('deve criar transação de entrada com tipo DIZIMO e dizimista membro', async () => {
       // Criar um membro para usar como dizimista
-      const tithePayerMember = await prisma.member.create({
-        data: {
-          name: 'Dizimista Teste',
-          email: 'dizimista@example.com',
-          branchId: branchId,
-          role: 'MEMBER',
-        },
+      const tithePayerMember = await createTestMember({
+        name: 'Dizimista Teste',
+        email: 'dizimista@example.com',
+        branchId: branchId,
+        role: 'MEMBER',
       })
 
       const transactionData = {
@@ -439,28 +445,26 @@ describe('Finances Routes', () => {
     })
 
     it('deve retornar 403 quando usuário não tem permissão', async () => {
-      const userWithoutPermission = await prisma.user.create({
-        data: {
-          name: 'User No Permission',
-          email: 'nopermission@example.com',
-          password: await bcrypt.hash('password123', 10),
-        },
+      const userWithoutPermission = await createTestUser({
+        firstName: 'User',
+        lastName: 'No Permission',
+        email: 'nopermission@example.com',
+        password: 'password123',
       })
 
-      const memberWithoutPermission = await prisma.member.create({
-        data: {
-          name: 'Member No Permission',
-          email: 'membernoperm@example.com',
-          branchId: branchId,
-          role: 'MEMBER',
-          userId: userWithoutPermission.id,
-        },
+      const memberWithoutPermission = await createTestMember({
+        name: 'Member No Permission',
+        email: 'membernoperm@example.com',
+        branchId: branchId,
+        role: 'MEMBER',
+        userId: userWithoutPermission.id,
       })
 
+      const fullNameWithoutPermission = `${userWithoutPermission.firstName} ${userWithoutPermission.lastName}`.trim()
       const tokenWithoutPermission = app.jwt.sign({
         sub: userWithoutPermission.id,
         email: userWithoutPermission.email,
-        name: userWithoutPermission.name,
+        name: fullNameWithoutPermission,
         type: 'user',
         memberId: memberWithoutPermission.id,
         role: memberWithoutPermission.role,

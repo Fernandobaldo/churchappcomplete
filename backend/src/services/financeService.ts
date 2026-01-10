@@ -4,6 +4,8 @@ import { TransactionType, EntryType, ExitType } from '@prisma/client'
 interface CreateTransactionInput {
   amount: number
   type: TransactionType
+  title?: string | null
+  category?: string | null
   entryType?: EntryType
   exitType?: ExitType
   exitTypeOther?: string
@@ -19,6 +21,8 @@ interface CreateTransactionInput {
 interface UpdateTransactionInput {
   amount?: number
   type?: TransactionType
+  title?: string | null
+  category?: string | null
   entryType?: EntryType
   exitType?: ExitType
   exitTypeOther?: string
@@ -232,6 +236,8 @@ export class FinanceService {
     }
 
     // Adicionar campos opcionais apenas se estiverem definidos
+    if (data.title !== undefined) transactionData.title = data.title
+    if (data.category !== undefined) transactionData.category = data.category
     if (data.entryType) transactionData.entryType = data.entryType
     if (data.exitType) transactionData.exitType = data.exitType
     if (data.exitTypeOther) transactionData.exitTypeOther = data.exitTypeOther

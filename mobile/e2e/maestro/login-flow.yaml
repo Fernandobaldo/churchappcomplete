@@ -1,0 +1,82 @@
+# E2E Test: Login Flow - Mobile (Maestro)
+# 
+# Browser automation test for login functionality.
+# 
+# Prerequisites:
+# - Maestro installed (see E2E_SETUP.md)
+# - App built and installed on device/simulator
+# - Backend running on accessible URL
+
+appId: com.churchapp.mobile # TODO: Update with actual app ID from app.json
+name: "Login Flow"
+
+---
+# Test 1: Login with valid credentials
+- launchApp
+- assertVisible: "Login Screen" # TODO: Add testID="login-screen" to LoginScreen
+
+# Fill login form
+- tapOn: 
+    id: "login-email-input" # TODO: Add testID to email input
+- inputText: "test@example.com"
+- tapOn:
+    id: "login-password-input" # TODO: Add testID to password input
+- inputText: "password123"
+- tapOn:
+    id: "login-submit-button" # TODO: Add testID to submit button
+
+# Wait for navigation (either dashboard or onboarding)
+- runFlow:
+    when:
+      visible:
+        id: "dashboard-screen" # TODO: Add testID to dashboard screen
+    commands:
+      - assertVisible: "Dashboard Screen"
+- runFlow:
+    when:
+      visible:
+        id: "onboarding-start-screen" # TODO: Add testID to onboarding start
+    commands:
+      - assertVisible: "Onboarding Start Screen"
+
+---
+# Test 2: Login with invalid credentials
+appId: com.churchapp.mobile
+name: "Login Flow - Invalid Credentials"
+
+- launchApp
+- assertVisible: "Login Screen"
+
+# Fill form with invalid credentials
+- tapOn:
+    id: "login-email-input"
+- inputText: "invalid@example.com"
+- tapOn:
+    id: "login-password-input"
+- inputText: "wrongpassword"
+- tapOn:
+    id: "login-submit-button"
+
+# Should show error and stay on login
+- assertVisible: "Login Screen"
+- assertVisible:
+    id: "error-message" # TODO: Add testID to error message
+
+---
+# Test 3: Required field validation
+appId: com.churchapp.mobile
+name: "Login Flow - Required Fields"
+
+- launchApp
+- assertVisible: "Login Screen"
+
+# Try to submit without filling fields
+- tapOn:
+    id: "login-submit-button"
+
+# Should show validation error
+- assertVisible:
+    id: "error-message" # TODO: Add testID to validation error
+# Should still be on login screen
+- assertVisible: "Login Screen"
+

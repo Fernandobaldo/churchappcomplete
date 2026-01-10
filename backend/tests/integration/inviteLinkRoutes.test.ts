@@ -13,6 +13,15 @@ import bcrypt from 'bcryptjs'
 import { resetTestDatabase } from '../utils/resetTestDatabase'
 import { logTestResponse } from '../utils/testResponseHelper'
 import { seedTestDatabase } from '../utils/seedTestDatabase'
+import { 
+  createTestUser,
+  createTestPlan,
+  createTestSubscription,
+  createTestChurch,
+  createTestBranch,
+  createTestMember,
+} from '../utils/testFactories'
+import { SubscriptionStatus } from '@prisma/client'
 
 describe('Invite Link Routes', () => {
   const app = Fastify()
@@ -41,14 +50,12 @@ describe('Invite Link Routes', () => {
         data: { maxMembers: 100 },
       })
     } else {
-      plan = await prisma.plan.create({
-        data: {
-          name: 'Free Plan',
-          price: 0,
-          features: ['basic'],
-          maxMembers: 100,
-          maxBranches: 1,
-        },
+      plan = await createTestPlan({
+        name: 'Free Plan',
+        price: 0,
+        features: ['basic'],
+        maxMembers: 100,
+        maxBranches: 1,
       })
     }
 
@@ -61,59 +68,48 @@ describe('Invite Link Routes', () => {
     })
 
     // Criar User e Member admin
-    const hashedPassword = await bcrypt.hash('password123', 10)
-    const user = await prisma.user.create({
-      data: {
-        name: 'Admin Test',
-        email: 'admin@test.com',
-        password: hashedPassword,
-        Subscription: {
-          create: {
-            planId: plan.id,
-            status: 'active',
-          },
-        },
-      },
+    const user = await createTestUser({
+      firstName: 'Admin',
+      lastName: 'Test',
+      email: 'admin@test.com',
+      password: 'password123',
     })
+    
+    await createTestSubscription(user.id, plan.id, SubscriptionStatus.active)
 
     adminUserId = user.id
 
     // Criar Church e Branch
-    const church = await prisma.church.create({
-      data: {
-        name: 'Igreja Teste',
-        isActive: true,
-      },
+    const church = await createTestChurch({
+      name: 'Igreja Teste',
+      address: 'Test Address',
     })
 
     churchId = church.id
 
-    const branch = await prisma.branch.create({
-      data: {
-        name: 'Sede',
-        churchId: church.id,
-        isMainBranch: true,
-      },
+    const branch = await createTestBranch({
+      name: 'Sede',
+      churchId: church.id,
+      isMainBranch: true,
     })
 
     branchId = branch.id
 
     // Criar Member admin
-    const adminMember = await prisma.member.create({
-      data: {
-        name: 'Admin Test',
-        email: 'admin@test.com',
-        role: 'ADMINGERAL',
-        branchId: branch.id,
-        userId: user.id,
-      },
+    const adminMember = await createTestMember({
+      name: 'Admin Test',
+      email: 'admin@test.com',
+      role: 'ADMINGERAL',
+      branchId: branch.id,
+      userId: user.id,
     })
 
     // Criar token
+    const fullName = `${user.firstName} ${user.lastName}`.trim()
     adminToken = app.jwt.sign({
       sub: user.id,
       email: user.email,
-      name: user.name,
+      name: fullName,
       type: 'member',
       memberId: adminMember.id,
       role: 'ADMINGERAL',
@@ -196,29 +192,27 @@ describe('Invite Link Routes', () => {
     })
 
     it('deve retornar 403 se não tiver permissão', async () => {
-      // Criar membro sem permissão
-      const memberUser = await prisma.user.create({
-        data: {
-          name: 'Member Test',
-          email: 'member@test.com',
-          password: await bcrypt.hash('password123', 10),
-        },
+      // Given: Criar membro sem permissão
+      const memberUser = await createTestUser({
+        firstName: 'Member',
+        lastName: 'Test',
+        email: 'member@test.com',
+        password: 'password123',
       })
 
-      const member = await prisma.member.create({
-        data: {
-          name: 'Member Test',
-          email: 'member@test.com',
-          role: 'MEMBER',
-          branchId,
-          userId: memberUser.id,
-        },
+      const member = await createTestMember({
+        name: 'Member Test',
+        email: 'member@test.com',
+        role: 'MEMBER',
+        branchId,
+        userId: memberUser.id,
       })
 
+      const memberFullName = `${memberUser.firstName} ${memberUser.lastName}`.trim()
       const memberToken = app.jwt.sign({
         sub: memberUser.id,
         email: memberUser.email,
-        name: memberUser.name,
+        name: memberFullName,
         type: 'member',
         memberId: member.id,
         role: 'MEMBER',
@@ -257,28 +251,19 @@ describe('Invite Link Routes', () => {
 
       // Criar 5 membros para atingir o limite
       for (let i = 0; i < 5; i++) {
-        const user = await prisma.user.create({
-          data: {
-            name: `Member ${i}`,
-            email: `member${i}@test.com`,
-            password: await bcrypt.hash('password123', 10),
-            Subscription: {
-              create: {
-                planId: plan.id,
-                status: 'active',
-              },
-            },
-          },
+        const user = await createTestUser({
+          firstName: 'Member',
+          lastName: `${i}`,
+          email: `member${i}@test.com`,
+          password: 'password123',
         })
 
-        await prisma.member.create({
-          data: {
-            name: `Member ${i}`,
-            email: `member${i}@test.com`,
-            role: 'MEMBER',
-            branchId,
-            userId: user.id,
-          },
+        await createTestMember({
+          name: `Member ${i}`,
+          email: `member${i}@test.com`,
+          role: 'MEMBER',
+          branchId,
+          userId: user.id,
         })
       }
 

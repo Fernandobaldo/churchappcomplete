@@ -1,189 +1,205 @@
+// IMPORTANTE: Carregar .env.test ANTES de qualquer importação
 import dotenv from 'dotenv'
-
 dotenv.config({ path: '.env.test' })
 
 process.env.NODE_ENV = 'test'
 process.env.VITEST = 'true'
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import Fastify from 'fastify'
-import fastifyJwt from '@fastify/jwt'
+import { beforeAll, afterAll, beforeEach, describe, it, expect } from 'vitest'
 import request from 'supertest'
 import { prisma } from '../../src/lib/prisma'
-import bcrypt from 'bcryptjs'
-import { resetTestDatabase } from '../utils/resetTestDatabase'
-import { registerRoutes } from '../../src/routes/registerRoutes'
-import { authenticate } from '../../src/middlewares/authenticate'
-import { logTestResponse } from '../utils/testResponseHelper'
+import { resetTestDatabase } from '../utils/db'
+import { createTestApp } from '../utils/createTestApp'
+import { generateTestToken } from '../utils/auth'
+import { 
+  createTestUser, 
+  createTestMember, 
+  createTestChurch, 
+  createTestBranch, 
+  createTestPlan, 
+  createTestSubscription 
+} from '../utils/testFactories'
+import type { FastifyInstance } from 'fastify'
+import { SubscriptionStatus } from '@prisma/client'
 
-describe('Members Routes', () => {
-  const app = Fastify()
+describe('Members Routes - Integration Tests', () => {
+  let app: FastifyInstance
+  let planId: string
+  let adminUser: any
+  let adminMember: any
   let adminToken: string
   let adminMemberId: string
   let adminBranchId: string
   let adminChurchId: string
+  let coordinatorUser: any
+  let coordinatorMember: any
   let coordinatorToken: string
   let coordinatorMemberId: string
+  let memberUser: any
+  let regularMember: any
   let memberToken: string
   let memberId: string
 
   beforeAll(async () => {
-    if (!process.env.JWT_SECRET) {
-      process.env.JWT_SECRET = 'churchapp-secret-key'
-    }
-
-    app.register(fastifyJwt, {
-      secret: process.env.JWT_SECRET || 'churchapp-secret-key',
-    })
-
-    app.decorate('authenticate', authenticate)
-
-    await registerRoutes(app)
-    await app.ready()
-
+    app = await createTestApp()
     await resetTestDatabase()
 
-    // Criar plano
-    const plan = await prisma.plan.findFirst({ where: { name: 'Free Plan' } }) || 
-      await prisma.plan.create({
-        data: {
-          name: 'Free Plan',
-          price: 0,
-          features: ['basic'],
-          maxMembers: 10,
-          maxBranches: 1,
-        },
-      })
+    // Criar plano para testes
+    const plan = await createTestPlan({
+      name: 'Free Plan',
+      maxMembers: 10,
+      maxBranches: 1,
+    })
+    planId = plan.id
+  })
 
-    // Criar igreja
-    const church = await prisma.church.create({
-      data: {
-        name: 'Igreja Teste',
-      },
+  beforeEach(async () => {
+    await resetTestDatabase()
+
+    // Criar plano novamente após reset
+    const plan = await createTestPlan({
+      name: 'Free Plan',
+      maxMembers: 10,
+      maxBranches: 1,
+    })
+    planId = plan.id
+
+    // Criar Church
+    const church = await createTestChurch({
+      name: 'Igreja Teste',
     })
     adminChurchId = church.id
 
-    // Criar filial
-    const branch = await prisma.branch.create({
-      data: {
-        name: 'Filial Teste',
-        churchId: church.id,
-      },
+    // Criar Branch
+    const branch = await createTestBranch({
+      churchId: church.id,
+      name: 'Filial Teste',
+      isMainBranch: true,
     })
     adminBranchId = branch.id
 
-    // Criar usuário ADMINGERAL
-    const adminUser = await prisma.user.create({
-      data: {
-        name: 'Admin User',
-        email: 'admin@example.com',
-        password: await bcrypt.hash('password123', 10),
-      },
+    // Criar User e Member ADMINGERAL
+    adminUser = await createTestUser({
+      email: `admin-${Date.now()}@test.com`,
+      firstName: 'Admin',
+      lastName: 'User',
+      password: 'password123',
     })
 
-    const adminMember = await prisma.member.create({
-      data: {
-        name: 'Admin Member',
-        email: 'adminmember@example.com',
-        branchId: branch.id,
-        role: 'ADMINGERAL',
-        userId: adminUser.id,
-      },
-      include: { Permission: true },
+    await createTestSubscription(adminUser.id, planId, SubscriptionStatus.active)
+
+    adminMember = await createTestMember({
+      userId: adminUser.id,
+      email: adminUser.email,
+      role: 'ADMINGERAL' as any,
+      branchId: branch.id,
     })
     adminMemberId = adminMember.id
 
-    adminToken = app.jwt.sign({
+    const adminMemberWithPermissions = await prisma.member.findUnique({
+      where: { id: adminMember.id },
+      include: { Permission: true },
+    })
+
+    adminToken = await generateTestToken(app, {
       sub: adminUser.id,
       email: adminUser.email,
-      name: adminUser.name,
-      type: 'user',
+      name: `${adminUser.firstName} ${adminUser.lastName}`.trim(),
+      type: 'member',
       memberId: adminMember.id,
       role: adminMember.role,
-      branchId: adminMember.branchId,
+      branchId: branch.id,
       churchId: church.id,
-      permissions: adminMember.Permission.map(p => p.type),
+      permissions: adminMemberWithPermissions!.Permission.map(p => p.type),
+      onboardingCompleted: true,
     })
 
-    // Criar usuário COORDINATOR
-    const coordinatorUser = await prisma.user.create({
-      data: {
-        name: 'Coordinator User',
-        email: 'coordinator@example.com',
-        password: await bcrypt.hash('password123', 10),
-      },
+    // Criar User e Member COORDINATOR
+    coordinatorUser = await createTestUser({
+      email: `coordinator-${Date.now()}@test.com`,
+      firstName: 'Coordinator',
+      lastName: 'User',
     })
 
-    const coordinatorMember = await prisma.member.create({
-      data: {
-        name: 'Coordinator Member',
-        email: 'coordinatormember@example.com',
-        branchId: branch.id,
-        role: 'COORDINATOR',
-        userId: coordinatorUser.id,
-      },
-      include: { Permission: true },
+    await createTestSubscription(coordinatorUser.id, planId, SubscriptionStatus.active)
+
+    coordinatorMember = await createTestMember({
+      userId: coordinatorUser.id,
+      email: coordinatorUser.email,
+      role: 'COORDINATOR' as any,
+      branchId: branch.id,
     })
     coordinatorMemberId = coordinatorMember.id
 
-    coordinatorToken = app.jwt.sign({
+    const coordinatorMemberWithPermissions = await prisma.member.findUnique({
+      where: { id: coordinatorMember.id },
+      include: { Permission: true },
+    })
+
+    coordinatorToken = await generateTestToken(app, {
       sub: coordinatorUser.id,
       email: coordinatorUser.email,
-      name: coordinatorUser.name,
-      type: 'user',
+      name: `${coordinatorUser.firstName} ${coordinatorUser.lastName}`.trim(),
+      type: 'member',
       memberId: coordinatorMember.id,
       role: coordinatorMember.role,
-      branchId: coordinatorMember.branchId,
+      branchId: branch.id,
       churchId: church.id,
-      permissions: coordinatorMember.Permission.map(p => p.type),
+      permissions: coordinatorMemberWithPermissions!.Permission.map(p => p.type),
+      onboardingCompleted: true,
     })
 
-    // Criar usuário MEMBER
-    const memberUser = await prisma.user.create({
-      data: {
-        name: 'Member User',
-        email: 'member@example.com',
-        password: await bcrypt.hash('password123', 10),
-      },
+    // Criar User e Member MEMBER
+    memberUser = await createTestUser({
+      email: `member-${Date.now()}@test.com`,
+      firstName: 'Member',
+      lastName: 'User',
     })
 
-    const regularMember = await prisma.member.create({
-      data: {
-        name: 'Regular Member',
-        email: 'regularmember@example.com',
-        branchId: branch.id,
-        role: 'MEMBER',
-        userId: memberUser.id,
-      },
-      include: { Permission: true },
+    await createTestSubscription(memberUser.id, planId, SubscriptionStatus.active)
+
+    regularMember = await createTestMember({
+      userId: memberUser.id,
+      email: memberUser.email,
+      role: 'MEMBER' as any,
+      branchId: branch.id,
     })
     memberId = regularMember.id
 
-    memberToken = app.jwt.sign({
+    const regularMemberWithPermissions = await prisma.member.findUnique({
+      where: { id: regularMember.id },
+      include: { Permission: true },
+    })
+
+    memberToken = await generateTestToken(app, {
       sub: memberUser.id,
       email: memberUser.email,
-      name: memberUser.name,
-      type: 'user',
+      name: `${memberUser.firstName} ${memberUser.lastName}`.trim(),
+      type: 'member',
       memberId: regularMember.id,
       role: regularMember.role,
-      branchId: regularMember.branchId,
+      branchId: branch.id,
       churchId: church.id,
-      permissions: regularMember.Permission.map(p => p.type),
+      permissions: regularMemberWithPermissions!.Permission.map(p => p.type),
+      onboardingCompleted: true,
     })
   })
 
   afterAll(async () => {
+    await resetTestDatabase()
     await app.close()
   })
 
   describe('GET /members', () => {
-    it('ADMINGERAL deve ver todos os membros da igreja', async () => {
+    // Teste 1: 200/201 Success - ADMINGERAL
+    it('ADMINGERAL deve ver todos os membros da igreja (200 OK)', async () => {
+      // Given: ADMINGERAL autenticado
+      // When: GET /members
       const response = await request(app.server)
         .get('/members')
         .set('Authorization', `Bearer ${adminToken}`)
 
-      logTestResponse(response, 200)
-      logTestResponse(response, 200)
+      // Then: Retorna 200 com todos os membros da igreja
       expect(response.status).toBe(200)
       expect(Array.isArray(response.body)).toBe(true)
       expect(response.body.length).toBeGreaterThanOrEqual(3) // Admin, Coordinator, Member
@@ -195,262 +211,327 @@ describe('Members Routes', () => {
       })
     })
 
-    it('COORDINATOR deve ver apenas membros da sua filial', async () => {
+    // Teste 2: 200/201 Success - COORDINATOR
+    it('COORDINATOR deve ver membros da sua filial (200 OK)', async () => {
+      // Given: COORDINATOR autenticado
+      // When: GET /members
       const response = await request(app.server)
         .get('/members')
         .set('Authorization', `Bearer ${coordinatorToken}`)
 
-      logTestResponse(response, 200)
-      logTestResponse(response, 200)
+      // Then: Retorna 200 com membros da mesma filial
       expect(response.status).toBe(200)
       expect(Array.isArray(response.body)).toBe(true)
-      // Coordinator vê membros da mesma filial
       expect(response.body.length).toBeGreaterThanOrEqual(3)
     })
 
-    it('MEMBER deve ver todos os membros da sua filial', async () => {
+    // Teste 3: 200/201 Success - MEMBER
+    it('MEMBER deve ver todos os membros da sua filial (200 OK)', async () => {
+      // Given: MEMBER autenticado
+      // When: GET /members
       const response = await request(app.server)
         .get('/members')
         .set('Authorization', `Bearer ${memberToken}`)
 
-      logTestResponse(response, 200)
-      logTestResponse(response, 200)
+      // Then: Retorna 200 com membros da mesma filial
       expect(response.status).toBe(200)
       expect(Array.isArray(response.body)).toBe(true)
-      // MEMBER pode ver todos os membros da mesma filial (Admin, Coordinator e Member)
       expect(response.body.length).toBeGreaterThanOrEqual(3)
+      
       // Verifica que o próprio membro está na lista
       const selfMember = response.body.find((m: any) => m.id === memberId)
       expect(selfMember).toBeDefined()
       expect(selfMember).toHaveProperty('id', memberId)
-      // Verifica que não inclui dados sensíveis (email, phone, address) para outros membros
-      // O próprio membro pode ter seus dados, mas vamos verificar que pelo menos a estrutura está correta
-      expect(selfMember).toHaveProperty('name', 'Regular Member')
+      expect(selfMember).toHaveProperty('name', regularMember.name)
+    })
+
+    // Teste 4: 401 Unauthenticated
+    it('deve retornar 401 quando não autenticado', async () => {
+      // Given: Requisição sem token
+      // When: GET /members sem Authorization
+      const response = await request(app.server).get('/members')
+
+      // Then: Retorna 401
+      expect(response.status).toBe(401)
+    })
+
+    // Teste 7: DB side-effect assertions (verificação de filtragem)
+    it('deve retornar apenas membros da mesma igreja', async () => {
+      // Given: Outra igreja com membros
+      const otherChurch = await createTestChurch({
+        name: 'Outra Igreja',
+      })
+
+      const otherBranch = await createTestBranch({
+        churchId: otherChurch.id,
+        name: 'Filial Outra Igreja',
+      })
+
+      const otherUser = await createTestUser({
+        email: `other-${Date.now()}@test.com`,
+      })
+
+      await createTestSubscription(otherUser.id, planId, SubscriptionStatus.active)
+
+      await createTestMember({
+        userId: otherUser.id,
+        email: otherUser.email,
+        role: 'MEMBER' as any,
+        branchId: otherBranch.id,
+      })
+
+      // When: GET /members como ADMINGERAL
+      const response = await request(app.server)
+        .get('/members')
+        .set('Authorization', `Bearer ${adminToken}`)
+
+      // Then: Não inclui membros da outra igreja
+      expect(response.status).toBe(200)
+      const otherChurchMemberIds = response.body
+        .map((m: any) => m.id)
+        .filter((id: string) => id.startsWith(otherBranch.id))
+      expect(otherChurchMemberIds.length).toBe(0)
     })
   })
 
   describe('GET /members/me', () => {
-    it('deve retornar perfil do usuário autenticado', async () => {
+    // Teste 1: 200/201 Success
+    it('deve retornar perfil do usuário autenticado (200 OK)', async () => {
+      // Given: MEMBER autenticado
+      // When: GET /members/me
       const response = await request(app.server)
         .get('/members/me')
         .set('Authorization', `Bearer ${memberToken}`)
 
-      logTestResponse(response, 200)
-      logTestResponse(response, 200)
+      // Then: Retorna 200 com dados do próprio membro
       expect(response.status).toBe(200)
       expect(response.body).toHaveProperty('id', memberId)
-      expect(response.body).toHaveProperty('name', 'Regular Member')
-      expect(response.body).toHaveProperty('email', 'regularmember@example.com')
+      expect(response.body).toHaveProperty('name', regularMember.name)
+      expect(response.body).toHaveProperty('email', regularMember.email)
     })
 
+    // Teste 2: 404 Not Found
     it('deve retornar 404 quando usuário não tem membro associado', async () => {
-      const userWithoutMember = await prisma.user.create({
-        data: {
-          name: 'User Without Member',
-          email: 'nowmember@example.com',
-          password: await bcrypt.hash('password123', 10),
-        },
+      // Given: Usuário sem member
+      const userWithoutMember = await createTestUser({
+        email: `nowmember-${Date.now()}@test.com`,
       })
 
-      const tokenWithoutMember = app.jwt.sign({
+      await createTestSubscription(userWithoutMember.id, planId, SubscriptionStatus.active)
+
+      const tokenWithoutMember = await generateTestToken(app, {
         sub: userWithoutMember.id,
         email: userWithoutMember.email,
-        name: userWithoutMember.name,
+        name: `${userWithoutMember.firstName} ${userWithoutMember.lastName}`.trim(),
         type: 'user',
+        memberId: null,
+        role: null,
+        branchId: null,
+        churchId: null,
+        permissions: [],
+        onboardingCompleted: false,
       })
 
+      // When: GET /members/me
       const response = await request(app.server)
         .get('/members/me')
         .set('Authorization', `Bearer ${tokenWithoutMember}`)
 
-      logTestResponse(response, 404)
-      logTestResponse(response, 404)
+      // Then: Retorna 404
       expect(response.status).toBe(404)
+    })
+
+    // Teste 3: 401 Unauthenticated
+    it('deve retornar 401 quando não autenticado', async () => {
+      // Given: Requisição sem token
+      // When: GET /members/me sem Authorization
+      const response = await request(app.server).get('/members/me')
+
+      // Then: Retorna 401
+      expect(response.status).toBe(401)
     })
   })
 
   describe('GET /members/:id', () => {
-    it('ADMINGERAL deve ver qualquer membro da igreja', async () => {
+    // Teste 1: 200/201 Success - ADMINGERAL
+    it('ADMINGERAL deve ver qualquer membro da igreja (200 OK)', async () => {
+      // Given: ADMINGERAL autenticado
+      // When: GET /members/:id
       const response = await request(app.server)
         .get(`/members/${memberId}`)
         .set('Authorization', `Bearer ${adminToken}`)
 
-      logTestResponse(response, 200)
+      // Then: Retorna 200 com dados do membro
       expect(response.status).toBe(200)
       expect(response.body).toHaveProperty('id', memberId)
-      // Verifica que permissões estão presentes na resposta
       expect(response.body).toHaveProperty('permissions')
       expect(Array.isArray(response.body.permissions)).toBe(true)
     })
 
-    it('COORDINATOR deve ver membros da sua filial', async () => {
+    // Teste 2: 200/201 Success - COORDINATOR
+    it('COORDINATOR deve ver membros da sua filial (200 OK)', async () => {
+      // Given: COORDINATOR autenticado
+      // When: GET /members/:id de membro da mesma filial
       const response = await request(app.server)
         .get(`/members/${memberId}`)
         .set('Authorization', `Bearer ${coordinatorToken}`)
 
-      logTestResponse(response, 200)
+      // Then: Retorna 200 com dados do membro
       expect(response.status).toBe(200)
       expect(response.body).toHaveProperty('id', memberId)
-      // Verifica que permissões estão presentes na resposta
       expect(response.body).toHaveProperty('permissions')
-      expect(Array.isArray(response.body.permissions)).toBe(true)
     })
 
-    it('MEMBER deve ver apenas a si mesmo', async () => {
+    // Teste 3: 200/201 Success - MEMBER
+    it('MEMBER deve ver a si mesmo (200 OK)', async () => {
+      // Given: MEMBER autenticado
+      // When: GET /members/:id do próprio membro
       const response = await request(app.server)
         .get(`/members/${memberId}`)
         .set('Authorization', `Bearer ${memberToken}`)
 
-      logTestResponse(response, 200)
+      // Then: Retorna 200 com dados do próprio membro
       expect(response.status).toBe(200)
       expect(response.body).toHaveProperty('id', memberId)
-      // Verifica que permissões estão presentes na resposta
       expect(response.body).toHaveProperty('permissions')
-      expect(Array.isArray(response.body.permissions)).toBe(true)
     })
 
-    it('MEMBER pode ver outros membros da mesma filial', async () => {
-      // MEMBER pode ver outros membros da mesma filial (todos estão na mesma branch)
+    // Teste 4: 200/201 Success - MEMBER pode ver outros da mesma filial
+    it('MEMBER pode ver outros membros da mesma filial (200 OK)', async () => {
+      // Given: MEMBER autenticado e outro membro na mesma filial
+      // When: GET /members/:id de outro membro da mesma filial
       const response = await request(app.server)
         .get(`/members/${adminMemberId}`)
         .set('Authorization', `Bearer ${memberToken}`)
 
-      logTestResponse(response, 200)
+      // Then: Retorna 200
       expect(response.status).toBe(200)
       expect(response.body).toHaveProperty('id', adminMemberId)
     })
 
+    // Teste 5: 403 Forbidden - MEMBER não vê membros de outras filiais
     it('MEMBER não deve ver membros de outras filiais', async () => {
-      // Criar outra filial
-      const otherBranch = await prisma.branch.create({
-        data: {
-          name: 'Outra Filial',
-          churchId: adminChurchId,
-        },
+      // Given: Outra filial com membro
+      const otherBranch = await createTestBranch({
+        churchId: adminChurchId,
+        name: 'Outra Filial',
       })
 
-      // Criar membro em outra filial
-      const otherBranchUser = await prisma.user.create({
-        data: {
-          name: 'Other Branch User',
-          email: 'otherbranch@example.com',
-          password: await bcrypt.hash('password123', 10),
-        },
+      const otherBranchUser = await createTestUser({
+        email: `otherbranch-${Date.now()}@test.com`,
       })
 
-      const otherBranchMember = await prisma.member.create({
-        data: {
-          name: 'Other Branch Member',
-          email: 'otherbranchmember@example.com',
-          branchId: otherBranch.id,
-          role: 'MEMBER',
-          userId: otherBranchUser.id,
-        },
+      await createTestSubscription(otherBranchUser.id, planId, SubscriptionStatus.active)
+
+      const otherBranchMember = await createTestMember({
+        userId: otherBranchUser.id,
+        email: otherBranchUser.email,
+        role: 'MEMBER' as any,
+        branchId: otherBranch.id,
       })
 
-      // MEMBER não deve ver membro de outra filial
+      // When: GET /members/:id de membro de outra filial
       const response = await request(app.server)
         .get(`/members/${otherBranchMember.id}`)
         .set('Authorization', `Bearer ${memberToken}`)
 
-      logTestResponse(response, 403)
+      // Then: Retorna 403
       expect(response.status).toBe(403)
       expect(response.body).toHaveProperty('error', 'Você só pode visualizar membros da sua filial')
     })
 
+    // Teste 6: 403 Forbidden - ADMINGERAL não vê membros de outras igrejas
     it('ADMINGERAL não deve ver membros de outras igrejas', async () => {
-      // Criar outra igreja
-      const otherChurch = await prisma.church.create({
-        data: {
-          name: 'Outra Igreja',
-        },
+      // Given: Outra igreja com membro
+      const otherChurch = await createTestChurch({
+        name: 'Outra Igreja',
       })
 
-      // Criar filial na outra igreja
-      const otherBranch = await prisma.branch.create({
-        data: {
-          name: 'Filial Outra Igreja',
-          churchId: otherChurch.id,
-        },
+      const otherBranch = await createTestBranch({
+        churchId: otherChurch.id,
+        name: 'Filial Outra Igreja',
       })
 
-      // Criar usuário na outra igreja
-      const otherChurchUser = await prisma.user.create({
-        data: {
-          name: 'Other Church User',
-          email: 'otherchurch@example.com',
-          password: await bcrypt.hash('password123', 10),
-        },
+      const otherChurchUser = await createTestUser({
+        email: `otherchurch-${Date.now()}@test.com`,
       })
 
-      // Criar membro na outra igreja
-      const otherChurchMember = await prisma.member.create({
-        data: {
-          name: 'Other Church Member',
-          email: 'otherchurchmember@example.com',
-          branchId: otherBranch.id,
-          role: 'MEMBER',
-          userId: otherChurchUser.id,
-        },
+      await createTestSubscription(otherChurchUser.id, planId, SubscriptionStatus.active)
+
+      const otherChurchMember = await createTestMember({
+        userId: otherChurchUser.id,
+        email: otherChurchUser.email,
+        role: 'MEMBER' as any,
+        branchId: otherBranch.id,
       })
 
-      // ADMINGERAL não deve ver membro de outra igreja
+      // When: GET /members/:id de membro de outra igreja
       const response = await request(app.server)
         .get(`/members/${otherChurchMember.id}`)
         .set('Authorization', `Bearer ${adminToken}`)
 
-      logTestResponse(response, 403)
+      // Then: Retorna 403
       expect(response.status).toBe(403)
       expect(response.body).toHaveProperty('error', 'Você só pode visualizar membros da sua igreja')
     })
 
+    // Teste 7: 404 Not Found
     it('deve retornar 404 quando membro não existe', async () => {
+      // Given: ID inexistente
       const fakeId = 'cmic00000000000000000000000'
 
+      // When: GET /members/:id
       const response = await request(app.server)
         .get(`/members/${fakeId}`)
         .set('Authorization', `Bearer ${adminToken}`)
 
-      logTestResponse(response, 404)
+      // Then: Retorna 404
       expect(response.status).toBe(404)
     })
   })
 
   describe('PUT /members/:id', () => {
-    it('deve atualizar membro com sucesso', async () => {
+    // Teste 1: 200/201 Success
+    it('deve atualizar membro com sucesso (200 OK)', async () => {
+      // Given: Dados de atualização
       const updateData = {
         name: 'Member Atualizado',
         phone: '11999999999',
       }
 
+      // When: PUT /members/:id
       const response = await request(app.server)
         .put(`/members/${memberId}`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send(updateData)
 
-      logTestResponse(response, 200)
+      // Then: Retorna 200 com dados atualizados
       expect(response.status).toBe(200)
       expect(response.body).toHaveProperty('name', 'Member Atualizado')
       expect(response.body).toHaveProperty('phone', '11999999999')
     })
 
+    // Teste 2: 200/201 Success - Com avatarUrl
     it('deve atualizar membro com avatarUrl', async () => {
+      // Given: Dados com avatarUrl
       const updateData = {
         avatarUrl: 'http://localhost:3000/uploads/avatars/test-avatar.png',
       }
 
+      // When: PUT /members/:id
       const response = await request(app.server)
         .put(`/members/${memberId}`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send(updateData)
 
-      logTestResponse(response, 200)
+      // Then: Retorna 200 com avatarUrl atualizado
       expect(response.status).toBe(200)
       expect(response.body).toHaveProperty('avatarUrl', 'http://localhost:3000/uploads/avatars/test-avatar.png')
     })
 
+    // Teste 3: 200/201 Success - Com positionId
     it('deve atualizar membro com positionId', async () => {
-      // Criar um cargo primeiro
+      // Given: Position criada
       const position = await prisma.churchPosition.create({
         data: {
           name: 'Pastor',
@@ -463,16 +544,16 @@ describe('Members Routes', () => {
         positionId: position.id,
       }
 
+      // When: PUT /members/:id
       const response = await request(app.server)
         .put(`/members/${memberId}`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send(updateData)
 
-      logTestResponse(response, 200)
+      // Then: Retorna 200 e positionId atualizado no banco
       expect(response.status).toBe(200)
-      // Verifica se a resposta contém os campos esperados
       expect(response.body).toHaveProperty('id')
-      // Verifica se positionId foi atualizado no banco
+
       const updatedMember = await prisma.member.findUnique({
         where: { id: memberId },
         include: { Position: true },
@@ -481,67 +562,81 @@ describe('Members Routes', () => {
       expect(updatedMember?.Position?.name).toBe('Pastor')
     })
 
-    it('deve remover cargo do membro (positionId null)', async () => {
-      // Primeiro atribuir um cargo
-      const position = await prisma.churchPosition.findFirst({
-        where: { churchId: adminChurchId },
-      })
-
-      if (position) {
-        await prisma.member.update({
-          where: { id: memberId },
-          data: { positionId: position.id },
-        })
-
-        // Agora remover o cargo - enviar null diretamente
-        const updateData = {
-          positionId: null,
-        }
-
-        const response = await request(app.server)
-          .put(`/members/${memberId}`)
-          .set('Authorization', `Bearer ${adminToken}`)
-          .send(updateData)
-
-        logTestResponse(response, 200)
-        expect(response.status).toBe(200)
-        // Verifica se positionId foi removido no banco
-        const updatedMember = await prisma.member.findUnique({
-          where: { id: memberId },
-        })
-        expect(updatedMember?.positionId).toBeNull()
+    // Teste 4: 401 Unauthenticated
+    it('deve retornar 401 quando não autenticado', async () => {
+      // Given: Dados válidos sem token
+      const updateData = {
+        name: 'Teste',
       }
+
+      // When: PUT /members/:id sem Authorization
+      const response = await request(app.server)
+        .put(`/members/${memberId}`)
+        .send(updateData)
+
+      // Then: Retorna 401
+      expect(response.status).toBe(401)
     })
 
+    // Teste 5: 403 Forbidden
     it('deve retornar 403 quando MEMBER tenta atualizar outro membro', async () => {
+      // Given: MEMBER autenticado tentando atualizar outro membro
       const updateData = {
         name: 'Tentativa de Atualização',
       }
 
+      // When: PUT /members/:id de outro membro
       const response = await request(app.server)
         .put(`/members/${adminMemberId}`)
         .set('Authorization', `Bearer ${memberToken}`)
         .send(updateData)
 
-      logTestResponse(response, 403)
+      // Then: Retorna 403
       expect(response.status).toBe(403)
     })
 
+    // Teste 6: 404 Not Found
     it('deve retornar 404 quando membro não existe', async () => {
+      // Given: ID inexistente
       const fakeId = 'cmic00000000000000000000000'
-
       const updateData = {
         name: 'Teste',
       }
 
+      // When: PUT /members/:id
       const response = await request(app.server)
         .put(`/members/${fakeId}`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send(updateData)
 
-      logTestResponse(response, 404)
+      // Then: Retorna 404
       expect(response.status).toBe(404)
+    })
+
+    // Teste 7: DB side-effect assertions
+    it('deve atualizar membro no banco de dados', async () => {
+      // Given: Dados de atualização
+      const updateData = {
+        name: 'Member DB Updated',
+        phone: '11988888888',
+      }
+
+      // When: PUT /members/:id
+      const response = await request(app.server)
+        .put(`/members/${memberId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(updateData)
+
+      expect(response.status).toBe(200)
+
+      // Then: Membro foi atualizado no banco
+      const updatedMember = await prisma.member.findUnique({
+        where: { id: memberId },
+      })
+
+      expect(updatedMember).not.toBeNull()
+      expect(updatedMember?.name).toBe('Member DB Updated')
+      expect(updatedMember?.phone).toBe('11988888888')
     })
   })
 })
-

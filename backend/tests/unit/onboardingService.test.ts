@@ -112,26 +112,53 @@ describe('ChurchService - Onboarding', () => {
     expect(result.member.role).toBe('ADMINGERAL')
   })
 
-  it('deve criar igreja sem filial se withBranch for false', async () => {
+  it('deve criar igreja sempre com filial (branch obrigatória para Member)', async () => {
+    // Nota: O código sempre cria branch principal, independente de withBranch,
+    // pois é obrigatória para Member conforme comentário no código (linha 47)
     const mockChurch = {
       id: 'church-123',
       name: 'Igreja Sem Filial',
       isActive: true,
     }
 
+    const mockBranch = {
+      id: 'branch-123',
+      name: 'Sede',
+      churchId: mockChurch.id,
+      isMainBranch: true,
+    }
+
     vi.mocked(prisma.church.create).mockResolvedValue(mockChurch as any)
+    vi.mocked(prisma.branch.create).mockResolvedValue(mockBranch as any)
     vi.mocked(prisma.user.findUnique).mockResolvedValue(mockUserData as any)
+    vi.mocked(prisma.member.findFirst).mockResolvedValue(null)
+    vi.mocked(prisma.member.create).mockResolvedValue({
+      id: 'member-123',
+      name: `${mockUserData.firstName} ${mockUserData.lastName}`,
+      email: mockUserData.email,
+      role: 'ADMINGERAL',
+      branchId: mockBranch.id,
+      userId: mockUserData.id,
+    } as any)
+    vi.mocked(prisma.permission.createMany).mockResolvedValue({ count: 0 } as any)
 
     const result = await service.createChurchWithMainBranch(
       {
         name: 'Igreja Sem Filial',
-        withBranch: false,
+        withBranch: false, // Parâmetro é ignorado - branch sempre é criada
       },
       mockUserData
     )
 
     expect(result.church).toEqual(mockChurch)
-    expect(prisma.branch.create).not.toHaveBeenCalled()
+    // Branch sempre é criada (obrigatória para Member)
+    expect(prisma.branch.create).toHaveBeenCalledWith({
+      data: {
+        name: 'Sede', // Nome padrão
+        churchId: mockChurch.id,
+        isMainBranch: true,
+      },
+    })
   })
 
   it('deve associar permissões ao membro administrador', async () => {

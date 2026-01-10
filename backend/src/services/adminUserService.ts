@@ -50,11 +50,12 @@ export class AdminUserService {
       }
     }
 
-    // Busca por email/nome
+    // Busca por email/nome (firstName ou lastName)
     if (filters.search) {
       where.OR = [
         { email: { contains: filters.search, mode: 'insensitive' } },
-        { name: { contains: filters.search, mode: 'insensitive' } },
+        { firstName: { contains: filters.search, mode: 'insensitive' } },
+        { lastName: { contains: filters.search, mode: 'insensitive' } },
       ]
     }
 

@@ -14,6 +14,15 @@ import { prisma } from '../../src/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { resetTestDatabase } from '../utils/resetTestDatabase'
 import { logTestResponse } from '../utils/testResponseHelper'
+import { 
+  createTestUser,
+  createTestPlan,
+  createTestSubscription,
+  createTestChurch,
+  createTestBranch,
+  createTestMember,
+} from '../utils/testFactories'
+import { SubscriptionStatus } from '@prisma/client'
 
 describe('Registro via Link de Convite - E2E', () => {
   const app = Fastify()
@@ -35,14 +44,12 @@ describe('Registro via Link de Convite - E2E', () => {
     // Criar plano ANTES de criar o User para garantir que existe
     let plan = await prisma.plan.findFirst({ where: { name: 'Free Plan' } })
     if (!plan) {
-      plan = await prisma.plan.create({
-        data: {
-          name: 'Free Plan',
-          price: 0,
-          features: ['basic'],
-          maxMembers: 5, // Limite baixo para testar
-          maxBranches: 1,
-        },
+      plan = await createTestPlan({
+        name: 'Free Plan',
+        price: 0,
+        features: ['basic'],
+        maxMembers: 5, // Limite baixo para testar
+        maxBranches: 1,
       })
     } else {
       // Atualizar o plano se já existir
@@ -55,49 +62,38 @@ describe('Registro via Link de Convite - E2E', () => {
     }
 
     // Criar User admin
-    const adminUser = await prisma.user.create({
-      data: {
-        name: 'Admin Test',
-        email: 'admin@test.com',
-        password: await bcrypt.hash('password123', 10),
-        Subscription: {
-          create: {
-            planId: plan.id,
-            status: 'active',
-          },
-        },
-      },
+    const adminUser = await createTestUser({
+      firstName: 'Admin',
+      lastName: 'Test',
+      email: 'admin@test.com',
+      password: 'password123',
     })
+    
+    await createTestSubscription(adminUser.id, plan.id, SubscriptionStatus.active)
 
     // Criar Church e Branch
-    const church = await prisma.church.create({
-      data: {
-        name: 'Igreja Teste',
-        isActive: true,
-      },
+    const church = await createTestChurch({
+      name: 'Igreja Teste',
+      address: 'Test Address',
     })
 
     churchId = church.id
 
-    const branch = await prisma.branch.create({
-      data: {
-        name: 'Sede',
-        churchId: church.id,
-        isMainBranch: true,
-      },
+    const branch = await createTestBranch({
+      name: 'Sede',
+      churchId: church.id,
+      isMainBranch: true,
     })
 
     branchId = branch.id
 
     // Criar Member admin
-    await prisma.member.create({
-      data: {
-        name: 'Admin Test',
-        email: 'admin@test.com',
-        role: 'ADMINGERAL',
-        branchId: branch.id,
-        userId: adminUser.id,
-      },
+    await createTestMember({
+      name: 'Admin Test',
+      email: 'admin@test.com',
+      role: 'ADMINGERAL',
+      branchId: branch.id,
+      userId: adminUser.id,
     })
   })
 
@@ -182,22 +178,19 @@ describe('Registro via Link de Convite - E2E', () => {
     // (1 admin + 4 novos = 5 membros = limite)
     for (let i = 0; i < 4; i++) {
       const timestamp = Date.now()
-      const user = await prisma.user.create({
-        data: {
-          name: `Member ${i}`,
-          email: `limitmember${i}_${timestamp}@test.com`,
-          password: await bcrypt.hash('password123', 10),
-        },
+      const user = await createTestUser({
+        firstName: 'Member',
+        lastName: `${i}`,
+        email: `limitmember${i}_${timestamp}@test.com`,
+        password: 'password123',
       })
 
-      await prisma.member.create({
-        data: {
-          name: `Member ${i}`,
-          email: `limitmember${i}_${timestamp}@test.com`,
-          role: 'MEMBER',
-          branchId,
-          userId: user.id,
-        },
+      await createTestMember({
+        name: `Member ${i}`,
+        email: `limitmember${i}_${timestamp}@test.com`,
+        role: 'MEMBER',
+        branchId,
+        userId: user.id,
       })
     }
 
@@ -227,22 +220,19 @@ describe('Registro via Link de Convite - E2E', () => {
     const existingEmail = 'existing@test.com'
 
     // Criar membro existente
-    const user = await prisma.user.create({
-      data: {
-        name: 'Existing User',
-        email: existingEmail,
-        password: await bcrypt.hash('password123', 10),
-      },
+    const user = await createTestUser({
+      firstName: 'Existing',
+      lastName: 'User',
+      email: existingEmail,
+      password: 'password123',
     })
 
-    await prisma.member.create({
-      data: {
-        name: 'Existing Member',
-        email: existingEmail,
-        role: 'MEMBER',
-        branchId,
-        userId: user.id,
-      },
+    await createTestMember({
+      name: 'Existing Member',
+      email: existingEmail,
+      role: 'MEMBER',
+      branchId,
+      userId: user.id,
     })
 
     const response = await app.inject({
@@ -371,22 +361,19 @@ describe('Registro via Link de Convite - E2E', () => {
     // (1 admin + 4 novos = 5 membros = limite)
     const timestamp = Date.now()
     for (let i = 0; i < 4; i++) {
-      const user = await prisma.user.create({
-        data: {
-          name: `Member ${i}`,
-          email: `limitmember${i}_${timestamp}@test.com`,
-          password: await bcrypt.hash('password123', 10),
-        },
+      const user = await createTestUser({
+        firstName: 'Member',
+        lastName: `${i}`,
+        email: `limitmember${i}_${timestamp}@test.com`,
+        password: 'password123',
       })
 
-      await prisma.member.create({
-        data: {
-          name: `Member ${i}`,
-          email: `limitmember${i}_${timestamp}@test.com`,
-          role: 'MEMBER',
-          branchId,
-          userId: user.id,
-        },
+      await createTestMember({
+        name: `Member ${i}`,
+        email: `limitmember${i}_${timestamp}@test.com`,
+        role: 'MEMBER',
+        branchId,
+        userId: user.id,
       })
     }
 

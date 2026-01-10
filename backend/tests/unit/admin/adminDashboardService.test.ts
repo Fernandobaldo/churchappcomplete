@@ -75,34 +75,25 @@ describe('AdminDashboardService - Unit Tests', () => {
         },
       })
 
-      // Cria usuários com assinaturas
-      const user1 = await prisma.user.create({
-        data: {
-          name: 'User 1',
-          email: 'user1@test.com',
-          password: await bcrypt.hash('password123', 10),
-          Subscription: {
-            create: {
-              planId: freePlan.id,
-              status: 'active',
-            },
-          },
-        },
+      // Usar factory em vez de prisma direto
+      const { createTestUser, createTestSubscription } = await import('../../utils/testFactories')
+      const { SubscriptionStatus } = await import('@prisma/client')
+      
+      const user1 = await createTestUser({
+        firstName: 'User',
+        lastName: '1',
+        email: 'user1@test.com',
+        password: await bcrypt.hash('password123', 10),
       })
+      await createTestSubscription(user1.id, freePlan.id, SubscriptionStatus.active)
 
-      const user2 = await prisma.user.create({
-        data: {
-          name: 'User 2',
-          email: 'user2@test.com',
-          password: await bcrypt.hash('password123', 10),
-          Subscription: {
-            create: {
-              planId: premiumPlan.id,
-              status: 'active',
-            },
-          },
-        },
+      const user2 = await createTestUser({
+        firstName: 'User',
+        lastName: '2',
+        email: 'user2@test.com',
+        password: await bcrypt.hash('password123', 10),
       })
+      await createTestSubscription(user2.id, premiumPlan.id, SubscriptionStatus.active)
 
       const stats = await dashboardService.getDashboardStats()
 
@@ -155,25 +146,21 @@ describe('AdminDashboardService - Unit Tests', () => {
         },
       })
 
+      // Usar factory em vez de prisma direto
+      const { createTestUser, createTestSubscription } = await import('../../utils/testFactories')
+      const { SubscriptionStatus } = await import('@prisma/client')
+      
       const users = []
       for (let i = 0; i < 50; i++) {
-        users.push(
-          prisma.user.create({
-            data: {
-              name: `User ${i}`,
-              email: `user${i}@test.com`,
-              password: await bcrypt.hash('password123', 10),
-              Subscription: {
-                create: {
-                  planId: plan.id,
-                  status: 'active',
-                },
-              },
-            },
-          })
-        )
+        const user = await createTestUser({
+          firstName: 'User',
+          lastName: `${i}`,
+          email: `user${i}@test.com`,
+          password: await bcrypt.hash('password123', 10),
+        })
+        await createTestSubscription(user.id, plan.id, SubscriptionStatus.active)
+        users.push(user)
       }
-      await Promise.all(users)
 
       const startTime = Date.now()
       const stats = await dashboardService.getDashboardStats()

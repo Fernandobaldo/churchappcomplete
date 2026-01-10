@@ -68,12 +68,15 @@ describe('AuthService - Novo Modelo User + Member', () => {
   })
 
   describe('validateCredentials', () => {
+    // Teste 1: Success - Validação de credenciais inválidas (userNotFound)
     it('deve retornar objeto com userNotFound se User não existir', async () => {
+      // Arrange
       prisma.user.findUnique.mockResolvedValue(null)
 
+      // Act
       const result = await authService.validateCredentials('naoexiste@example.com', '123456')
 
-      // A implementação retorna um objeto especial para indicar que o usuário não foi encontrado
+      // Assert
       expect(result).toEqual({ userNotFound: true })
       expect(prisma.user.findUnique).toHaveBeenCalledWith({
         where: { email: 'naoexiste@example.com' },
@@ -92,22 +95,29 @@ describe('AuthService - Novo Modelo User + Member', () => {
       })
     })
 
+    // Teste 2: Validation failure - Senha incorreta
     it('deve retornar objeto com invalidPassword se senha do User estiver incorreta', async () => {
+      // Arrange
       prisma.user.findUnique.mockResolvedValue(mockUserWithMember)
       ;(bcrypt.compare as vi.Mock).mockResolvedValue(false)
 
+      // Act
       const result = await authService.validateCredentials('member@example.com', 'wrongpass')
 
-      // A implementação retorna um objeto especial para indicar que a senha está incorreta
+      // Assert
       expect(result).toEqual({ invalidPassword: true })
     })
 
+    // Teste 3: Success - Validação com Member
     it('deve retornar type: member quando User tem Member associado', async () => {
+      // Arrange
       prisma.user.findUnique.mockResolvedValue(mockUserWithMember)
       ;(bcrypt.compare as vi.Mock).mockResolvedValue(true)
 
+      // Act
       const result = await authService.validateCredentials('member@example.com', '123456')
 
+      // Assert
       expect(result).not.toBeNull()
       expect(result?.type).toBe('member')
       expect(result?.user).toBeDefined()
@@ -116,12 +126,16 @@ describe('AuthService - Novo Modelo User + Member', () => {
       expect(result?.member?.role).toBe('ADMINGERAL')
     })
 
+    // Teste 4: Success - Validação sem Member
     it('deve retornar type: user quando User não tem Member associado', async () => {
+      // Arrange
       prisma.user.findUnique.mockResolvedValue(mockUserWithoutMember)
       ;(bcrypt.compare as vi.Mock).mockResolvedValue(true)
 
+      // Act
       const result = await authService.validateCredentials('admin@example.com', '123456')
 
+      // Assert
       expect(result).not.toBeNull()
       expect(result?.type).toBe('user')
       expect(result?.user).toBeDefined()
@@ -130,12 +144,16 @@ describe('AuthService - Novo Modelo User + Member', () => {
   })
 
   describe('login', () => {
+    // Teste 5: Success - Login com Member
     it('deve retornar token com contexto de Member quando User tem Member', async () => {
+      // Arrange
       prisma.user.findUnique.mockResolvedValue(mockUserWithMember)
       ;(bcrypt.compare as vi.Mock).mockResolvedValue(true)
 
+      // Act
       const result = await authService.login('member@example.com', '123456')
 
+      // Assert
       expect(result).toHaveProperty('token')
       expect(result).toHaveProperty('user')
       expect(result).toHaveProperty('type')
@@ -148,14 +166,18 @@ describe('AuthService - Novo Modelo User + Member', () => {
       expect(result.user.permissions).toHaveLength(2)
     })
 
+    // Teste 6: Success - Login sem Member
     it('deve retornar token sem contexto de Member quando User não tem Member', async () => {
+      // Arrange
       prisma.user.findUnique.mockResolvedValue(mockUserWithoutMember)
       prisma.member.findFirst.mockResolvedValue(null) // Não encontra Member associado
       prisma.member.findUnique.mockResolvedValue(null)
       ;(bcrypt.compare as vi.Mock).mockResolvedValue(true)
 
+      // Act
       const result = await authService.login('admin@example.com', '123456')
 
+      // Assert
       expect(result).toHaveProperty('token')
       expect(result).toHaveProperty('user')
       expect(result).toHaveProperty('type')
@@ -171,11 +193,24 @@ describe('AuthService - Novo Modelo User + Member', () => {
       expect(result.user.permissions.length).toBe(0)
     })
 
+    // Teste 7: Validation failure - Credenciais inválidas
     it('deve lançar erro se credenciais forem inválidas', async () => {
+      // Arrange
       prisma.user.findUnique.mockResolvedValue(null)
 
-      // A implementação lança erro específico quando usuário não é encontrado
+      // Act & Assert
       await expect(authService.login('naoexiste@example.com', '123456')).rejects.toThrow('Usuário não encontrado')
+    })
+
+    // Teste 8: Dependency failure propagation - Erro do Prisma
+    it('deve propagar erro se Prisma falhar', async () => {
+      // Arrange
+      const dbError = new Error('Database connection failed')
+      prisma.user.findUnique.mockRejectedValue(dbError)
+
+      // Act & Assert
+      await expect(authService.login('member@example.com', '123456')).rejects.toThrow(dbError)
+      expect(prisma.user.findUnique).toHaveBeenCalled()
     })
   })
 })

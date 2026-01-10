@@ -15,6 +15,15 @@ import { resetTestDatabase } from '../utils/resetTestDatabase'
 import { registerRoutes } from '../../src/routes/registerRoutes'
 import { authenticate } from '../../src/middlewares/authenticate'
 import { logTestResponse } from '../utils/testResponseHelper'
+import { 
+  createTestUser,
+  createTestPlan,
+  createTestSubscription,
+  createTestChurch,
+  createTestBranch,
+  createTestMember,
+} from '../utils/testFactories'
+import { SubscriptionStatus } from '@prisma/client'
 
 describe('Branches Routes - CRUD Completo', () => {
   const app = Fastify()
@@ -42,103 +51,99 @@ describe('Branches Routes - CRUD Completo', () => {
 
     // Criar plano
     const plan = await prisma.plan.findFirst({ where: { name: 'Free Plan' } }) || 
-      await prisma.plan.create({
-        data: {
-          name: 'Free Plan',
-          price: 0,
-          features: ['basic'],
-          maxMembers: 10,
-          maxBranches: 5, // Permitir múltiplas branches para testes
-        },
+      await createTestPlan({
+        name: 'Free Plan',
+        price: 0,
+        features: ['basic'],
+        maxMembers: 10,
+        maxBranches: 5, // Permitir múltiplas branches para testes
       })
 
     // Criar igreja
-    const church = await prisma.church.create({
-      data: {
-        name: 'Igreja Teste',
-      },
+    const church = await createTestChurch({
+      name: 'Igreja Teste',
     })
     adminChurchId = church.id
 
     // Criar filial principal
-    const mainBranch = await prisma.branch.create({
-      data: {
-        name: 'Filial Principal',
-        churchId: church.id,
-        isMainBranch: true,
-      },
+    const mainBranch = await createTestBranch({
+      name: 'Filial Principal',
+      churchId: church.id,
+      isMainBranch: true,
     })
     adminBranchId = mainBranch.id
 
     // Criar usuário ADMINGERAL
-    const adminUser = await prisma.user.create({
-      data: {
-        name: 'Admin User',
-        email: 'admin@example.com',
-        password: await bcrypt.hash('password123', 10),
-        Subscription: {
-          create: {
-            planId: plan.id,
-            status: 'active',
-          },
-        },
-      },
+    const adminUser = await createTestUser({
+      firstName: 'Admin',
+      lastName: 'User',
+      email: 'admin@example.com',
+      password: 'password123',
+    })
+    
+    await createTestSubscription(adminUser.id, plan.id, SubscriptionStatus.active)
+
+    const adminMember = await createTestMember({
+      name: 'Admin Member',
+      email: 'adminmember@example.com',
+      branchId: mainBranch.id,
+      role: 'ADMINGERAL',
+      userId: adminUser.id,
     })
 
-    const adminMember = await prisma.member.create({
-      data: {
-        name: 'Admin Member',
-        email: 'adminmember@example.com',
-        branchId: mainBranch.id,
-        role: 'ADMINGERAL',
-        userId: adminUser.id,
-      },
+    // Buscar adminMember com Permission incluída
+    const adminMemberWithPermission = await prisma.member.findUnique({
+      where: { id: adminMember.id },
       include: { Permission: true },
     })
-    adminMemberId = adminMember.id
+    adminMemberId = adminMemberWithPermission!.id
 
+    const adminFullName = `${adminUser.firstName} ${adminUser.lastName}`.trim()
     adminToken = app.jwt.sign({
       sub: adminUser.id,
       email: adminUser.email,
-      name: adminUser.name,
+      name: adminFullName,
       type: 'user',
-      memberId: adminMember.id,
-      role: adminMember.role,
-      branchId: adminMember.branchId,
+      memberId: adminMemberWithPermission!.id,
+      role: adminMemberWithPermission!.role,
+      branchId: adminMemberWithPermission!.branchId,
       churchId: church.id,
-      permissions: adminMember.Permission.map(p => p.type),
+      permissions: adminMemberWithPermission!.Permission.map(p => p.type),
     })
 
     // Criar usuário COORDINATOR (sem permissão para criar branches)
-    const coordinatorUser = await prisma.user.create({
-      data: {
-        name: 'Coordinator User',
-        email: 'coordinator@example.com',
-        password: await bcrypt.hash('password123', 10),
-      },
+    const coordinatorUser = await createTestUser({
+      firstName: 'Coordinator',
+      lastName: 'User',
+      email: 'coordinator@example.com',
+      password: 'password123',
     })
 
-    const coordinatorMember = await prisma.member.create({
-      data: {
-        name: 'Coordinator Member',
-        email: 'coordinatormember@example.com',
-        branchId: mainBranch.id,
-        role: 'COORDINATOR',
-        userId: coordinatorUser.id,
-      },
+    const coordinatorMember = await createTestMember({
+      name: 'Coordinator Member',
+      email: 'coordinatormember@example.com',
+      branchId: mainBranch.id,
+      role: 'COORDINATOR',
+      userId: coordinatorUser.id,
+    })
+
+    // Buscar coordinatorMember com Permission incluída
+    const coordinatorMemberWithPermission = await prisma.member.findUnique({
+      where: { id: coordinatorMember.id },
       include: { Permission: true },
     })
 
+    const coordinatorFullName = `${coordinatorUser.firstName} ${coordinatorUser.lastName}`.trim()
     coordinatorToken = app.jwt.sign({
       sub: coordinatorUser.id,
       email: coordinatorUser.email,
-      name: coordinatorUser.name,
+      name: coordinatorFullName,
       type: 'user',
-      memberId: coordinatorMember.id,
-      role: coordinatorMember.role,
-      branchId: coordinatorMember.branchId,
+      memberId: coordinatorMemberWithPermission!.id,
+      role: coordinatorMemberWithPermission!.role,
+      branchId: coordinatorMemberWithPermission!.branchId,
       churchId: church.id,
-      permissions: coordinatorMember.Permission.map(p => p.type),
+      permissions: coordinatorMemberWithPermission!.Permission.map(p => p.type),
     })
   })
 
@@ -222,62 +227,87 @@ describe('Branches Routes - CRUD Completo', () => {
 
     it('deve retornar 403 quando limite de branches é excedido', async () => {
       // Criar plano com limite de 1 branch
-      const limitedPlan = await prisma.plan.create({
-        data: {
-          name: 'Limited Plan',
-          price: 0,
-          features: ['basic'],
-          maxMembers: 10,
-          maxBranches: 1,
-        },
+      const limitedPlan = await createTestPlan({
+        name: 'Limited Plan',
+        price: 0,
+        features: ['basic'],
+        maxMembers: 10,
+        maxBranches: 1,
       })
 
-      const limitedChurch = await prisma.church.create({
-        data: {
-          name: 'Igreja Limitada',
-        },
+      const limitedChurch = await createTestChurch({
+        name: 'Igreja Limitada',
       })
 
       // Criar branch principal
-      await prisma.branch.create({
-        data: {
-          name: 'Filial Principal Limitada',
-          churchId: limitedChurch.id,
-          isMainBranch: true,
-        },
+      const limitedMainBranch = await createTestBranch({
+        name: 'Filial Principal Limitada',
+        churchId: limitedChurch.id,
+        isMainBranch: true,
       })
 
       // Criar admin para esta igreja
-      const limitedAdminUser = await prisma.user.create({
-        data: {
-          name: 'Limited Admin',
-          email: 'limited@example.com',
-          password: await bcrypt.hash('password123', 10),
-        },
+      const limitedAdminUser = await createTestUser({
+        firstName: 'Limited',
+        lastName: 'Admin',
+        email: 'limited@example.com',
+        password: 'password123',
       })
 
-      const limitedAdminMember = await prisma.member.create({
-        data: {
-          name: 'Limited Admin Member',
-          email: 'limitedmember@example.com',
-          branchId: adminBranchId, // Usar branch existente temporariamente
-          role: 'ADMINGERAL',
-          userId: limitedAdminUser.id,
-        },
+      // Criar subscription para o usuário com o plano limitado
+      await createTestSubscription(limitedAdminUser.id, limitedPlan.id, SubscriptionStatus.active)
+
+      const limitedAdminMember = await createTestMember({
+        name: 'Limited Admin Member',
+        email: 'limitedmember@example.com',
+        branchId: limitedMainBranch.id,
+        role: 'ADMINGERAL',
+        userId: limitedAdminUser.id,
+      })
+
+      // Buscar limitedAdminMember com Permission incluída
+      const limitedAdminMemberWithPermission = await prisma.member.findUnique({
+        where: { id: limitedAdminMember.id },
         include: { Permission: true },
       })
 
+      const limitedFullName = `${limitedAdminUser.firstName} ${limitedAdminUser.lastName}`.trim()
       const limitedToken = app.jwt.sign({
         sub: limitedAdminUser.id,
         email: limitedAdminUser.email,
-        name: limitedAdminUser.name,
+        name: limitedFullName,
         type: 'user',
-        memberId: limitedAdminMember.id,
-        role: limitedAdminMember.role,
-        branchId: limitedAdminMember.branchId,
+        memberId: limitedAdminMemberWithPermission!.id,
+        role: limitedAdminMemberWithPermission!.role,
+        branchId: limitedAdminMemberWithPermission!.branchId,
         churchId: limitedChurch.id,
-        permissions: limitedAdminMember.Permission.map(p => p.type),
+        permissions: limitedAdminMemberWithPermission!.Permission.map(p => p.type),
       })
+
+      // Verificar que tudo foi criado corretamente antes de fazer a requisição
+      // Garantir que o usuário tem Member com Branch e Subscription ativa
+      const verifyUser = await prisma.user.findUnique({
+        where: { id: limitedAdminUser.id },
+        include: {
+          Member: {
+            include: {
+              Branch: true,
+            },
+          },
+          Subscription: {
+            where: { status: SubscriptionStatus.active },
+            include: { Plan: true },
+          },
+        },
+      })
+
+      if (!verifyUser?.Member?.Branch) {
+        throw new Error('Member não foi criado corretamente com Branch')
+      }
+
+      if (!verifyUser.Subscription[0]?.Plan) {
+        throw new Error('Subscription não foi criada corretamente')
+      }
 
       const branchData = {
         name: 'Filial Extra',
@@ -292,18 +322,18 @@ describe('Branches Routes - CRUD Completo', () => {
       logTestResponse(response, 403)
       expect(response.status).toBe(403)
       expect(response.body).toHaveProperty('error')
+      // Verificar que o erro é sobre limite excedido, não sobre plano/igreja não encontrada
+      expect(response.body.error).toContain('Limite do plano')
     })
   })
 
   describe('DELETE /branches/:id', () => {
     it('deve deletar branch com sucesso', async () => {
       // Criar branch para deletar
-      const branchToDelete = await prisma.branch.create({
-        data: {
-          name: 'Filial para Deletar',
-          churchId: adminChurchId,
-          isMainBranch: false,
-        },
+      const branchToDelete = await createTestBranch({
+        name: 'Filial para Deletar',
+        churchId: adminChurchId,
+        isMainBranch: false,
       })
 
       const response = await request(app.server)
@@ -343,12 +373,10 @@ describe('Branches Routes - CRUD Completo', () => {
     })
 
     it('deve retornar 403 quando COORDINATOR tenta deletar', async () => {
-      const branchToDelete = await prisma.branch.create({
-        data: {
-          name: 'Filial para Teste',
-          churchId: adminChurchId,
-          isMainBranch: false,
-        },
+      const branchToDelete = await createTestBranch({
+        name: 'Filial para Teste',
+        churchId: adminChurchId,
+        isMainBranch: false,
       })
 
       const response = await request(app.server)

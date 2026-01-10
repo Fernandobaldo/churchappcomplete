@@ -1,0 +1,240 @@
+# Template: E2E Test - Mobile (Maestro)
+# 
+# Padrão Obrigatório: Mínimo de 5 cenários críticos não sobrepostos
+# + 1 por novo fluxo crítico
+# 
+# Estrutura:
+# - Fluxo declarativo em YAML
+# - Device automation real
+# - App deve estar instalado no dispositivo
+# 
+# Localização: mobile/e2e/maestro/[flow].yaml (quando configurado)
+# 
+# ⚠️ STATUS: NÃO CONFIGURADO NO PROJETO
+# 
+# Para configurar Maestro:
+# 1. Instalar Maestro: https://maestro.mobile.dev
+# 2. Executar: maestro test mobile/e2e/maestro/[flow].yaml
+# 
+# Referência: mobile/e2e/README.md (planejamento)
+# 
+# Este template é um placeholder até Maestro ser configurado.
+
+# TODO: Configurar Maestro antes de usar este template
+
+---
+appId: com.churchapp.mobile # TODO: Atualizar com appId real
+name: "[Flow Name] - E2E Test"
+
+# ============================================================================
+# CENÁRIO 1: FLUXO PRINCIPAL HAPPY PATH
+# ============================================================================
+- launchApp
+- assertVisible: "Login Screen" # ou usar testID quando disponível
+
+# Passo 1: Login
+- tapOn: "Email Input" # TODO: Adicionar testID
+- inputText: "user@example.com"
+- tapOn: "Password Input" # TODO: Adicionar testID
+- inputText: "password123"
+- tapOn: "Login Button" # TODO: Adicionar testID
+
+# Passo 2: Aguardar navegação
+- assertVisible: "Dashboard Screen" # TODO: Adicionar testID
+- assertVisible: "Welcome Message"
+
+# Passo 3: Ações no fluxo
+- tapOn: "Action Button" # TODO: Adicionar testID
+- assertVisible: "Form Screen"
+- tapOn: "Field Input" # TODO: Adicionar testID
+- inputText: "Test Value"
+- tapOn: "Submit Button" # TODO: Adicionar testID
+
+# Then - Verificações finais
+- assertVisible: "Success Message"
+- assertVisible: "Operation completed successfully"
+
+---
+appId: com.churchapp.mobile
+name: "[Flow Name] - Campo Obrigatório (Negativo)"
+
+# Negativo incluído no cenário 1: Campo obrigatório
+- launchApp
+- navigateToScreen: "Form Screen" # ou usar flow de navegação
+
+# When - Tentar submeter sem preencher
+- tapOn: "Submit Button" # TODO: Adicionar testID
+
+# Then - Deve mostrar erro
+- assertVisible: "Campo obrigatório"
+- assertVisible: "Error Message" # TODO: Adicionar testID
+
+---
+appId: com.churchapp.mobile
+name: "[Flow Name] - Resumir Fluxo PENDING"
+
+# ============================================================================
+# CENÁRIO 2: RESUMO/RETRY DE FLUXO
+# ============================================================================
+- launchApp
+- navigateToScreen: "Onboarding Screen" # TODO: Adicionar testID
+
+# Given - Estado PENDING (simulado via backend ou estado salvo)
+# Quando app retoma, deve mostrar dados salvos
+
+# When - Retomar fluxo
+- tapOn: "Resume Button" # TODO: Adicionar testID
+
+# Then - Deve preencher dados e continuar
+- assertVisible: "Field Input"
+- assertVisible:
+    text: "Valor Existente" # Verificar que campo tem valor preenchido
+
+---
+appId: com.churchapp.mobile
+name: "[Flow Name] - Bloquear Duplicação (Negativo)"
+
+# Negativo: Bloqueio de duplicação
+- launchApp
+- navigateToScreen: "Create Screen" # TODO: Adicionar testID
+
+# Given - Usuário já possui entidade (simulado)
+
+# When - Tentar criar duplicata
+- tapOn: "Create Button" # TODO: Adicionar testID
+
+# Then - Deve bloquear
+- assertVisible: "Usuário já possui uma igreja"
+- assertNotVisible: "Success Message"
+
+---
+appId: com.churchapp.mobile
+name: "[Flow Name] - Idempotência"
+
+# ============================================================================
+# CENÁRIO 3: IDEMPOTÊNCIA
+# ============================================================================
+- launchApp
+- navigateToScreen: "Form Screen"
+
+# Given - Formulário preenchido
+- tapOn: "Field 1 Input" # TODO: Adicionar testID
+- inputText: "Value 1"
+- tapOn: "Field 2 Input" # TODO: Adicionar testID
+- inputText: "Value 2"
+
+# When - Submeter múltiplas vezes rapidamente
+- tapOn: "Submit Button" # TODO: Adicionar testID
+- tapOn: "Submit Button" # Segunda submissão rápida
+
+# Then - Deve criar apenas uma entidade
+- assertVisible: "Created successfully"
+- assertVisible:
+    text: "1 item" # Verificar que há apenas 1 item na lista
+
+---
+appId: com.churchapp.mobile
+name: "[Flow Name] - Validação Regra Negócio"
+
+# ============================================================================
+# CENÁRIO 4: VALIDAÇÃO DE REGRA DE NEGÓCIO
+# ============================================================================
+- launchApp
+- navigateToScreen: "Form Screen"
+
+# Given - Estado que viola regra de negócio
+# Exemplo: MaxMembers excedido
+
+# When - Tentar ação que viola regra
+- tapOn: "Members Input" # TODO: Adicionar testID
+- inputText: "1000" # Exceder limite do plano
+- tapOn: "Submit Button" # TODO: Adicionar testID
+
+# Then - Deve mostrar erro
+- assertVisible: "Limite de membros do plano excedido"
+- assertVisible: "Error 422" # TODO: Adicionar testID
+
+---
+appId: com.churchapp.mobile
+name: "[Flow Name] - Logout em 401"
+
+# ============================================================================
+# CENÁRIO 5: TRATAMENTO DE ERRO CRÍTICO
+# ============================================================================
+- launchApp
+
+# Given - Usuário autenticado
+- tapOn: "Email Input" # TODO: Adicionar testID
+- inputText: "user@example.com"
+- tapOn: "Password Input" # TODO: Adicionar testID
+- inputText: "password"
+- tapOn: "Login Button" # TODO: Adicionar testID
+- assertVisible: "Dashboard Screen"
+
+# When - Token expira ou se torna inválido
+# Simular: fazer ação que retorna 401
+- tapOn: "Action Requiring Auth" # TODO: Adicionar testID
+
+# Then - Deve fazer logout e redirecionar
+- assertVisible: "Login Screen"
+- assertVisible: "Faça login novamente"
+
+# Verificar que não pode acessar telas protegidas
+- navigateToScreen: "Dashboard Screen"
+- assertVisible: "Login Screen" # Redirecionado de volta
+
+---
+# ============================================================================
+# CONFIGURAÇÃO NECESSÁRIA ANTES DE USAR
+# ============================================================================
+
+# ⚠️ CHECKLIST DE CONFIGURAÇÃO:
+# 
+# 1. Instalar Maestro:
+#    - macOS: brew tap mobile-dev-inc/tap && brew install maestro
+#    - Linux: curl -Ls "https://get.maestro.mobile.dev" | bash
+#    - Windows: https://maestro.mobile.dev/docs/getting-started
+# 
+# 2. Configurar appId correto no YAML
+# 
+# 3. Adicionar testIDs nos componentes:
+#    - React Native: testID prop
+#    - Exemplo: <View testID="login-screen">
+# 
+# 4. Executar testes:
+#    maestro test mobile/e2e/maestro/[flow].yaml
+# 
+# 5. Para iOS Simulator:
+#    maestro test --device "iPhone 13" mobile/e2e/maestro/[flow].yaml
+# 
+# 6. Para Android Emulator:
+#    maestro test --device "emulator-5554" mobile/e2e/maestro/[flow].yaml
+# 
+# Referências:
+# - https://maestro.mobile.dev
+# - https://maestro.mobile.dev/docs/commands
+# - mobile/e2e/README.md (planejamento)
+# 
+# CHECKLIST ANTES DE USAR:
+# 
+# ✅ Configuração:
+# [ ] Maestro instalado
+# [ ] appId configurado corretamente
+# [ ] TestIDs adicionados nos componentes
+# 
+# ✅ Estrutura:
+# [ ] Arquivo está em mobile/e2e/maestro/
+# [ ] Nome segue padrão: [flow].yaml
+# [ ] Fluxo declarativo bem estruturado
+# 
+# ✅ Conteúdo:
+# [ ] Mínimo 5 cenários críticos implementados
+# [ ] Inclui negativos em cenários relevantes
+# [ ] Usa testIDs estáveis quando disponíveis
+# 
+# ✅ Validações:
+# [ ] Valida elementos visíveis
+# [ ] Valida textos/mensagens
+# [ ] Valida navegação entre telas
+# [ ] Valida tratamento de erros
+

@@ -18,6 +18,11 @@ import {
 } from '../../utils/adminTestHelpers'
 import { prisma } from '../../../src/lib/prisma'
 import { logTestResponse } from '../../utils/testResponseHelper'
+import {
+  createTestChurch,
+  createTestBranch,
+  createTestMember,
+} from '../../utils/testFactories'
 
 describe('Admin Members Routes - Integration Tests', () => {
   const app = Fastify()
@@ -53,28 +58,22 @@ describe('Admin Members Routes - Integration Tests', () => {
     superadminToken = superadminAuth.token
 
     // Cria igreja, branch e membro de teste
-    testChurch = await prisma.church.create({
-      data: {
-        name: 'Test Church',
-        isActive: true,
-      },
+    testChurch = await createTestChurch({
+      name: 'Test Church',
+      isActive: true,
     })
 
-    testBranch = await prisma.branch.create({
-      data: {
-        name: 'Test Branch',
-        churchId: testChurch.id,
-        isMainBranch: true,
-      },
+    testBranch = await createTestBranch({
+      name: 'Test Branch',
+      churchId: testChurch.id,
+      isMainBranch: true,
     })
 
-    testMember = await prisma.member.create({
-      data: {
-        name: 'Test Member',
-        email: 'testmember@test.com',
-        role: 'MEMBER',
-        branchId: testBranch.id,
-      },
+    testMember = await createTestMember({
+      name: 'Test Member',
+      email: 'testmember@test.com',
+      role: 'MEMBER',
+      branchId: testBranch.id,
     })
   })
 

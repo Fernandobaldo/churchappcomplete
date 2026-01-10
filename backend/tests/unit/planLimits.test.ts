@@ -15,6 +15,9 @@ vi.mock('../../src/lib/prisma', () => ({
     member: {
       findFirst: vi.fn(),
     },
+    subscription: {
+      findMany: vi.fn(),
+    },
   },
 }))
 
@@ -53,7 +56,9 @@ describe('planLimits', () => {
       },
     }
 
+    // Teste 1: Success - Abaixo do limite
     it('deve permitir criar membro quando está abaixo do limite', async () => {
+      // Arrange
       prisma.user.findUnique.mockResolvedValue(mockUserWithPlan)
       prisma.branch.findMany.mockResolvedValue([
         {
@@ -62,10 +67,13 @@ describe('planLimits', () => {
         },
       ])
 
+      // Act & Assert
       await expect(checkPlanMembersLimit(mockUserId)).resolves.not.toThrow()
     })
 
+    // Teste 2: Validation failure - Limite excedido
     it('deve lançar erro quando o limite de membros é excedido', async () => {
+      // Arrange
       prisma.user.findUnique.mockResolvedValue(mockUserWithPlan)
       prisma.branch.findMany.mockResolvedValue([
         {
@@ -74,12 +82,15 @@ describe('planLimits', () => {
         },
       ])
 
+      // Act & Assert
       await expect(checkPlanMembersLimit(mockUserId)).rejects.toThrow(
         'Limite do plano atingido'
       )
     })
 
+    // Teste 3: Edge case #1 - Plano ilimitado (maxMembers null)
     it('deve permitir criar membro quando maxMembers é null (ilimitado)', async () => {
+      // Arrange
       const userWithUnlimitedPlan = {
         ...mockUserWithPlan,
         Subscription: [
@@ -103,10 +114,13 @@ describe('planLimits', () => {
         },
       ])
 
+      // Act & Assert
       await expect(checkPlanMembersLimit(mockUserId)).resolves.not.toThrow()
     })
 
+    // Teste adicional: Edge case - Usuário sem plano
     it('deve lançar erro quando usuário não tem plano', async () => {
+      // Arrange
       // Usuário com Member e Branch, mas sem Subscription (sem plano próprio)
       prisma.user.findUnique.mockResolvedValue({
         id: mockUserId,
@@ -122,13 +136,22 @@ describe('planLimits', () => {
 
       // Quando busca o plano do ADMINGERAL, também não encontra
       prisma.member.findFirst.mockResolvedValue(null)
+      
+      // Mock necessário porque código pode tentar buscar subscriptions do admin
+      prisma.subscription.findMany.mockResolvedValue([])
+      
+      // Mock necessário porque código busca branches mesmo quando lança erro de plano
+      prisma.branch.findMany.mockResolvedValue([])
 
+      // Act & Assert
       await expect(checkPlanMembersLimit(mockUserId)).rejects.toThrow(
         'Plano não encontrado para o usuário ou para a igreja'
       )
     })
 
+    // Teste 4: Edge case #2 - Usuário sem igreja
     it('deve lançar erro quando usuário não tem igreja', async () => {
+      // Arrange
       prisma.user.findUnique.mockResolvedValue({
         id: mockUserId,
         Subscription: [
@@ -144,12 +167,15 @@ describe('planLimits', () => {
         Member: null,
       })
 
+      // Act & Assert
       await expect(checkPlanMembersLimit(mockUserId)).rejects.toThrow(
         'Igreja não encontrada para o usuário'
       )
     })
 
+    // Teste 5: Edge case #3 - Múltiplas branches
     it('deve contar membros de múltiplas branches', async () => {
+      // Arrange
       prisma.user.findUnique.mockResolvedValue(mockUserWithPlan)
       prisma.branch.findMany.mockResolvedValue([
         {
@@ -162,12 +188,14 @@ describe('planLimits', () => {
         },
       ])
 
-      await expect(checkPlanMembersLimit(mockUserId)).resolves.not.toThrow()
-
+      // Act & Assert
       // Total: 8 membros, limite: 10, deve passar
+      await expect(checkPlanMembersLimit(mockUserId)).resolves.not.toThrow()
     })
 
+    // Teste 6: Validation failure - Limite excedido em múltiplas branches
     it('deve lançar erro quando total de membros em múltiplas branches excede limite', async () => {
+      // Arrange
       prisma.user.findUnique.mockResolvedValue(mockUserWithPlan)
       prisma.branch.findMany.mockResolvedValue([
         {
@@ -180,6 +208,7 @@ describe('planLimits', () => {
         },
       ])
 
+      // Act & Assert
       // Total: 11 membros, limite: 10, deve falhar
       await expect(checkPlanMembersLimit(mockUserId)).rejects.toThrow(
         'Limite do plano atingido'
@@ -217,23 +246,31 @@ describe('planLimits', () => {
       },
     }
 
+    // Teste 1: Success - Abaixo do limite de branches
     it('deve permitir criar branch quando está abaixo do limite', async () => {
+      // Arrange
       prisma.user.findUnique.mockResolvedValue(mockUserWithPlan)
       prisma.branch.count.mockResolvedValue(0)
 
+      // Act & Assert
       await expect(checkPlanBranchesLimit(mockUserId)).resolves.not.toThrow()
     })
 
+    // Teste 2: Validation failure - Limite de branches excedido
     it('deve lançar erro quando o limite de branches é excedido', async () => {
+      // Arrange
       prisma.user.findUnique.mockResolvedValue(mockUserWithPlan)
       prisma.branch.count.mockResolvedValue(1)
 
+      // Act & Assert
       await expect(checkPlanBranchesLimit(mockUserId)).rejects.toThrow(
         'Limite do plano atingido'
       )
     })
 
+    // Teste 3: Edge case #1 - Plano ilimitado (maxBranches null)
     it('deve permitir criar branch quando maxBranches é null (ilimitado)', async () => {
+      // Arrange
       const userWithUnlimitedPlan = {
         ...mockUserWithPlan,
         Subscription: [
@@ -252,10 +289,13 @@ describe('planLimits', () => {
       prisma.user.findUnique.mockResolvedValue(userWithUnlimitedPlan)
       prisma.branch.count.mockResolvedValue(10)
 
+      // Act & Assert
       await expect(checkPlanBranchesLimit(mockUserId)).resolves.not.toThrow()
     })
 
+    // Teste 4: Edge case #2 - Usuário sem plano
     it('deve lançar erro quando usuário não tem plano', async () => {
+      // Arrange
       const mockChurchId = 'church-1'
       
       // Usuário com Member e Branch, mas sem Subscription (sem plano próprio)
@@ -273,13 +313,22 @@ describe('planLimits', () => {
 
       // Quando busca o plano do ADMINGERAL, também não encontra
       prisma.member.findFirst.mockResolvedValue(null)
+      
+      // Mock necessário porque código pode tentar buscar subscriptions do admin
+      prisma.subscription.findMany.mockResolvedValue([])
+      
+      // Mock necessário porque código busca branches mesmo quando lança erro de plano
+      prisma.branch.count.mockResolvedValue(0)
 
+      // Act & Assert
       await expect(checkPlanBranchesLimit(mockUserId)).rejects.toThrow(
         'Plano não encontrado para o usuário ou para a igreja'
       )
     })
 
+    // Teste 5: Edge case #3 - Usuário sem igreja
     it('deve lançar erro quando usuário não tem igreja', async () => {
+      // Arrange
       prisma.user.findUnique.mockResolvedValue({
         id: mockUserId,
         Subscription: [
@@ -295,6 +344,7 @@ describe('planLimits', () => {
         Member: null,
       })
 
+      // Act & Assert
       await expect(checkPlanBranchesLimit(mockUserId)).rejects.toThrow(
         'Igreja não encontrada para o usuário'
       )

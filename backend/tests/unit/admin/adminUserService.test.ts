@@ -44,19 +44,16 @@ describe('AdminUserService - Unit Tests', () => {
       },
     })
 
-    testUser = await prisma.user.create({
-      data: {
-        name: 'Test User',
-        email: 'testuser@test.com',
-        password: await bcrypt.hash('password123', 10),
-        Subscription: {
-          create: {
-            planId: testPlan.id,
-            status: 'active',
-          },
-        },
-      },
+    // Usar factory em vez de prisma direto
+    const { createTestUser, createTestSubscription } = await import('../../utils/testFactories')
+    const { SubscriptionStatus } = await import('@prisma/client')
+    testUser = await createTestUser({
+      firstName: 'Test',
+      lastName: 'User',
+      email: 'testuser@test.com',
+      password: await bcrypt.hash('password123', 10),
     })
+    await createTestSubscription(testUser.id, testPlan.id, SubscriptionStatus.active)
   })
 
   afterAll(async () => {
@@ -89,13 +86,14 @@ describe('AdminUserService - Unit Tests', () => {
 
   describe('getAllUsers - filtros e paginação', () => {
     it('deve filtrar usuários por status bloqueado', async () => {
-      const blockedUser = await prisma.user.create({
-        data: {
-          name: 'Blocked User',
-          email: 'blocked@test.com',
-          password: await bcrypt.hash('password123', 10),
-          isBlocked: true,
-        },
+      // Usar factory em vez de prisma direto
+      const { createTestUser } = await import('../../utils/testFactories')
+      const blockedUser = await createTestUser({
+        firstName: 'Blocked',
+        lastName: 'User',
+        email: 'blocked@test.com',
+        password: await bcrypt.hash('password123', 10),
+        isBlocked: true,
       })
 
       const result = await userService.getAllUsers(

@@ -10,7 +10,7 @@ import Fastify from 'fastify'
 import fastifyJwt from '@fastify/jwt'
 import request from 'supertest'
 import { registerRoutes } from '../../../src/routes/registerRoutes'
-import { resetTestDatabase } from '../../utils/resetTestDatabase'
+import { resetTestDatabase } from '../../utils/db'
 import {
   createAdminUsersFixtures,
   loginAdmin,
@@ -20,6 +20,11 @@ import { AdminRole, SubscriptionStatus } from '@prisma/client'
 import { prisma } from '../../../src/lib/prisma'
 import { logTestResponse } from '../../utils/testResponseHelper'
 import bcrypt from 'bcryptjs'
+import { 
+  createTestPlan,
+  createTestUser,
+  createTestSubscription,
+} from '../../utils/testFactories'
 
 describe('Admin Subscriptions Routes - Integration Tests', () => {
   const app = Fastify()
@@ -73,31 +78,26 @@ describe('Admin Subscriptions Routes - Integration Tests', () => {
     supportToken = supportAuth.token
 
     // Cria plano, usuário e assinatura de teste
-    testPlan = await prisma.plan.create({
-      data: {
-        name: 'Test Plan',
-        price: 0,
-        features: ['basic'],
-        maxMembers: 10,
-        maxBranches: 1,
-      },
+    testPlan = await createTestPlan({
+      name: 'Test Plan',
+      price: 0,
+      features: ['basic'],
+      maxMembers: 10,
+      maxBranches: 1,
     })
 
-    testUser = await prisma.user.create({
-      data: {
-        name: 'Test User',
-        email: 'testuser@test.com',
-        password: await bcrypt.hash('password123', 10),
-      },
+    testUser = await createTestUser({
+      firstName: 'Test',
+      lastName: 'User',
+      email: 'testuser@test.com',
+      password: 'password123',
     })
 
-    testSubscription = await prisma.subscription.create({
-      data: {
-        userId: testUser.id,
-        planId: testPlan.id,
-        status: SubscriptionStatus.active,
-      },
-    })
+    testSubscription = await createTestSubscription(
+      testUser.id,
+      testPlan.id,
+      SubscriptionStatus.active
+    )
   })
 
   afterAll(async () => {
@@ -159,14 +159,13 @@ describe('Admin Subscriptions Routes - Integration Tests', () => {
 
   describe('ADM_API_SUBS_TS001_TC004: PATCH /admin/subscriptions/:id/plan - trocar plano (SUPERADMIN/FINANCE)', () => {
     it('deve trocar plano quando SUPERADMIN', async () => {
-      const newPlan = await prisma.plan.create({
-        data: {
-          name: 'New Plan',
-          price: 99.99,
-          features: ['advanced'],
-          maxMembers: 100,
-          maxBranches: 5,
-        },
+      // Given: Novo plano criado
+      const newPlan = await createTestPlan({
+        name: 'New Plan',
+        price: 99.99,
+        features: ['advanced'],
+        maxMembers: 100,
+        maxBranches: 5,
       })
 
       const response = await request(app.server)
@@ -179,14 +178,13 @@ describe('Admin Subscriptions Routes - Integration Tests', () => {
     })
 
     it('deve permitir FINANCE trocar plano', async () => {
-      const newPlan = await prisma.plan.create({
-        data: {
-          name: 'Finance Plan',
-          price: 49.99,
-          features: ['basic'],
-          maxMembers: 50,
-          maxBranches: 3,
-        },
+      // Given: Novo plano criado
+      const newPlan = await createTestPlan({
+        name: 'Finance Plan',
+        price: 49.99,
+        features: ['basic'],
+        maxMembers: 50,
+        maxBranches: 3,
       })
 
       const response = await request(app.server)

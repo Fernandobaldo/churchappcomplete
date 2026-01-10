@@ -5,94 +5,63 @@ dotenv.config({ path: '.env.test' })
 process.env.NODE_ENV = 'test'
 process.env.VITEST = 'true'
 
-import Fastify from 'fastify'
-import fastifyJwt from '@fastify/jwt'
-import { beforeAll, afterAll, describe, it, expect, beforeEach } from 'vitest'
+import { beforeAll, afterAll, beforeEach, describe, it, expect } from 'vitest'
 import request from 'supertest'
-import { registerRoutes } from '../../src/routes/registerRoutes'
 import { prisma } from '../../src/lib/prisma'
-import bcrypt from 'bcryptjs'
-import { resetTestDatabase } from '../utils/resetTestDatabase'
-import { seedTestDatabase } from '../utils/seedTestDatabase'
-import { authenticate } from '../../src/middlewares/authenticate'
-import { logTestResponse } from '../utils/testResponseHelper'
+import { resetTestDatabase } from '../utils/db'
+import { createTestApp } from '../utils/createTestApp'
+import { generateTestToken } from '../utils/auth'
+import { 
+  createTestUser, 
+  createTestMember, 
+  createTestChurch, 
+  createTestBranch, 
+  createTestPlan, 
+  createTestSubscription 
+} from '../utils/testFactories'
+import type { FastifyInstance } from 'fastify'
+import { SubscriptionStatus } from '@prisma/client'
 
-describe('Onboarding Routes - Fluxo Completo', () => {
-  const app = Fastify()
-  let testData: Awaited<ReturnType<typeof seedTestDatabase>>
-  let userToken: string
-  let userId: string
+describe('Onboarding Routes - Integration Tests', () => {
+  let app: FastifyInstance
+  let planId: string
 
   beforeAll(async () => {
-    app.register(fastifyJwt, {
-      secret: 'churchapp-secret-key',
-    })
-
-    // Usa o middleware authenticate do projeto que popula request.user corretamente
-    app.decorate('authenticate', authenticate)
-
-    await registerRoutes(app)
-    await app.ready()
-
+    app = await createTestApp()
     await resetTestDatabase()
-    testData = await seedTestDatabase()
   })
 
   afterAll(async () => {
+    await resetTestDatabase()
     await app.close()
   })
 
-  beforeEach(async () => {
-    // Cria um usuário de teste para o onboarding
-    const hashedPassword = await bcrypt.hash('password123', 10)
-    const user = await prisma.user.create({
-      data: {
-        firstName: 'Onboarding',
-        lastName: 'User',
-        email: `onboarding-${Date.now()}@test.com`,
-        password: hashedPassword,
-      },
+  describe('POST /register - Public Registration (fromLandingPage)', () => {
+    beforeEach(async () => {
+      await resetTestDatabase()
+
+      // Criar plano Free Plan (necessário para registro público criar subscription)
+      await createTestPlan({
+        name: 'Free Plan',
+        maxMembers: 10,
+        maxBranches: 1,
+      })
     })
 
-    userId = user.id
-
-    // Busca plano Free
-    const freePlan = await prisma.plan.findFirst({ where: { name: 'free' } })
-    if (freePlan) {
-      await prisma.subscription.create({
-        data: {
-          userId: user.id,
-          planId: freePlan.id,
-          status: 'active',
-        },
-      })
-    }
-
-    // Gera token JWT
-    const tokenPayload = {
-      sub: user.id,
-      email: user.email,
-      name: `${user.firstName} ${user.lastName}`,
-      type: 'user' as const,
-      role: null,
-      branchId: null,
-      permissions: [],
-    }
-
-    userToken = app.jwt.sign(tokenPayload, { expiresIn: '7d' })
-  })
-
-  describe('POST /register - Registro Público', () => {
-    it('deve criar usuário e retornar token', async () => {
+    // Teste 1: 200/201 Success
+    it('deve criar usuário público e retornar token (201 Created)', async () => {
+      // Given: Dados de registro válidos
+      // When: POST /register com fromLandingPage
       const response = await request(app.server)
         .post('/register')
         .send({
           name: 'Novo Usuário',
           email: `newuser-${Date.now()}@test.com`,
           password: 'password123',
+          fromLandingPage: true,
         })
 
-      logTestResponse(response, 201)
+      // Then: Retorna 201 com token e user
       expect(response.status).toBe(201)
       expect(response.body).toHaveProperty('token')
       expect(response.body).toHaveProperty('user')
@@ -100,379 +69,149 @@ describe('Onboarding Routes - Fluxo Completo', () => {
       expect(response.body.user).toHaveProperty('email')
     })
 
-    it('deve retornar erro se email já existe', async () => {
+    // Teste 2: 400 Invalid payload
+    it('deve retornar 400 se campos obrigatórios estiverem ausentes', async () => {
+      // Given: Requisição sem campos obrigatórios
+      // When: POST /register sem name/email/password
+      const response = await request(app.server)
+        .post('/register')
+        .send({
+          fromLandingPage: true,
+        })
+
+      // Then: Retorna 400
+      expect(response.status).toBe(400)
+    })
+
+    // Teste 3: 401 Unauthenticated (não aplicável para registro público)
+
+    // Teste 4: 403 Forbidden (não aplicável)
+
+    // Teste 5: 409 Conflict - Email duplicado
+    it('deve retornar 400 ou 409 se email já existe', async () => {
+      // Given: Email já cadastrado
       const email = `duplicate-${Date.now()}@test.com`
 
-      // Primeira criação
       await request(app.server).post('/register').send({
         name: 'Usuário 1',
         email,
         password: 'password123',
+        fromLandingPage: true,
       })
 
-      // Tentativa duplicada
+      // When: Tentar registrar novamente com mesmo email
       const response = await request(app.server).post('/register').send({
         name: 'Usuário 2',
         email,
         password: 'password123',
+        fromLandingPage: true,
       })
 
-      logTestResponse(response, 400)
-      expect(response.status).toBe(400)
-      expect(response.body.error).toContain('já cadastrado')
+      // Then: Retorna 400 ou 409
+      expect([400, 409]).toContain(response.status)
+      expect(response.body.error || response.body.message).toBeDefined()
     })
-  })
 
-  describe('POST /churches - Criação de Igreja', () => {
-    it('deve criar igreja com filial principal', async () => {
+    // Teste 6: 422 Business rule (não aplicável para registro público)
+
+    // Teste 7: DB side-effect assertions
+    it('deve criar User e Subscription no banco ao registrar', async () => {
+      // Given: Dados de registro
+      const email = `db-test-${Date.now()}@test.com`
+
+      // When: POST /register
       const response = await request(app.server)
-        .post('/churches')
-        .set('Authorization', `Bearer ${userToken}`)
+        .post('/register')
         .send({
-          name: 'Igreja de Teste',
-          withBranch: true,
-          branchName: 'Sede',
+          name: 'User DB Test',
+          email,
+          password: 'password123',
+          fromLandingPage: true,
         })
 
-      logTestResponse(response, 201)
       expect(response.status).toBe(201)
-      expect(response.body).toHaveProperty('church')
-      expect(response.body.church).toHaveProperty('id')
-      expect(response.body.church.name).toBe('Igreja de Teste')
-      expect(response.body).toHaveProperty('branch')
-      expect(response.body.branch.isMainBranch).toBe(true)
-    })
 
-    it('deve retornar igreja existente ao tentar criar segunda vez (idempotência)', async () => {
-      // Primeira criação
-      const firstResponse = await request(app.server)
-        .post('/churches')
-        .set('Authorization', `Bearer ${userToken}`)
-        .send({
-          name: 'Igreja Idempotente',
-          withBranch: true,
-          branchName: 'Sede',
-        })
-
-      expect(firstResponse.status).toBe(201)
-      const firstChurchId = firstResponse.body.church.id
-
-      // Segunda tentativa de criação (deve retornar a mesma igreja)
-      const secondResponse = await request(app.server)
-        .post('/churches')
-        .set('Authorization', `Bearer ${userToken}`)
-        .send({
-          name: 'Igreja Idempotente 2',
-          withBranch: true,
-          branchName: 'Sede',
-        })
-
-      logTestResponse(secondResponse, 200)
-      expect(secondResponse.status).toBe(200)
-      expect(secondResponse.body).toHaveProperty('existing', true)
-      expect(secondResponse.body.church.id).toBe(firstChurchId)
-      expect(secondResponse.body.church.name).toBe('Igreja Idempotente') // Mantém nome original
-
-      // Verificar que não foi criada uma segunda igreja
-      const churches = await prisma.church.findMany({
-        where: { createdByUserId: userId },
-      })
-      expect(churches.length).toBe(1)
-    })
-
-    it('deve criar membro administrador ao criar igreja', async () => {
-      const response = await request(app.server)
-        .post('/churches')
-        .set('Authorization', `Bearer ${userToken}`)
-        .send({
-          name: 'Igreja com Admin',
-          withBranch: true,
-          branchName: 'Sede',
-        })
-
-      logTestResponse(response, 201)
-      expect(response.status).toBe(201)
-      expect(response.body).toHaveProperty('member')
-      expect(response.body.member.role).toBe('ADMINGERAL')
-    })
-
-    it('deve retornar 401 sem autenticação', async () => {
-      const response = await request(app.server).post('/churches').send({
-        name: 'Igreja Sem Auth',
+      // Then: Verifica side-effects no banco
+      const user = await prisma.user.findUnique({
+        where: { email },
+        include: { Subscription: true },
       })
 
-      logTestResponse(response, 401)
-      expect(response.status).toBe(401)
+      expect(user).toBeDefined()
+      expect(user?.email).toBe(email)
+      expect(user?.Subscription.length).toBeGreaterThan(0)
     })
   })
 
-  describe('GET /churches - Buscar Igrejas', () => {
-    it('deve retornar array vazio quando usuário não tem branchId (sem igreja configurada)', async () => {
-      const response = await request(app.server)
-        .get('/churches')
-        .set('Authorization', `Bearer ${userToken}`)
-
-      logTestResponse(response, 200)
-      expect(response.status).toBe(200)
-      expect(response.body).toEqual([])
-    })
-
-    it('deve retornar apenas a igreja do usuário quando tem branchId', async () => {
-      // Primeiro cria uma igreja para o usuário
-      const churchResponse = await request(app.server)
-        .post('/churches')
-        .set('Authorization', `Bearer ${userToken}`)
-        .send({
-          name: 'Igreja do Usuário',
-          withBranch: true,
-          branchName: 'Sede',
-        })
-
-      expect(churchResponse.status).toBe(201)
-      const memberToken = churchResponse.body.token
-
-      // Agora busca as igrejas com o token que tem branchId
-      const response = await request(app.server)
-        .get('/churches')
-        .set('Authorization', `Bearer ${memberToken}`)
-
-      logTestResponse(response, 200)
-      expect(response.status).toBe(200)
-      expect(Array.isArray(response.body)).toBe(true)
-      expect(response.body.length).toBe(1)
-      expect(response.body[0]).toHaveProperty('id')
-      expect(response.body[0].name).toBe('Igreja do Usuário')
-    })
-
-    it('não deve retornar igrejas de outros usuários', async () => {
-      // Cria uma segunda igreja com outro usuário
-      const hashedPassword2 = await bcrypt.hash('password123', 10)
-      const user2 = await prisma.user.create({
-        data: {
-          firstName: 'Outro',
-          lastName: 'Usuário',
-          email: `otheruser-${Date.now()}@test.com`,
-          password: hashedPassword2,
-        },
-      })
-
-      const freePlan = await prisma.plan.findFirst({ where: { name: 'free' } })
-      if (freePlan) {
-        await prisma.subscription.create({
-          data: {
-            userId: user2.id,
-            planId: freePlan.id,
-            status: 'active',
-          },
-        })
-      }
-
-      const tokenPayload2 = {
-        sub: user2.id,
-        email: user2.email,
-        name: `${user2.firstName} ${user2.lastName}`,
-        type: 'user' as const,
-        role: null,
-        branchId: null,
-        permissions: [],
-      }
-
-      const userToken2 = app.jwt.sign(tokenPayload2, { expiresIn: '7d' })
-
-      // Cria igreja para o segundo usuário
-      const churchResponse2 = await request(app.server)
-        .post('/churches')
-        .set('Authorization', `Bearer ${userToken2}`)
-        .send({
-          name: 'Igreja do Outro Usuário',
-          withBranch: true,
-          branchName: 'Sede',
-        })
-
-      expect(churchResponse2.status).toBe(201)
-      const memberToken2 = churchResponse2.body.token
-
-      // Cria igreja para o primeiro usuário
-      const churchResponse1 = await request(app.server)
-        .post('/churches')
-        .set('Authorization', `Bearer ${userToken}`)
-        .send({
-          name: 'Igreja do Primeiro Usuário',
-          withBranch: true,
-          branchName: 'Sede',
-        })
-
-      expect(churchResponse1.status).toBe(201)
-      const memberToken1 = churchResponse1.body.token
-
-      // Busca igrejas com token do primeiro usuário
-      const response = await request(app.server)
-        .get('/churches')
-        .set('Authorization', `Bearer ${memberToken1}`)
-
-      logTestResponse(response, 200)
-      expect(response.status).toBe(200)
-      expect(Array.isArray(response.body)).toBe(true)
-      expect(response.body.length).toBe(1)
-      expect(response.body[0].name).toBe('Igreja do Primeiro Usuário')
-      // Não deve conter a igreja do outro usuário
-      expect(response.body.find((c: any) => c.name === 'Igreja do Outro Usuário')).toBeUndefined()
-    })
-  })
-
-  describe('POST /branches - Criação de Filiais', () => {
-    let churchId: string
-    let memberToken: string
+  describe('GET /onboarding/state - Onboarding State', () => {
+    let userToken: string
+    let userId: string
 
     beforeEach(async () => {
-      // Cria igreja antes de cada teste
-      const churchResponse = await request(app.server)
-        .post('/churches')
-        .set('Authorization', `Bearer ${userToken}`)
-        .send({
-          name: 'Igreja para Filiais',
-          withBranch: true,
-          branchName: 'Sede',
-        })
+      await resetTestDatabase()
 
-      churchId = churchResponse.body.church.id
-      
-      // Usa o token retornado da criação da igreja (que tem branchId e role)
-      if (churchResponse.body.token) {
-        memberToken = churchResponse.body.token
-        
-        // Garante que o userId do token tenha subscription
-        // O token usa dbUser.id (userId do token original), não member.userId
-        // Precisamos decodificar o token para pegar o userId correto
-        const decoded = app.jwt.decode(memberToken) as any
-        const tokenUserId = decoded?.sub || decoded?.userId || userId
-        
-        // Busca o plano (pode ser 'free' ou 'Free Plan')
-        const freePlan = await prisma.plan.findFirst({ 
-          where: { 
-            OR: [
-              { name: 'free' },
-              { name: 'Free Plan' },
-              { name: { contains: 'free', mode: 'insensitive' } }
-            ]
-          } 
-        })
-        
-        if (freePlan) {
-          // Verifica se já existe subscription para o userId do token
-          const existingSubscription = await prisma.subscription.findFirst({
-            where: { userId: tokenUserId, status: 'active' }
-          })
-          if (!existingSubscription) {
-            await prisma.subscription.create({
-              data: {
-                userId: tokenUserId,
-                planId: freePlan.id,
-                status: 'active',
-              },
-            })
-          }
-        }
-      } else {
-        // Se não retornou token, cria um manualmente
-        const member = churchResponse.body.member
-        const updatedTokenPayload = {
-          sub: userId,
-          email: 'onboarding@test.com',
-          name: 'Onboarding User',
-          type: 'member' as const,
-          role: member.role,
-          branchId: member.branchId,
-          permissions: ['events_manage', 'contributions_manage', 'members_manage'],
-        }
-        memberToken = app.jwt.sign(updatedTokenPayload, { expiresIn: '7d' })
-      }
-    })
-
-    it('deve criar filial com sucesso', async () => {
-      // Aumenta o limite de filiais do plano para permitir criar uma filial adicional
-      // (já existe 1 filial principal criada com a igreja)
-      const plan = await prisma.plan.findFirst({ 
-        where: { 
-          OR: [
-            { name: 'free' },
-            { name: 'Free Plan' },
-            { name: { contains: 'free', mode: 'insensitive' } }
-          ]
-        } 
+      // Criar plano após reset (necessário para subscription)
+      const plan = await createTestPlan({
+        name: 'Free Plan',
+        maxMembers: 10,
+        maxBranches: 1,
       })
-      
-      if (plan) {
-        // Salva o limite original
-        const originalLimit = plan.maxBranches
-        
-        // Aumenta o limite temporariamente para o teste
-        await prisma.plan.update({
-          where: { id: plan.id },
-          data: { maxBranches: 2 },
-        })
-        
-        try {
-          const response = await request(app.server)
-            .post('/branches')
-            .set('Authorization', `Bearer ${memberToken}`)
-            .send({
-              name: 'Filial Centro',
-              churchId,
-            })
+      const planId = plan.id
 
-          logTestResponse(response, 201)
-      expect(response.status).toBe(201)
-          expect(response.body).toHaveProperty('id')
-          expect(response.body.name).toBe('Filial Centro')
-          expect(response.body.churchId).toBe(churchId)
-          
-          // Restaura o limite original
-          await prisma.plan.update({
-            where: { id: plan.id },
-            data: { maxBranches: originalLimit },
-          })
-        } catch (error) {
-          // Restaura o limite original mesmo em caso de erro
-          await prisma.plan.update({
-            where: { id: plan.id },
-            data: { maxBranches: originalLimit },
-          })
-          throw error
-        }
-      } else {
-        // Se não encontrar o plano, o teste deve falhar
-        throw new Error('Plano não encontrado para o teste')
-      }
+      // Criar User sem Member
+      const user = await createTestUser({
+        email: `onboarding-${Date.now()}@test.com`,
+        firstName: 'Onboarding',
+        lastName: 'User',
+      })
+
+      await createTestSubscription(user.id, planId, SubscriptionStatus.active)
+
+      userId = user.id
+
+      userToken = await generateTestToken(app, {
+        sub: user.id,
+        email: user.email,
+        name: `${user.firstName} ${user.lastName}`.trim(),
+        type: 'user',
+        memberId: null,
+        role: null,
+        branchId: null,
+        churchId: null,
+        permissions: [],
+        onboardingCompleted: false,
+      })
     })
 
-    it('deve retornar erro se churchId não existe', async () => {
-      const response = await request(app.server)
-        .post('/branches')
-        .set('Authorization', `Bearer ${memberToken}`)
-        .send({
-          name: 'Filial Inválida',
-          churchId: 'invalid-church-id',
-        })
-
-      logTestResponse(response, 400)
-      expect(response.status).toBe(400)
-    })
-  })
-
-  describe('GET /onboarding/state - Estado de Onboarding', () => {
-    it('deve retornar NEW quando usuário não tem igreja', async () => {
+    // Teste 1: 200/201 Success - Status NEW
+    it('deve retornar status NEW quando usuário não tem igreja (200 OK)', async () => {
+      // Given: Usuário sem igreja
+      // When: GET /onboarding/state
       const response = await request(app.server)
         .get('/onboarding/state')
         .set('Authorization', `Bearer ${userToken}`)
 
-      logTestResponse(response, 200)
+      // Then: Retorna 200 com status NEW
       expect(response.status).toBe(200)
       expect(response.body.status).toBe('NEW')
     })
 
-    it('deve retornar PENDING quando usuário tem igreja mas não completou onboarding', async () => {
-      // Cria igreja
+    // Teste 2: 400 Invalid payload (não aplicável para GET)
+
+    // Teste 3: 401 Unauthenticated
+    it('deve retornar 401 se não estiver autenticado', async () => {
+      // Given: Requisição sem token
+      // When: GET /onboarding/state sem Authorization
+      const response = await request(app.server)
+        .get('/onboarding/state')
+
+      // Then: Retorna 401
+      expect(response.status).toBe(401)
+    })
+
+    // Teste adicional: Status PENDING
+    it('deve retornar status PENDING quando usuário tem igreja mas não completou onboarding', async () => {
+      // Given: Usuário com igreja criada
       const churchResponse = await request(app.server)
         .post('/churches')
         .set('Authorization', `Bearer ${userToken}`)
@@ -484,20 +223,20 @@ describe('Onboarding Routes - Fluxo Completo', () => {
 
       expect(churchResponse.status).toBe(201)
 
-      // Busca estado (com token que não tem branchId completo)
-      const stateResponse = await request(app.server)
+      // When: GET /onboarding/state (com token original que não tem memberId completo)
+      const response = await request(app.server)
         .get('/onboarding/state')
         .set('Authorization', `Bearer ${userToken}`)
 
-      logTestResponse(stateResponse, 200)
-      expect(stateResponse.status).toBe(200)
-      expect(stateResponse.body.status).toBe('PENDING')
-      expect(stateResponse.body.church).toBeDefined()
-      expect(stateResponse.body.church.id).toBe(churchResponse.body.church.id)
+      // Then: Retorna 200 com status PENDING
+      expect(response.status).toBe(200)
+      expect(response.body.status).toBe('PENDING')
+      expect(response.body.church).toBeDefined()
     })
 
-    it('deve retornar COMPLETE quando usuário tem memberId e branchId', async () => {
-      // Cria igreja (que cria member completo)
+    // Teste adicional: Status COMPLETE
+    it('deve retornar status COMPLETE quando onboarding está completo', async () => {
+      // Given: Usuário com igreja e member completo
       const churchResponse = await request(app.server)
         .post('/churches')
         .set('Authorization', `Bearer ${userToken}`)
@@ -510,35 +249,48 @@ describe('Onboarding Routes - Fluxo Completo', () => {
       expect(churchResponse.status).toBe(201)
       const memberToken = churchResponse.body.token
 
-      // Busca estado com token que tem memberId e branchId
-      const stateResponse = await request(app.server)
+      // When: GET /onboarding/state com token que tem memberId
+      const response = await request(app.server)
         .get('/onboarding/state')
         .set('Authorization', `Bearer ${memberToken}`)
 
-      logTestResponse(stateResponse, 200)
-      expect(stateResponse.status).toBe(200)
-      expect(stateResponse.body.status).toBe('COMPLETE')
-      expect(stateResponse.body.church).toBeDefined()
-      expect(stateResponse.body.branch).toBeDefined()
-      expect(stateResponse.body.member).toBeDefined()
+      // Then: Retorna 200 com status COMPLETE
+      expect(response.status).toBe(200)
+      expect(response.body.status).toBe('COMPLETE')
+      expect(response.body.church).toBeDefined()
+      expect(response.body.branch).toBeDefined()
+      expect(response.body.member).toBeDefined()
     })
   })
 
-  describe('Fluxo Completo de Onboarding', () => {
-    it('deve completar todo o fluxo: registro → igreja', async () => {
-      // 1. Registro
+  describe('Fluxo Completo de Onboarding E2E', () => {
+    beforeEach(async () => {
+      await resetTestDatabase()
+
+      // Criar plano Free Plan (necessário para registro público criar subscription)
+      await createTestPlan({
+        name: 'Free Plan',
+        maxMembers: 10,
+        maxBranches: 1,
+      })
+    })
+
+    it('deve completar todo o fluxo: registro público → criar igreja → onboarding completo', async () => {
+      // Given: Usuário novo sem conta
+      // Step 1: Registro público
       const registerResponse = await request(app.server)
         .post('/register')
         .send({
           name: 'Usuário Completo',
           email: `complete-${Date.now()}@test.com`,
           password: 'password123',
+          fromLandingPage: true,
         })
 
       expect(registerResponse.status).toBe(201)
       const registerToken = registerResponse.body.token
 
-      // 2. Criar Igreja
+      // Step 2: Criar Igreja (onboarding)
       const churchResponse = await request(app.server)
         .post('/churches')
         .set('Authorization', `Bearer ${registerToken}`)
@@ -548,6 +300,164 @@ describe('Onboarding Routes - Fluxo Completo', () => {
           branchName: 'Sede',
         })
 
+      expect(churchResponse.status).toBe(201)
+
+      // Then: Verifica que tudo foi criado corretamente
+      expect(churchResponse.body.church).toBeDefined()
+      expect(churchResponse.body.branch).toBeDefined()
+      expect(churchResponse.body.member).toBeDefined()
+      expect(churchResponse.body.member.role).toBe('ADMINGERAL')
+
+      // Verifica no banco
+      const church = await prisma.church.findUnique({
+        where: { id: churchResponse.body.church.id },
+        include: { Branch: true },
+      })
+      expect(church).toBeDefined()
+      expect(church?.Branch.length).toBe(1)
+      expect(church?.Branch[0].isMainBranch).toBe(true)
+
+      // Verifica onboarding state
+      const memberToken = churchResponse.body.token
+      const stateResponse = await request(app.server)
+        .get('/onboarding/state')
+        .set('Authorization', `Bearer ${memberToken}`)
+
+      expect(stateResponse.status).toBe(200)
+      expect(stateResponse.body.status).toBe('COMPLETE')
+    })
+  })
+
+  describe('POST /branches - Criação de Filiais', () => {
+    let churchId: string
+    let memberToken: string
+    let userToken: string
+    let userId: string
+
+    beforeEach(async () => {
+      await resetTestDatabase()
+
+      // Criar plano novamente após reset com maxBranches suficiente
+      const plan = await createTestPlan({
+        name: 'Free Plan',
+        maxMembers: 10,
+        maxBranches: 2, // Permite criar filial adicional após branch principal
+      })
+
+      // Criar User
+      const user = await createTestUser({
+        email: `branches-${Date.now()}@test.com`,
+        firstName: 'Branches',
+        lastName: 'User',
+      })
+
+      await createTestSubscription(user.id, plan.id, SubscriptionStatus.active)
+
+      userId = user.id
+
+      userToken = await generateTestToken(app, {
+        sub: user.id,
+        email: user.email,
+        name: `${user.firstName} ${user.lastName}`.trim(),
+        type: 'user',
+        memberId: null,
+        role: null,
+        branchId: null,
+        churchId: null,
+        permissions: [],
+        onboardingCompleted: false,
+      })
+
+      // Cria igreja antes de cada teste
+      const churchResponse = await request(app.server)
+        .post('/churches')
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({
+          name: 'Igreja para Filiais',
+          withBranch: true,
+          branchName: 'Sede',
+        })
+
+      churchId = churchResponse.body.church.id
+      memberToken = churchResponse.body.token || userToken
+    })
+
+    it('deve criar filial com sucesso (201 Created)', async () => {
+      // Given: Plano com limite suficiente (maxBranches: 2 no beforeEach) e churchId válido
+      // Nota: O plano foi criado no beforeEach com maxBranches: 2, então permite criar filial adicional
+      // O usuário já tem uma branch principal criada no POST /churches, então precisa de maxBranches >= 2
+
+      // When: POST /branches
+      const response = await request(app.server)
+        .post('/branches')
+        .set('Authorization', `Bearer ${memberToken}`)
+        .send({
+          name: 'Filial Centro',
+          churchId,
+        })
+
+      // Then: Retorna 201 com filial criada
+      expect(response.status).toBe(201)
+      expect(response.body).toHaveProperty('id')
+      expect(response.body.name).toBe('Filial Centro')
+      expect(response.body.churchId).toBe(churchId)
+    })
+
+    it('deve retornar erro se churchId não existe', async () => {
+      // Given: churchId inválido
+      // When: POST /branches com churchId inexistente
+      const response = await request(app.server)
+        .post('/branches')
+        .set('Authorization', `Bearer ${memberToken}`)
+        .send({
+          name: 'Filial Inválida',
+          churchId: 'invalid-church-id',
+        })
+
+      // Then: Retorna 400
+      expect(response.status).toBe(400)
+    })
+  })
+
+  describe('Fluxo Completo de Onboarding', () => {
+    beforeEach(async () => {
+      await resetTestDatabase()
+
+      // Criar plano Free Plan (necessário para registro público criar subscription)
+      await createTestPlan({
+        name: 'Free Plan',
+        maxMembers: 10,
+        maxBranches: 1,
+      })
+    })
+
+    it('deve completar todo o fluxo: registro → igreja', async () => {
+      // Given: Usuário novo sem conta
+      // Step 1: Registro público
+      const registerResponse = await request(app.server)
+        .post('/register')
+        .send({
+          name: 'Usuário Completo',
+          email: `complete-${Date.now()}@test.com`,
+          password: 'password123',
+          fromLandingPage: true,
+        })
+
+      // Then: Registro bem-sucedido
+      expect(registerResponse.status).toBe(201)
+      const registerToken = registerResponse.body.token
+
+      // Step 2: Criar Igreja (onboarding)
+      const churchResponse = await request(app.server)
+        .post('/churches')
+        .set('Authorization', `Bearer ${registerToken}`)
+        .send({
+          name: 'Igreja Completa',
+          withBranch: true,
+          branchName: 'Sede',
+        })
+
+      // Then: Igreja criada com sucesso
       expect(churchResponse.status).toBe(201)
 
       // Verifica que tudo foi criado

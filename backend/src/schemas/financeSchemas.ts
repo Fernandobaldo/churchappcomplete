@@ -5,6 +5,8 @@ export const createTransactionBodySchema = z.object({
   type: z.enum(['ENTRY', 'EXIT'], {
     errorMap: () => ({ message: 'Tipo deve ser ENTRY ou EXIT' }),
   }),
+  title: z.string().nullable().optional(),
+  category: z.string().nullable().optional(),
   entryType: z.enum(['OFERTA', 'DIZIMO', 'CONTRIBUICAO']).optional(),
   exitType: z.enum(['ALUGUEL', 'ENERGIA', 'AGUA', 'INTERNET', 'OUTROS']).optional(),
   exitTypeOther: z.string().optional(),
@@ -69,6 +71,8 @@ export const createTransactionBodySchema = z.object({
 export const updateTransactionBodySchema = z.object({
   amount: z.number().positive('Valor deve ser positivo').optional(),
   type: z.enum(['ENTRY', 'EXIT']).optional(),
+  title: z.string().nullable().optional(),
+  category: z.string().nullable().optional(),
   entryType: z.enum(['OFERTA', 'DIZIMO', 'CONTRIBUICAO']).optional(),
   exitType: z.enum(['ALUGUEL', 'ENERGIA', 'AGUA', 'INTERNET', 'OUTROS']).optional(),
   exitTypeOther: z.string().optional(),

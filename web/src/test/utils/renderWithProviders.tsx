@@ -1,26 +1,9 @@
-import { ReactElement } from 'react'
-import { render, RenderOptions } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
-import { Toaster } from 'react-hot-toast'
+/**
+ * @deprecated Use renderWithProviders from '../renderWithProviders' instead
+ * This file is kept for backward compatibility and will be removed in future versions.
+ */
 
-interface CustomRenderOptions extends Omit<RenderOptions, 'wrapper'> {
-  initialEntries?: string[]
-}
-
-export function renderWithProviders(
-  ui: ReactElement,
-  { initialEntries = ['/'], ...renderOptions }: CustomRenderOptions = {}
-) {
-  function Wrapper({ children }: { children: React.ReactNode }) {
-    return (
-      <MemoryRouter initialEntries={initialEntries}>
-        {children}
-        <Toaster />
-      </MemoryRouter>
-    )
-  }
-
-  return render(ui, { wrapper: Wrapper, ...renderOptions })
-}
+export { renderWithProviders } from '../renderWithProviders'
+export type { RenderWithProvidersOptions } from '../renderWithProviders'
 
 

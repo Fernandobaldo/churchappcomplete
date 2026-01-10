@@ -26,7 +26,9 @@ describe('FinanceService', () => {
   const mockBranchId = 'branch-123'
 
   describe('getByBranch', () => {
+    // Teste 1: Success - Listar transações
     it('deve retornar todas as transações de uma filial ordenadas por data de criação (desc)', async () => {
+      // Arrange
       const mockTransactions = [
         {
           id: 'transaction-1',
@@ -52,15 +54,18 @@ describe('FinanceService', () => {
 
       ;(prisma.transaction.findMany as any).mockResolvedValue(mockTransactions)
 
+      // Act
       const result = await service.getByBranch(mockBranchId)
 
+      // Assert
       expect(prisma.transaction.findMany).toHaveBeenCalledWith({
         where: { branchId: mockBranchId },
         include: {
           CreatedByUser: {
             select: {
               id: true,
-              name: true,
+              firstName: true,
+              lastName: true,
               email: true,
             },
           },
@@ -76,17 +81,23 @@ describe('FinanceService', () => {
       expect(result).toEqual(mockTransactions)
     })
 
+    // Teste 2: Edge case #1 - Array vazio
     it('deve retornar array vazio quando não há transações', async () => {
+      // Arrange
       ;(prisma.transaction.findMany as any).mockResolvedValue([])
 
+      // Act
       const result = await service.getByBranch(mockBranchId)
 
+      // Assert
       expect(result).toEqual([])
     })
   })
 
   describe('getByBranchWithSummary', () => {
+    // Teste 3: Success - Resumo com entradas e saídas
     it('deve retornar transações e resumo correto com entradas e saídas', async () => {
+      // Arrange
       const mockTransactions = [
         {
           id: 'transaction-1',
@@ -119,8 +130,10 @@ describe('FinanceService', () => {
 
       ;(prisma.transaction.findMany as any).mockResolvedValue(mockTransactions)
 
+      // Act
       const result = await service.getByBranchWithSummary(mockBranchId)
 
+      // Assert
       expect(result).toHaveProperty('transactions')
       expect(result).toHaveProperty('summary')
       expect(result.transactions).toEqual(mockTransactions)
@@ -225,7 +238,9 @@ describe('FinanceService', () => {
   })
 
   describe('create', () => {
+    // Teste 4: Success - Criar transação
     it('deve criar uma transação de entrada com todos os campos', async () => {
+      // Arrange
       const transactionData = {
         title: 'Dízimo',
         amount: 1000.0,
@@ -254,22 +269,20 @@ describe('FinanceService', () => {
           title: transactionData.title,
           amount: transactionData.amount,
           type: transactionData.type,
+          branchId: transactionData.branchId,
+          date: expect.any(Date),
           category: transactionData.category,
           entryType: transactionData.entryType,
-          exitType: undefined,
-          exitTypeOther: undefined,
-          contributionId: undefined,
-          createdBy: undefined,
           tithePayerMemberId: transactionData.tithePayerMemberId,
           tithePayerName: transactionData.tithePayerName,
           isTithePayerMember: transactionData.isTithePayerMember,
-          branchId: transactionData.branchId,
         },
         include: {
           CreatedByUser: {
             select: {
               id: true,
-              name: true,
+              firstName: true,
+              lastName: true,
               email: true,
             },
           },
@@ -313,22 +326,16 @@ describe('FinanceService', () => {
           title: transactionData.title,
           amount: transactionData.amount,
           type: transactionData.type,
-          category: transactionData.category,
-          entryType: undefined,
-          exitType: undefined,
-          exitTypeOther: undefined,
-          contributionId: undefined,
-          createdBy: undefined,
-          tithePayerMemberId: undefined,
-          tithePayerName: undefined,
-          isTithePayerMember: undefined,
           branchId: transactionData.branchId,
+          date: expect.any(Date),
+          category: transactionData.category,
         },
         include: {
           CreatedByUser: {
             select: {
               id: true,
-              name: true,
+              firstName: true,
+              lastName: true,
               email: true,
             },
           },
@@ -400,22 +407,19 @@ describe('FinanceService', () => {
           title: transactionData.title,
           amount: transactionData.amount,
           type: transactionData.type,
+          branchId: transactionData.branchId,
+          date: expect.any(Date),
           category: transactionData.category,
           entryType: transactionData.entryType,
-          exitType: undefined,
-          exitTypeOther: undefined,
-          contributionId: undefined,
-          createdBy: undefined,
-          tithePayerMemberId: undefined,
           tithePayerName: transactionData.tithePayerName,
           isTithePayerMember: transactionData.isTithePayerMember,
-          branchId: transactionData.branchId,
         },
         include: {
           CreatedByUser: {
             select: {
               id: true,
-              name: true,
+              firstName: true,
+              lastName: true,
               email: true,
             },
           },
@@ -463,7 +467,8 @@ describe('FinanceService', () => {
           CreatedByUser: {
             select: {
               id: true,
-              name: true,
+              firstName: true,
+              lastName: true,
               email: true,
             },
           },
@@ -528,7 +533,8 @@ describe('FinanceService', () => {
           CreatedByUser: {
             select: {
               id: true,
-              name: true,
+              firstName: true,
+              lastName: true,
               email: true,
             },
           },
@@ -662,7 +668,8 @@ describe('FinanceService', () => {
         CreatedByUser: {
           select: {
             id: true,
-            name: true,
+            firstName: true,
+            lastName: true,
             email: true,
           },
         },
@@ -716,7 +723,8 @@ describe('FinanceService', () => {
         CreatedByUser: {
           select: {
             id: true,
-            name: true,
+            firstName: true,
+            lastName: true,
             email: true,
           },
         },
@@ -774,7 +782,8 @@ describe('FinanceService', () => {
         CreatedByUser: {
           select: {
             id: true,
-            name: true,
+            firstName: true,
+            lastName: true,
             email: true,
           },
         },

@@ -10,7 +10,7 @@ import Fastify from 'fastify'
 import fastifyJwt from '@fastify/jwt'
 import request from 'supertest'
 import { registerRoutes } from '../../../src/routes/registerRoutes'
-import { resetTestDatabase } from '../../utils/resetTestDatabase'
+import { resetTestDatabase } from '../../utils/db'
 import {
   createAdminUsersFixtures,
   loginAdmin,
@@ -20,6 +20,15 @@ import { AdminRole } from '@prisma/client'
 import { prisma } from '../../../src/lib/prisma'
 import { logTestResponse } from '../../utils/testResponseHelper'
 import bcrypt from 'bcryptjs'
+import {
+  createTestPlan,
+  createTestUser,
+  createTestSubscription,
+  createTestChurch,
+  createTestBranch,
+  createTestMember,
+} from '../../utils/testFactories'
+import { SubscriptionStatus } from '@prisma/client'
 
 describe('Admin Churches Routes - Integration Tests', () => {
   const app = Fastify()
@@ -73,53 +82,40 @@ describe('Admin Churches Routes - Integration Tests', () => {
     financeToken = financeAuth.token
 
     // Cria plano, usuário, igreja e branch de teste
-    testPlan = await prisma.plan.create({
-      data: {
-        name: 'Test Plan',
-        price: 0,
-        features: ['basic'],
-        maxMembers: 10,
-        maxBranches: 1,
-      },
+    testPlan = await createTestPlan({
+      name: 'Test Plan',
+      price: 0,
+      features: ['basic'],
+      maxMembers: 10,
+      maxBranches: 1,
     })
 
-    testUser = await prisma.user.create({
-      data: {
-        name: 'Church Owner',
-        email: 'churchowner@test.com',
-        password: await bcrypt.hash('password123', 10),
-        Subscription: {
-          create: {
-            planId: testPlan.id,
-            status: 'active',
-          },
-        },
-      },
+    testUser = await createTestUser({
+      firstName: 'Church',
+      lastName: 'Owner',
+      email: 'churchowner@test.com',
+      password: 'password123',
     })
 
-    testChurch = await prisma.church.create({
-      data: {
-        name: 'Test Church',
-        isActive: true,
-      },
+    await createTestSubscription(testUser.id, testPlan.id, SubscriptionStatus.active)
+
+    testChurch = await createTestChurch({
+      name: 'Test Church',
+      isActive: true,
     })
 
-    const branch = await prisma.branch.create({
-      data: {
-        name: 'Main Branch',
-        churchId: testChurch.id,
-        isMainBranch: true,
-      },
+    const branch = await createTestBranch({
+      name: 'Main Branch',
+      churchId: testChurch.id,
+      isMainBranch: true,
     })
 
-    await prisma.member.create({
-      data: {
-        name: 'Church Owner',
-        email: 'churchowner@test.com',
-        role: 'ADMINGERAL',
-        branchId: branch.id,
-        userId: testUser.id,
-      },
+    await createTestMember({
+      name: 'Church Owner',
+      email: 'churchowner@test.com',
+      role: 'ADMINGERAL',
+      branchId: branch.id,
+      userId: testUser.id,
     })
   })
 
@@ -256,14 +252,13 @@ describe('Admin Churches Routes - Integration Tests', () => {
 
   describe('ADM_API_CHURCHES_TS001_TC009: PATCH /admin/churches/:id/plan - trocar plano (SUPERADMIN/FINANCE)', () => {
     it('deve trocar plano quando SUPERADMIN', async () => {
-      const newPlan = await prisma.plan.create({
-        data: {
-          name: 'New Plan',
-          price: 99.99,
-          features: ['advanced'],
-          maxMembers: 100,
-          maxBranches: 5,
-        },
+      // Given: Novo plano criado
+      const newPlan = await createTestPlan({
+        name: 'New Plan',
+        price: 99.99,
+        features: ['advanced'],
+        maxMembers: 100,
+        maxBranches: 5,
       })
 
       const response = await request(app.server)
@@ -286,14 +281,13 @@ describe('Admin Churches Routes - Integration Tests', () => {
     })
 
     it('deve permitir FINANCE trocar plano', async () => {
-      const newPlan = await prisma.plan.create({
-        data: {
-          name: 'Finance Plan',
-          price: 49.99,
-          features: ['basic'],
-          maxMembers: 50,
-          maxBranches: 3,
-        },
+      // Given: Novo plano criado
+      const newPlan = await createTestPlan({
+        name: 'Finance Plan',
+        price: 49.99,
+        features: ['basic'],
+        maxMembers: 50,
+        maxBranches: 3,
       })
 
       const response = await request(app.server)
@@ -308,11 +302,10 @@ describe('Admin Churches Routes - Integration Tests', () => {
 
   describe('ADM_API_CHURCHES_TS001_TC010: Suspender igreja - SUPPORT não pode', () => {
     it('deve negar acesso quando SUPPORT tenta suspender', async () => {
-      const churchToSuspend = await prisma.church.create({
-        data: {
-          name: 'Church to Suspend',
-          isActive: true,
-        },
+      // Given: Igreja criada
+      const churchToSuspend = await createTestChurch({
+        name: 'Church to Suspend',
+        isActive: true,
       })
 
       const response = await request(app.server)

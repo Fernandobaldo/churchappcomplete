@@ -15,6 +15,15 @@ import { resetTestDatabase } from '../utils/resetTestDatabase'
 import { registerRoutes } from '../../src/routes/registerRoutes'
 import { authenticate } from '../../src/middlewares/authenticate'
 import { logTestResponse } from '../utils/testResponseHelper'
+import { 
+  createTestUser,
+  createTestPlan,
+  createTestSubscription,
+  createTestChurch,
+  createTestBranch,
+  createTestMember,
+} from '../utils/testFactories'
+import { SubscriptionStatus } from '@prisma/client'
 
 describe('Devotional Routes', () => {
   const app = Fastify()
@@ -43,81 +52,71 @@ describe('Devotional Routes', () => {
 
     // Criar plano
     const plan = await prisma.plan.findFirst({ where: { name: 'Free Plan' } }) || 
-      await prisma.plan.create({
-        data: {
-          name: 'Free Plan',
-          price: 0,
-          features: ['basic'],
-          maxMembers: 10,
-          maxBranches: 1,
-        },
+      await createTestPlan({
+        name: 'Free Plan',
+        price: 0,
+        features: ['basic'],
+        maxMembers: 10,
+        maxBranches: 1,
       })
 
     // Criar User
-    const user = await prisma.user.create({
-      data: {
-        name: 'User Teste',
-        email: 'user@test.com',
-        password: await bcrypt.hash('password123', 10),
-        Subscription: {
-          create: {
-            planId: plan.id,
-            status: 'active',
-          },
-        },
-      },
+    const user = await createTestUser({
+      firstName: 'User',
+      lastName: 'Teste',
+      email: 'user@test.com',
+      password: 'password123',
     })
+    
+    await createTestSubscription(user.id, plan.id, SubscriptionStatus.active)
 
     userId = user.id
 
     // Criar Church e Branch
-    const church = await prisma.church.create({
-      data: {
-        name: 'Igreja Teste',
-        isActive: true,
-        Branch: {
-          create: {
-            name: 'Sede',
-            isMainBranch: true,
-          },
-        },
-      },
-      include: {
-        Branch: true,
-      },
+    const church = await createTestChurch({
+      name: 'Igreja Teste',
+      address: 'Test Address',
     })
 
-    branchId = church.Branch[0].id
+    const branch = await createTestBranch({
+      name: 'Sede',
+      churchId: church.id,
+      isMainBranch: true,
+    })
+
+    branchId = branch.id
 
     // Criar Member
-    const member = await prisma.member.create({
-      data: {
-        name: 'Member Teste',
-        email: 'member@test.com',
-        role: 'ADMINGERAL',
-        branchId,
-        userId,
-        Permission: {
-          create: {
-            type: 'devotional_manage',
-          },
-        },
-      },
+    const member = await createTestMember({
+      name: 'Member Teste',
+      email: 'member@test.com',
+      role: 'ADMINGERAL',
+      branchId,
+      userId,
     })
 
-    memberId = member.id
+    // Criar permissão para o membro
+    await prisma.permission.create({
+      data: {
+        memberId: member.id,
+        type: 'devotional_manage',
+      },
+    })
 
     // Buscar permissões do membro
     const memberWithPermissions = await prisma.member.findUnique({
       where: { id: member.id },
       include: { Permission: true },
     })
+    
+    memberId = memberWithPermissions!.id
 
     // Criar token para Member com permissões
+    const fullName = `${user.firstName} ${user.lastName}`.trim()
     userToken = app.jwt.sign({
       sub: user.id,
       email: user.email,
-      name: user.name,
+      name: fullName,
       type: 'member',
       id: user.id,
       userId: user.id,
@@ -408,28 +407,28 @@ describe('Devotional Routes', () => {
       })
       const devotionalId = devotional.id
       // Criar outro membro sem permissão
-      const otherUser = await prisma.user.create({
-        data: {
-          name: 'Other User',
-          email: 'other@test.com',
-          password: await bcrypt.hash('password123', 10),
-        },
+      const { createTestUser } = await import('../utils/testFactories')
+      
+      const otherUser = await createTestUser({
+        firstName: 'Other',
+        lastName: 'User',
+        email: 'other@test.com',
+        password: 'password123',
       })
 
-      const otherMember = await prisma.member.create({
-        data: {
-          name: 'Other Member',
-          email: 'othermember@test.com',
-          branchId,
-          role: 'MEMBER',
-          userId: otherUser.id,
-        },
+      const otherMember = await createTestMember({
+        name: 'Other Member',
+        email: 'othermember@test.com',
+        branchId,
+        role: 'MEMBER',
+        userId: otherUser.id,
       })
 
+      const otherFullName = `${otherUser.firstName} ${otherUser.lastName}`.trim()
       const otherToken = app.jwt.sign({
         sub: otherUser.id,
         email: otherUser.email,
-        name: otherUser.name,
+        name: otherFullName,
         type: 'member',
         id: otherUser.id,
         userId: otherUser.id,
@@ -466,40 +465,50 @@ describe('Devotional Routes', () => {
       const devotionalId = devotional.id
 
       // Criar membro com permissão mas não é o autor
-      const otherUser = await prisma.user.create({
+      const { createTestUser } = await import('../utils/testFactories')
+      
+      const otherUser = await createTestUser({
+        firstName: 'Admin',
+        lastName: 'User',
+        email: 'admin@test.com',
+        password: 'password123',
+      })
+
+      const adminMember = await createTestMember({
+        name: 'Admin Member',
+        email: 'adminmember@test.com',
+        branchId,
+        role: 'ADMINFILIAL',
+        userId: otherUser.id,
+      })
+
+      // Criar permissão para o membro
+      await prisma.permission.create({
         data: {
-          name: 'Admin User',
-          email: 'admin@test.com',
-          password: await bcrypt.hash('password123', 10),
+          memberId: adminMember.id,
+          type: 'devotional_manage',
         },
       })
 
-      const adminMember = await prisma.member.create({
-        data: {
-          name: 'Admin Member',
-          email: 'adminmember@test.com',
-          branchId,
-          role: 'ADMINFILIAL',
-          userId: otherUser.id,
-          Permission: {
-            create: { type: 'devotional_manage' },
-          },
-        },
+      // Buscar member com Permission incluída
+      const adminMemberWithPermission = await prisma.member.findUnique({
+        where: { id: adminMember.id },
         include: { Permission: true },
       })
 
+      const adminFullName = `${otherUser.firstName} ${otherUser.lastName}`.trim()
       const adminToken = app.jwt.sign({
         sub: otherUser.id,
         email: otherUser.email,
-        name: otherUser.name,
+        name: adminFullName,
         type: 'member',
         id: otherUser.id,
         userId: otherUser.id,
-        memberId: adminMember.id,
-        role: adminMember.role,
-        branchId: adminMember.branchId,
+        memberId: adminMemberWithPermission!.id,
+        role: adminMemberWithPermission!.role,
+        branchId: adminMemberWithPermission!.branchId,
         churchId: null,
-        permissions: adminMember.Permission.map(p => p.type),
+        permissions: adminMemberWithPermission!.Permission.map(p => p.type),
       })
 
       const response = await request(app.server)
@@ -601,28 +610,28 @@ describe('Devotional Routes', () => {
       })
       const devotionalId = devotional.id
       // Criar outro membro sem permissão
-      const otherUser = await prisma.user.create({
-        data: {
-          name: 'Other User',
-          email: 'other2@test.com',
-          password: await bcrypt.hash('password123', 10),
-        },
+      const { createTestUser } = await import('../utils/testFactories')
+      
+      const otherUser = await createTestUser({
+        firstName: 'Other',
+        lastName: 'User',
+        email: 'other2@test.com',
+        password: 'password123',
       })
 
-      const otherMember = await prisma.member.create({
-        data: {
-          name: 'Other Member',
-          email: 'othermember2@test.com',
-          branchId,
-          role: 'MEMBER',
-          userId: otherUser.id,
-        },
+      const otherMember = await createTestMember({
+        name: 'Other Member',
+        email: 'othermember2@test.com',
+        branchId,
+        role: 'MEMBER',
+        userId: otherUser.id,
       })
 
+      const otherFullName2 = `${otherUser.firstName} ${otherUser.lastName}`.trim()
       const otherToken = app.jwt.sign({
         sub: otherUser.id,
         email: otherUser.email,
-        name: otherUser.name,
+        name: otherFullName2,
         type: 'member',
         id: otherUser.id,
         userId: otherUser.id,

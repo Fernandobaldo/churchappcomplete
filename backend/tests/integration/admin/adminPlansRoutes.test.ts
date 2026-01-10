@@ -19,6 +19,7 @@ import {
 import { AdminRole } from '@prisma/client'
 import { prisma } from '../../../src/lib/prisma'
 import { logTestResponse } from '../../utils/testResponseHelper'
+import { createTestPlan } from '../../utils/testFactories'
 
 describe('Admin Plans Routes - Integration Tests', () => {
   const app = Fastify()
@@ -82,14 +83,13 @@ describe('Admin Plans Routes - Integration Tests', () => {
 
   describe('ADM_API_PLANS_TS001_TC002: GET /admin/plans/:id - detalhes do plano', () => {
     it('deve retornar detalhes do plano', async () => {
-      const plan = await prisma.plan.create({
-        data: {
-          name: 'Test Plan',
-          price: 0,
-          features: ['basic'],
-          maxMembers: 10,
-          maxBranches: 1,
-        },
+      // Given: Plano criado
+      const plan = await createTestPlan({
+        name: 'Test Plan',
+        price: 0,
+        features: ['basic'],
+        maxMembers: 10,
+        maxBranches: 1,
       })
 
       const response = await request(app.server)
@@ -136,14 +136,13 @@ describe('Admin Plans Routes - Integration Tests', () => {
 
   describe('ADM_API_PLANS_TS001_TC004: PATCH /admin/plans/:id - editar plano (SUPERADMIN)', () => {
     it('deve editar plano quando SUPERADMIN', async () => {
-      const plan = await prisma.plan.create({
-        data: {
-          name: `Plan to Edit ${Date.now()}-1`,
-          price: 0,
-          features: ['events'],
-          maxMembers: 10,
-          maxBranches: 1,
-        },
+      // Given: Plano criado
+      const plan = await createTestPlan({
+        name: `Plan to Edit ${Date.now()}-1`,
+        price: 0,
+        features: ['events'],
+        maxMembers: 10,
+        maxBranches: 1,
       })
 
       const response = await request(app.server)
@@ -160,14 +159,13 @@ describe('Admin Plans Routes - Integration Tests', () => {
     })
 
     it('deve editar plano com features válidas', async () => {
-      const plan = await prisma.plan.create({
-        data: {
-          name: `Plan with Features ${Date.now()}-2`,
-          price: 0,
-          features: ['events'],
-          maxMembers: 10,
-          maxBranches: 1,
-        },
+      // Given: Plano criado
+      const plan = await createTestPlan({
+        name: `Plan with Features ${Date.now()}-2`,
+        price: 0,
+        features: ['events'],
+        maxMembers: 10,
+        maxBranches: 1,
       })
 
       const response = await request(app.server)
@@ -184,14 +182,13 @@ describe('Admin Plans Routes - Integration Tests', () => {
     })
 
     it('deve rejeitar features inválidas', async () => {
-      const plan = await prisma.plan.create({
-        data: {
-          name: `Plan Invalid Features ${Date.now()}-3`,
-          price: 0,
-          features: ['events'],
-          maxMembers: 10,
-          maxBranches: 1,
-        },
+      // Given: Plano criado
+      const plan = await createTestPlan({
+        name: `Plan Invalid Features ${Date.now()}-3`,
+        price: 0,
+        features: ['events'],
+        maxMembers: 10,
+        maxBranches: 1,
       })
 
       const response = await request(app.server)
@@ -209,14 +206,13 @@ describe('Admin Plans Routes - Integration Tests', () => {
     })
 
     it('deve aceitar array vazio de features', async () => {
-      const plan = await prisma.plan.create({
-        data: {
-          name: `Plan Empty Features ${Date.now()}-4`,
-          price: 0,
-          features: ['events'],
-          maxMembers: 10,
-          maxBranches: 1,
-        },
+      // Given: Plano criado
+      const plan = await createTestPlan({
+        name: `Plan Empty Features ${Date.now()}-4`,
+        price: 0,
+        features: ['events'],
+        maxMembers: 10,
+        maxBranches: 1,
       })
 
       const response = await request(app.server)
@@ -236,15 +232,14 @@ describe('Admin Plans Routes - Integration Tests', () => {
     })
 
     it('deve editar todos os campos do plano', async () => {
-      const plan = await prisma.plan.create({
-        data: {
-          name: `Plan Full Edit ${Date.now()}-5`,
-          price: 0,
-          features: ['events'],
-          maxMembers: 10,
-          maxBranches: 1,
-          isActive: true,
-        },
+      // Given: Plano criado
+      const plan = await createTestPlan({
+        name: `Plan Full Edit ${Date.now()}-5`,
+        price: 0,
+        features: ['events'],
+        maxMembers: 10,
+        maxBranches: 1,
+        isActive: true,
       })
 
       const response = await request(app.server)
@@ -271,13 +266,12 @@ describe('Admin Plans Routes - Integration Tests', () => {
 
   describe('ADM_API_PLANS_TS001_TC005: PATCH /admin/plans/:id/activate - ativar (SUPERADMIN)', () => {
     it('deve ativar plano quando SUPERADMIN', async () => {
-      const plan = await prisma.plan.create({
-        data: {
-          name: 'Inactive Plan',
-          price: 0,
-          features: ['basic'],
-          isActive: false,
-        },
+      // Given: Plano inativo criado
+      const plan = await createTestPlan({
+        name: 'Inactive Plan',
+        price: 0,
+        features: ['basic'],
+        isActive: false,
       })
 
       const response = await request(app.server)
@@ -296,13 +290,12 @@ describe('Admin Plans Routes - Integration Tests', () => {
 
   describe('ADM_API_PLANS_TS001_TC006: PATCH /admin/plans/:id/deactivate - desativar (SUPERADMIN)', () => {
     it('deve desativar plano quando SUPERADMIN', async () => {
-      const plan = await prisma.plan.create({
-        data: {
-          name: 'Active Plan',
-          price: 0,
-          features: ['basic'],
-          isActive: true,
-        },
+      // Given: Plano ativo criado
+      const plan = await createTestPlan({
+        name: 'Active Plan',
+        price: 0,
+        features: ['basic'],
+        isActive: true,
       })
 
       const response = await request(app.server)

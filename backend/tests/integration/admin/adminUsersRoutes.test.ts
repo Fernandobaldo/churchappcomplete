@@ -10,7 +10,7 @@ import Fastify from 'fastify'
 import fastifyJwt from '@fastify/jwt'
 import request from 'supertest'
 import { registerRoutes } from '../../../src/routes/registerRoutes'
-import { resetTestDatabase } from '../../utils/resetTestDatabase'
+import { resetTestDatabase } from '../../utils/db'
 import {
   createAdminUsersFixtures,
   loginAdmin,
@@ -20,6 +20,7 @@ import { AdminRole } from '@prisma/client'
 import { prisma } from '../../../src/lib/prisma'
 import { logTestResponse } from '../../utils/testResponseHelper'
 import bcrypt from 'bcryptjs'
+import { createTestUser, createTestPlan } from '../../utils/testFactories'
 
 describe('Admin Users Routes - Integration Tests', () => {
   const app = Fastify()
@@ -72,29 +73,25 @@ describe('Admin Users Routes - Integration Tests', () => {
     financeToken = financeAuth.token
 
     // Cria plano e usuário de teste
-    testPlan = await prisma.plan.create({
-      data: {
-        name: 'Test Plan',
-        price: 0,
-        features: ['basic'],
-        maxMembers: 10,
-        maxBranches: 1,
-      },
+    testPlan = await createTestPlan({
+      name: 'Test Plan',
+      price: 0,
+      features: ['basic'],
+      maxMembers: 10,
+      maxBranches: 1,
     })
 
-    testUser = await prisma.user.create({
-      data: {
-        name: 'Test User',
-        email: 'testuser@test.com',
-        password: await bcrypt.hash('password123', 10),
-        Subscription: {
-          create: {
-            planId: testPlan.id,
-            status: 'active',
-          },
-        },
-      },
+    const { createTestSubscription } = await import('../../utils/testFactories')
+    const { SubscriptionStatus } = await import('@prisma/client')
+    
+    testUser = await createTestUser({
+      firstName: 'Test',
+      lastName: 'User',
+      email: `testuser-${Date.now()}@test.com`, // Email único
+      password: 'password123',
     })
+    
+    await createTestSubscription(testUser.id, testPlan.id, SubscriptionStatus.active)
   })
 
   afterAll(async () => {
@@ -130,15 +127,20 @@ describe('Admin Users Routes - Integration Tests', () => {
 
   describe('ADM_API_USERS_TS001_TC002: GET /admin/users?search=email - buscar por email', () => {
     it('deve filtrar usuários por email', async () => {
+      // Nota: testUser.email tem timestamp, então buscamos por padrão
+      const searchPattern = 'testuser'
+      
       const response = await request(app.server)
         .get('/admin/users')
-        .query({ search: 'testuser@test.com' })
+        .query({ search: searchPattern })
         .set('Authorization', `Bearer ${superadminToken}`)
 
       logTestResponse(response, 200)
       expect(response.status).toBe(200)
       expect(response.body.users.length).toBeGreaterThan(0)
-      expect(response.body.users[0].email).toContain('testuser@test.com')
+      // Verifica que pelo menos um usuário contém o padrão de busca
+      const foundUser = response.body.users.find((u: any) => u.email.includes(searchPattern))
+      expect(foundUser).toBeDefined()
     })
   })
 
@@ -171,12 +173,11 @@ describe('Admin Users Routes - Integration Tests', () => {
 
   describe('ADM_API_USERS_TS001_TC004: PATCH /admin/users/:id/block - bloquear (SUPERADMIN)', () => {
     it('deve bloquear usuário quando SUPERADMIN', async () => {
-      const userToBlock = await prisma.user.create({
-        data: {
-          name: 'User to Block',
-          email: 'usertoblock@test.com',
-          password: await bcrypt.hash('password123', 10),
-        },
+      const userToBlock = await createTestUser({
+        firstName: 'User',
+        lastName: 'to Block',
+        email: 'usertoblock@test.com',
+        password: 'password123',
       })
 
       const response = await request(app.server)
@@ -206,13 +207,19 @@ describe('Admin Users Routes - Integration Tests', () => {
 
   describe('ADM_API_USERS_TS001_TC005: PATCH /admin/users/:id/unblock - desbloquear (SUPERADMIN)', () => {
     it('deve desbloquear usuário quando SUPERADMIN', async () => {
-      const userToUnblock = await prisma.user.create({
-        data: {
-          name: 'User to Unblock',
-          email: 'usertounblock@test.com',
-          password: await bcrypt.hash('password123', 10),
-          isBlocked: true,
-        },
+      const { createTestUser } = await import('../../utils/testFactories')
+      
+      const userToUnblock = await createTestUser({
+        firstName: 'User',
+        lastName: 'Unblock',
+        email: 'usertounblock@test.com',
+        password: 'password123',
+      })
+      
+      // Marcar como bloqueado manualmente
+      await prisma.user.update({
+        where: { id: userToUnblock.id },
+        data: { isBlocked: true },
       })
 
       const response = await request(app.server)
@@ -276,12 +283,13 @@ describe('Admin Users Routes - Integration Tests', () => {
 
   describe('ADM_API_USERS_TS001_TC008: Bloquear usuário - SUPPORT não pode', () => {
     it('deve negar acesso quando SUPPORT tenta bloquear', async () => {
-      const userToBlock = await prisma.user.create({
-        data: {
-          name: 'User for Support Test',
-          email: 'userforsupport@test.com',
-          password: await bcrypt.hash('password123', 10),
-        },
+      const { createTestUser } = await import('../../utils/testFactories')
+      
+      const userToBlock = await createTestUser({
+        firstName: 'User',
+        lastName: 'Support Test',
+        email: 'userforsupport@test.com',
+        password: 'password123',
       })
 
       const response = await request(app.server)

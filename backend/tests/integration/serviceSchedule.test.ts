@@ -1,6 +1,11 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
 import { prisma } from '../../src/lib/prisma'
 import { ServiceScheduleService } from '../../src/services/serviceScheduleService'
+import { 
+  createTestUser,
+  createTestChurch,
+  createTestBranch,
+} from '../utils/testFactories'
 
 describe('ServiceSchedule - Integration Tests', () => {
   let service: ServiceScheduleService
@@ -12,29 +17,24 @@ describe('ServiceSchedule - Integration Tests', () => {
     service = new ServiceScheduleService()
 
     // Criar dados de teste
-    const testUser = await prisma.user.create({
-      data: {
-        name: 'Test User',
-        email: `test-${Date.now()}@example.com`,
-        password: 'hashed_password',
-      },
+    const testUser = await createTestUser({
+      firstName: 'Test',
+      lastName: 'User',
+      email: `test-${Date.now()}@example.com`,
+      password: 'password123',
     })
     testUserId = testUser.id
 
-    const testChurch = await prisma.church.create({
-      data: {
-        name: 'Test Church',
-        isActive: true,
-      },
+    const testChurch = await createTestChurch({
+      name: 'Test Church',
+      address: 'Test Address',
     })
     testChurchId = testChurch.id
 
-    const testBranch = await prisma.branch.create({
-      data: {
-        name: 'Test Branch',
-        churchId: testChurchId,
-        isMainBranch: true,
-      },
+    const testBranch = await createTestBranch({
+      name: 'Test Branch',
+      churchId: testChurchId,
+      isMainBranch: true,
     })
     testBranchId = testBranch.id
   })

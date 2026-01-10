@@ -45,19 +45,16 @@ describe('AdminChurchService - Unit Tests', () => {
       },
     })
 
-    testUser = await prisma.user.create({
-      data: {
-        name: 'Church Owner',
-        email: 'churchowner@test.com',
-        password: await bcrypt.hash('password123', 10),
-        Subscription: {
-          create: {
-            planId: testPlan.id,
-            status: 'active',
-          },
-        },
-      },
+    // Usar factory em vez de prisma direto
+    const { createTestUser, createTestSubscription } = await import('../../utils/testFactories')
+    const { SubscriptionStatus } = await import('@prisma/client')
+    testUser = await createTestUser({
+      firstName: 'Church',
+      lastName: 'Owner',
+      email: 'churchowner@test.com',
+      password: await bcrypt.hash('password123', 10),
     })
+    await createTestSubscription(testUser.id, testPlan.id, SubscriptionStatus.active)
 
     testChurch = await prisma.church.create({
       data: {

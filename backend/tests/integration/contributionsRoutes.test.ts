@@ -15,6 +15,13 @@ import { resetTestDatabase } from '../utils/resetTestDatabase'
 import { registerRoutes } from '../../src/routes/registerRoutes'
 import { authenticate } from '../../src/middlewares/authenticate'
 import { logTestResponse } from '../utils/testResponseHelper'
+import { 
+  createTestUser,
+  createTestPlan,
+  createTestChurch,
+  createTestBranch,
+  createTestMember,
+} from '../utils/testFactories'
 
 describe('Contributions Routes', () => {
   const app = Fastify()
@@ -42,71 +49,72 @@ describe('Contributions Routes', () => {
 
     // Criar plano
     const plan = await prisma.plan.findFirst({ where: { name: 'Free Plan' } }) || 
-      await prisma.plan.create({
-        data: {
-          name: 'Free Plan',
-          price: 0,
-          features: ['basic'],
-          maxMembers: 10,
-          maxBranches: 1,
-        },
+      await createTestPlan({
+        name: 'Free Plan',
+        price: 0,
+        features: ['basic'],
+        maxMembers: 10,
+        maxBranches: 1,
       })
 
     // Criar igreja
-    const church = await prisma.church.create({
-      data: {
-        name: 'Igreja Teste',
-      },
+    const church = await createTestChurch({
+      name: 'Igreja Teste',
     })
     churchId = church.id
 
     // Criar filial
-    const branch = await prisma.branch.create({
-      data: {
-        name: 'Filial Teste',
-        churchId: church.id,
-      },
+    const branch = await createTestBranch({
+      name: 'Filial Teste',
+      churchId: church.id,
     })
     branchId = branch.id
 
     // Criar usuário
-    const hashedPassword = await bcrypt.hash('password123', 10)
-    const user = await prisma.user.create({
-      data: {
-        name: 'Test User',
-        email: 'test@example.com',
-        password: hashedPassword,
-      },
+    const user = await createTestUser({
+      firstName: 'Test',
+      lastName: 'User',
+      email: 'test@example.com',
+      password: 'password123',
     })
     userId = user.id
 
     // Criar membro com permissão contributions_manage
-    const member = await prisma.member.create({
+    const member = await createTestMember({
+      name: 'Test Member',
+      email: 'member@example.com',
+      branchId: branch.id,
+      role: 'ADMINFILIAL',
+      userId: user.id,
+    })
+
+    // Criar permissão para o membro
+    await prisma.permission.create({
       data: {
-        name: 'Test Member',
-        email: 'member@example.com',
-        branchId: branch.id,
-        role: 'ADMINFILIAL',
-        userId: user.id,
-        Permission: {
-          create: { type: 'contributions_manage' },
-        },
+        memberId: member.id,
+        type: 'contributions_manage',
       },
+    })
+
+    // Buscar member com Permission incluída
+    const memberWithPermission = await prisma.member.findUnique({
+      where: { id: member.id },
       include: { Permission: true },
     })
-    memberId = member.id
+    memberId = memberWithPermission!.id
 
     // Gerar token
+    const fullName = `${user.firstName} ${user.lastName}`.trim()
     userToken = app.jwt.sign({
       sub: user.id,
       email: user.email,
-      name: user.name,
+      name: fullName,
       type: 'user',
-      memberId: member.id,
-      role: member.role,
-      branchId: member.branchId,
+      memberId: memberWithPermission!.id,
+      role: memberWithPermission!.role,
+      branchId: memberWithPermission!.branchId,
       churchId: church.id,
-      permissions: member.Permission.map(p => p.type),
+      permissions: memberWithPermission!.Permission.map(p => p.type),
     })
   })
 
@@ -153,18 +161,19 @@ describe('Contributions Routes', () => {
     })
 
     it('deve retornar 400 quando usuário não tem branchId', async () => {
-      const userWithoutMember = await prisma.user.create({
-        data: {
-          name: 'User Without Member',
-          email: 'nowmember@example.com',
-          password: await bcrypt.hash('password123', 10),
-        },
+      const { createTestUser } = await import('../utils/testFactories')
+      
+      const userWithoutMember = await createTestUser({
+        firstName: 'User',
+        lastName: 'Without Member',
+        email: 'nowmember@example.com',
+        password: 'password123',
       })
 
       const tokenWithoutMember = app.jwt.sign({
         sub: userWithoutMember.id,
         email: userWithoutMember.email,
-        name: userWithoutMember.name,
+        name: `${userWithoutMember.firstName} ${userWithoutMember.lastName}`.trim(),
         type: 'user',
       })
 
@@ -280,18 +289,19 @@ describe('Contributions Routes', () => {
     })
 
     it('deve retornar 400 quando usuário não tem branchId', async () => {
-      const userWithoutMember = await prisma.user.create({
-        data: {
-          name: 'User Without Member 2',
-          email: 'nowmember2@example.com',
-          password: await bcrypt.hash('password123', 10),
-        },
+      const { createTestUser } = await import('../utils/testFactories')
+      
+      const userWithoutMember = await createTestUser({
+        firstName: 'User',
+        lastName: 'Without Member 2',
+        email: 'nowmember2@example.com',
+        password: 'password123',
       })
 
       const tokenWithoutMember = app.jwt.sign({
         sub: userWithoutMember.id,
         email: userWithoutMember.email,
-        name: userWithoutMember.name,
+        name: `${userWithoutMember.firstName} ${userWithoutMember.lastName}`.trim(),
         type: 'user',
       })
 
@@ -312,28 +322,27 @@ describe('Contributions Routes', () => {
 
     it('deve retornar 403 quando usuário não tem permissão', async () => {
       // Criar membro sem permissão contributions_manage
-      const userWithoutPermission = await prisma.user.create({
-        data: {
-          name: 'User No Permission',
-          email: 'nopermission@example.com',
-          password: await bcrypt.hash('password123', 10),
-        },
+      const { createTestUser } = await import('../utils/testFactories')
+      
+      const userWithoutPermission = await createTestUser({
+        firstName: 'User',
+        lastName: 'No Permission',
+        email: 'nopermission@example.com',
+        password: 'password123',
       })
 
-      const memberWithoutPermission = await prisma.member.create({
-        data: {
-          name: 'Member No Permission',
-          email: 'membernoperm@example.com',
-          branchId: branchId,
-          role: 'MEMBER',
-          userId: userWithoutPermission.id,
-        },
+      const memberWithoutPermission = await createTestMember({
+        name: 'Member No Permission',
+        email: 'membernoperm@example.com',
+        branchId: branchId,
+        role: 'MEMBER',
+        userId: userWithoutPermission.id,
       })
 
       const tokenWithoutPermission = app.jwt.sign({
         sub: userWithoutPermission.id,
         email: userWithoutPermission.email,
-        name: userWithoutPermission.name,
+        name: `${userWithoutPermission.firstName} ${userWithoutPermission.lastName}`.trim(),
         type: 'user',
         memberId: memberWithoutPermission.id,
         role: memberWithoutPermission.role,
@@ -358,11 +367,9 @@ describe('Contributions Routes', () => {
 
     it('deve ignorar branchId enviado no body e usar branchId do token', async () => {
       // Criar outra filial na mesma igreja
-      const otherBranch = await prisma.branch.create({
-        data: {
-          name: 'Outra Filial Mesma Igreja',
-          churchId: churchId,
-        },
+      const otherBranch = await createTestBranch({
+        name: 'Outra Filial Mesma Igreja',
+        churchId: churchId,
       })
 
       const contributionData = {
@@ -386,52 +393,56 @@ describe('Contributions Routes', () => {
 
     it('deve retornar 403 ao tentar criar contribuição para outra igreja', async () => {
       // Criar outra igreja completamente diferente
-      const otherChurch = await prisma.church.create({
-        data: {
-          name: 'Outra Igreja',
-        },
+      const otherChurch = await createTestChurch({
+        name: 'Outra Igreja',
       })
 
-      const otherBranch = await prisma.branch.create({
-        data: {
-          name: 'Filial Outra Igreja',
-          churchId: otherChurch.id,
-        },
+      const otherBranch = await createTestBranch({
+        name: 'Filial Outra Igreja',
+        churchId: otherChurch.id,
       })
 
       // Criar usuário e membro na outra igreja
-      const otherUser = await prisma.user.create({
+      const otherUser = await createTestUser({
+        firstName: 'User',
+        lastName: 'Outra Igreja',
+        email: 'otherchurch@example.com',
+        password: 'password123',
+      })
+
+      const otherMember = await createTestMember({
+        name: 'Member Outra Igreja',
+        email: 'memberother@example.com',
+        branchId: otherBranch.id,
+        role: 'ADMINFILIAL',
+        userId: otherUser.id,
+      })
+
+      // Criar permissão para o membro
+      await prisma.permission.create({
         data: {
-          name: 'User Outra Igreja',
-          email: 'otherchurch@example.com',
-          password: await bcrypt.hash('password123', 10),
+          memberId: otherMember.id,
+          type: 'contributions_manage',
         },
       })
 
-      const otherMember = await prisma.member.create({
-        data: {
-          name: 'Member Outra Igreja',
-          email: 'memberother@example.com',
-          branchId: otherBranch.id,
-          role: 'ADMINFILIAL',
-          userId: otherUser.id,
-          Permission: {
-            create: { type: 'contributions_manage' },
-          },
-        },
+      // Buscar otherMember com Permission incluída
+      const otherMemberWithPermission = await prisma.member.findUnique({
+        where: { id: otherMember.id },
         include: { Permission: true },
       })
 
+      const otherFullName = `${otherUser.firstName} ${otherUser.lastName}`.trim()
       const otherToken = app.jwt.sign({
         sub: otherUser.id,
         email: otherUser.email,
-        name: otherUser.name,
+        name: otherFullName,
         type: 'user',
-        memberId: otherMember.id,
-        role: otherMember.role,
-        branchId: otherMember.branchId,
+        memberId: otherMemberWithPermission!.id,
+        role: otherMemberWithPermission!.role,
+        branchId: otherMemberWithPermission!.branchId,
         churchId: otherChurch.id,
-        permissions: otherMember.Permission.map(p => p.type),
+        permissions: otherMemberWithPermission!.Permission.map(p => p.type),
       })
 
       // Tentar criar contribuição na outra igreja usando token da primeira igreja
@@ -515,11 +526,9 @@ describe('Contributions Routes', () => {
 
     it('deve retornar 403 quando contribuição pertence a outra filial', async () => {
       // Criar outra filial
-      const otherBranch = await prisma.branch.create({
-        data: {
-          name: 'Outra Filial',
-          churchId: churchId,
-        },
+      const otherBranch = await createTestBranch({
+        name: 'Outra Filial',
+        churchId: churchId,
       })
 
       // Criar contribuição na outra filial
@@ -542,18 +551,19 @@ describe('Contributions Routes', () => {
     })
 
     it('deve retornar 400 quando usuário não tem branchId', async () => {
-      const userWithoutMember = await prisma.user.create({
-        data: {
-          name: 'User Without Member',
-          email: 'nowmember3@example.com',
-          password: await bcrypt.hash('password123', 10),
-        },
+      const { createTestUser } = await import('../utils/testFactories')
+      
+      const userWithoutMember = await createTestUser({
+        firstName: 'User',
+        lastName: 'Without Member 3',
+        email: 'nowmember3@example.com',
+        password: 'password123',
       })
 
       const tokenWithoutMember = app.jwt.sign({
         sub: userWithoutMember.id,
         email: userWithoutMember.email,
-        name: userWithoutMember.name,
+        name: `${userWithoutMember.firstName} ${userWithoutMember.lastName}`.trim(),
         type: 'user',
       })
 
@@ -577,17 +587,13 @@ describe('Contributions Routes', () => {
 
     it('deve retornar 403 quando contribuição pertence a outra igreja', async () => {
       // Criar outra igreja completamente diferente
-      const otherChurch = await prisma.church.create({
-        data: {
-          name: 'Outra Igreja Diferente',
-        },
+      const otherChurch = await createTestChurch({
+        name: 'Outra Igreja Diferente',
       })
 
-      const otherBranch = await prisma.branch.create({
-        data: {
-          name: 'Filial Outra Igreja',
-          churchId: otherChurch.id,
-        },
+      const otherBranch = await createTestBranch({
+        name: 'Filial Outra Igreja',
+        churchId: otherChurch.id,
       })
 
       // Criar contribuição na outra igreja
@@ -641,11 +647,9 @@ describe('Contributions Routes', () => {
     })
 
     it('deve retornar 403 quando contribuição pertence a outra filial', async () => {
-      const otherBranch = await prisma.branch.create({
-        data: {
-          name: 'Outra Filial',
-          churchId: churchId,
-        },
+      const otherBranch = await createTestBranch({
+        name: 'Outra Filial',
+        churchId: churchId,
       })
 
       const contribution = await prisma.contribution.create({
@@ -667,17 +671,13 @@ describe('Contributions Routes', () => {
 
     it('deve retornar 403 quando contribuição pertence a outra igreja', async () => {
       // Criar outra igreja completamente diferente
-      const otherChurch = await prisma.church.create({
-        data: {
-          name: 'Outra Igreja para Toggle',
-        },
+      const otherChurch = await createTestChurch({
+        name: 'Outra Igreja para Toggle',
       })
 
-      const otherBranch = await prisma.branch.create({
-        data: {
-          name: 'Filial Outra Igreja Toggle',
-          churchId: otherChurch.id,
-        },
+      const otherBranch = await createTestBranch({
+        name: 'Filial Outra Igreja Toggle',
+        churchId: otherChurch.id,
       })
 
       // Criar contribuição na outra igreja

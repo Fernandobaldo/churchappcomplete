@@ -10,7 +10,7 @@ import Fastify from 'fastify'
 import fastifyJwt from '@fastify/jwt'
 import request from 'supertest'
 import { registerRoutes } from '../../../src/routes/registerRoutes'
-import { resetTestDatabase } from '../../utils/resetTestDatabase'
+import { resetTestDatabase } from '../../utils/db'
 import {
   createAdminUsersFixtures,
   loginAdmin,
@@ -19,6 +19,15 @@ import {
 import { logTestResponse } from '../../utils/testResponseHelper'
 import { prisma } from '../../../src/lib/prisma'
 import bcrypt from 'bcryptjs'
+import {
+  createTestPlan,
+  createTestUser,
+  createTestSubscription,
+  createTestChurch,
+  createTestBranch,
+  createTestMember,
+} from '../../utils/testFactories'
+import { SubscriptionStatus } from '@prisma/client'
 
 describe('Admin Dashboard Routes - Integration Tests', () => {
   const app = Fastify()
@@ -92,50 +101,37 @@ describe('Admin Dashboard Routes - Integration Tests', () => {
 
   describe('ADM_API_DASHBOARD_TS001_TC002: Dashboard com dados - valida totais', () => {
     it('deve retornar métricas corretas quando há dados no banco', async () => {
-      // Cria dados de teste
-      const plan = await prisma.plan.create({
-        data: {
-          name: 'Test Plan',
-          price: 0,
-          features: ['basic'],
-          maxMembers: 10,
-          maxBranches: 1,
-        },
+      // Given: Cria dados de teste
+      const plan = await createTestPlan({
+        name: 'Test Plan',
+        price: 0,
+        features: ['basic'],
+        maxMembers: 10,
+        maxBranches: 1,
       })
 
-      const user = await prisma.user.create({
-        data: {
-          name: 'Test User',
-          email: 'testuser@test.com',
-          password: await bcrypt.hash('password123', 10),
-          Subscription: {
-            create: {
-              planId: plan.id,
-              status: 'active',
-            },
-          },
-        },
+      const user = await createTestUser({
+        firstName: 'Test',
+        lastName: 'User',
+        email: 'testuser@test.com',
+        password: 'password123',
       })
 
-      const church = await prisma.church.create({
-        data: {
-          name: 'Test Church',
-        },
+      await createTestSubscription(user.id, plan.id, SubscriptionStatus.active)
+
+      const church = await createTestChurch({
+        name: 'Test Church',
       })
 
-      const branch = await prisma.branch.create({
-        data: {
-          name: 'Test Branch',
-          churchId: church.id,
-        },
+      const branch = await createTestBranch({
+        name: 'Test Branch',
+        churchId: church.id,
       })
 
-      await prisma.member.create({
-        data: {
-          name: 'Test Member',
-          email: 'testmember@test.com',
-          branchId: branch.id,
-        },
+      await createTestMember({
+        name: 'Test Member',
+        email: 'testmember@test.com',
+        branchId: branch.id,
       })
 
       const response = await request(app.server)

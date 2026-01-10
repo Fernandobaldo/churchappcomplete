@@ -69,8 +69,10 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
-describe('ChurchService', () => {
+describe('ChurchService - Unit Tests', () => {
+  // Teste 1: Success - Criar igreja com filial e membro
   it('deve criar uma igreja com filial principal e membro administrador', async () => {
+    // Arrange
 //     const mockChurch = { id: 'church1', name: 'Igreja Teste' }
 
 const mockChurch = {
@@ -118,6 +120,7 @@ const mockChurch = {
       return await fn(tx)
     })
 
+    // Act
     const result = await service.createChurchWithMainBranch(
       {
         name: 'Igreja Teste',
@@ -132,6 +135,7 @@ const mockChurch = {
       }
     )
 
+    // Assert
     expect(result).toEqual(mockChurch)
     expect(prisma.church.create).toHaveBeenCalled()
     expect(prisma.branch.create).toHaveBeenCalled()
@@ -146,9 +150,12 @@ const mockChurch = {
     }
   })
 
+  // Teste 2: Dependency failure propagation - Erro ao criar
   it('deve lidar com erro ao criar igreja', async () => {
+    // Arrange
     prisma.church.create.mockRejectedValue(new Error('Erro inesperado'))
 
+    // Act & Assert
     await expect(
       service.createChurchWithMainBranch(
         {
@@ -166,11 +173,16 @@ const mockChurch = {
     ).rejects.toThrow('Erro inesperado')
   })
 
+  // Teste 3: Success - Buscar igreja por id
   it('deve buscar igreja por id', async () => {
+    // Arrange
     const churchMock = { id: '123', name: 'Igreja Buscada' }
     prisma.church.findUnique.mockResolvedValue(churchMock)
 
+    // Act
     const result = await service.getChurchById('123')
+
+    // Assert
     expect(result).toEqual(churchMock)
     expect(prisma.church.findUnique).toHaveBeenCalledWith({
       where: { id: '123' },
@@ -178,17 +190,24 @@ const mockChurch = {
     })
   })
 
+  // Teste 4: Success - Atualizar igreja
   it('deve atualizar igreja', async () => {
+    // Arrange
     const churchMock = { id: '123', name: 'Atualizada' }
     prisma.church.update.mockResolvedValue(churchMock)
 
+    // Act
     const result = await service.updateChurch('123', { name: 'Atualizada' })
+
+    // Assert
     expect(result).toEqual(churchMock)
     expect(prisma.church.update).toHaveBeenCalledWith({ where: { id: '123' }, data: { name: 'Atualizada' } })
   })
 
- it('deve deletar igreja', async () => {
-   const mockBranches = [
+  // Teste 5: Success - Deletar igreja
+  it('deve deletar igreja', async () => {
+    // Arrange
+    const mockBranches = [
      { 
        id: 'branch1',
        Member: [
@@ -222,28 +241,39 @@ const mockChurch = {
      return await fn(tx)
    })
 
-   prisma.church.delete.mockResolvedValue({ id: '123' })
+    prisma.church.delete.mockResolvedValue({ id: '123' })
 
-   const result = await service.deleteChurch('123')
+    // Act
+    const result = await service.deleteChurch('123')
 
-   expect(result).toEqual({ id: '123' })
+    // Assert
+    expect(result).toEqual({ id: '123' })
    expect(prisma.church.delete).toHaveBeenCalledWith({ where: { id: '123' } })
  })
 
   describe('getAllChurches', () => {
+    // Teste 6: Edge case #1 - branchId null
     it('deve retornar array vazio quando usuário não tem branchId', async () => {
+      // Arrange (não precisa de mocks)
+      
+      // Act
       const result = await service.getAllChurches(null)
       
+      // Assert
       expect(result).toEqual([])
       expect(prisma.branch.findUnique).not.toHaveBeenCalled()
       expect(prisma.church.findMany).not.toHaveBeenCalled()
     })
 
+    // Teste 7: Edge case #2 - branchId inválido
     it('deve retornar array vazio quando branchId não existe', async () => {
+      // Arrange
       prisma.branch.findUnique.mockResolvedValue(null)
       
+      // Act
       const result = await service.getAllChurches('invalid-branch-id')
       
+      // Assert
       expect(result).toEqual([])
       expect(prisma.branch.findUnique).toHaveBeenCalledWith({
         where: { id: 'invalid-branch-id' },
@@ -257,7 +287,9 @@ const mockChurch = {
       })
     })
 
+    // Teste 8: Success - Retornar igreja com branchId válido
     it('deve retornar apenas a igreja da branch do usuário quando tem branchId válido', async () => {
+      // Arrange
       const mockBranch = {
         id: 'branch-123',
         name: 'Sede',
@@ -274,8 +306,10 @@ const mockChurch = {
 
       prisma.branch.findUnique.mockResolvedValue(mockBranch)
       
+      // Act
       const result = await service.getAllChurches('branch-123')
       
+      // Assert
       expect(result).toEqual([mockBranch.Church])
       expect(prisma.branch.findUnique).toHaveBeenCalledWith({
         where: { id: 'branch-123' },

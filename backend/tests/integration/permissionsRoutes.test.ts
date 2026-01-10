@@ -15,6 +15,13 @@ import { resetTestDatabase } from '../utils/resetTestDatabase'
 import { registerRoutes } from '../../src/routes/registerRoutes'
 import { authenticate } from '../../src/middlewares/authenticate'
 import { logTestResponse } from '../utils/testResponseHelper'
+import { 
+  createTestUser,
+  createTestPlan,
+  createTestChurch,
+  createTestBranch,
+  createTestMember,
+} from '../utils/testFactories'
 
 describe('Permissions Routes - Integração', () => {
   const app = Fastify()
@@ -45,130 +52,133 @@ describe('Permissions Routes - Integração', () => {
 
     // Criar plano
     const plan = await prisma.plan.findFirst({ where: { name: 'Free Plan' } }) || 
-      await prisma.plan.create({
-        data: {
-          name: 'Free Plan',
-          price: 0,
-          features: ['basic'],
-          maxMembers: 10,
-          maxBranches: 1,
-        },
+      await createTestPlan({
+        name: 'Free Plan',
+        price: 0,
+        features: ['basic'],
+        maxMembers: 10,
+        maxBranches: 1,
       })
 
     // Criar igreja
-    const church = await prisma.church.create({
-      data: {
-        name: 'Igreja Teste Permissões',
-      },
+    const church = await createTestChurch({
+      name: 'Igreja Teste Permissões',
     })
     adminChurchId = church.id
 
     // Criar filial
-    const branch = await prisma.branch.create({
-      data: {
-        name: 'Filial Teste Permissões',
-        churchId: church.id,
-      },
+    const branch = await createTestBranch({
+      name: 'Filial Teste Permissões',
+      churchId: church.id,
     })
     adminBranchId = branch.id
 
     // Criar usuário ADMINGERAL
-    const adminUser = await prisma.user.create({
-      data: {
-        name: 'Admin Permissões',
-        email: 'adminperms@example.com',
-        password: await bcrypt.hash('password123', 10),
-      },
+    const adminUser = await createTestUser({
+      firstName: 'Admin',
+      lastName: 'Permissões',
+      email: 'adminperms@example.com',
+      password: 'password123',
     })
 
-    const adminMember = await prisma.member.create({
-      data: {
-        name: 'Admin Member Permissões',
-        email: 'adminmemberperms@example.com',
-        branchId: branch.id,
-        role: 'ADMINGERAL',
-        userId: adminUser.id,
-      },
+    const adminMember = await createTestMember({
+      name: 'Admin Member Permissões',
+      email: 'adminmemberperms@example.com',
+      branchId: branch.id,
+      role: 'ADMINGERAL',
+      userId: adminUser.id,
+    })
+
+    // Buscar adminMember com Permission incluída
+    const adminMemberWithPermission = await prisma.member.findUnique({
+      where: { id: adminMember.id },
       include: { Permission: true },
     })
-    adminMemberId = adminMember.id
+    adminMemberId = adminMemberWithPermission!.id
 
+    const adminFullName = `${adminUser.firstName} ${adminUser.lastName}`.trim()
     adminToken = app.jwt.sign({
       sub: adminUser.id,
       email: adminUser.email,
-      name: adminUser.name,
+      name: adminFullName,
       type: 'member',
-      memberId: adminMember.id,
-      role: adminMember.role,
-      branchId: adminMember.branchId,
+      memberId: adminMemberWithPermission!.id,
+      role: adminMemberWithPermission!.role,
+      branchId: adminMemberWithPermission!.branchId,
       churchId: church.id,
-      permissions: adminMember.Permission.map(p => p.type),
+      permissions: adminMemberWithPermission!.Permission.map(p => p.type),
     })
 
     // Criar usuário COORDINATOR
-    const coordinatorUser = await prisma.user.create({
-      data: {
-        name: 'Coordinator Permissões',
-        email: 'coordperms@example.com',
-        password: await bcrypt.hash('password123', 10),
-      },
+    const coordinatorUser = await createTestUser({
+      firstName: 'Coordinator',
+      lastName: 'Permissões',
+      email: 'coordperms@example.com',
+      password: 'password123',
     })
 
-    const coordinatorMember = await prisma.member.create({
-      data: {
-        name: 'Coordinator Member Permissões',
-        email: 'coordmemberperms@example.com',
-        branchId: branch.id,
-        role: 'COORDINATOR',
-        userId: coordinatorUser.id,
-      },
+    const coordinatorMember = await createTestMember({
+      name: 'Coordinator Member Permissões',
+      email: 'coordmemberperms@example.com',
+      branchId: branch.id,
+      role: 'COORDINATOR',
+      userId: coordinatorUser.id,
+    })
+
+    // Buscar coordinatorMember com Permission incluída
+    const coordinatorMemberWithPermission = await prisma.member.findUnique({
+      where: { id: coordinatorMember.id },
       include: { Permission: true },
     })
-    coordinatorMemberId = coordinatorMember.id
+    coordinatorMemberId = coordinatorMemberWithPermission!.id
 
+    const coordinatorFullName = `${coordinatorUser.firstName} ${coordinatorUser.lastName}`.trim()
     coordinatorToken = app.jwt.sign({
       sub: coordinatorUser.id,
       email: coordinatorUser.email,
-      name: coordinatorUser.name,
+      name: coordinatorFullName,
       type: 'member',
-      memberId: coordinatorMember.id,
-      role: coordinatorMember.role,
-      branchId: coordinatorMember.branchId,
+      memberId: coordinatorMemberWithPermission!.id,
+      role: coordinatorMemberWithPermission!.role,
+      branchId: coordinatorMemberWithPermission!.branchId,
       churchId: church.id,
-      permissions: coordinatorMember.Permission.map(p => p.type),
+      permissions: coordinatorMemberWithPermission!.Permission.map(p => p.type),
     })
 
     // Criar usuário MEMBER
-    const memberUser = await prisma.user.create({
-      data: {
-        name: 'Member Permissões',
-        email: 'memberperms@example.com',
-        password: await bcrypt.hash('password123', 10),
-      },
+    const memberUser = await createTestUser({
+      firstName: 'Member',
+      lastName: 'Permissões',
+      email: 'memberperms@example.com',
+      password: 'password123',
     })
 
-    const regularMember = await prisma.member.create({
-      data: {
-        name: 'Regular Member Permissões',
-        email: 'regularmemberperms@example.com',
-        branchId: branch.id,
-        role: 'MEMBER',
-        userId: memberUser.id,
-      },
+    const regularMember = await createTestMember({
+      name: 'Regular Member Permissões',
+      email: 'regularmemberperms@example.com',
+      branchId: branch.id,
+      role: 'MEMBER',
+      userId: memberUser.id,
+    })
+
+    // Buscar regularMember com Permission incluída
+    const regularMemberWithPermission = await prisma.member.findUnique({
+      where: { id: regularMember.id },
       include: { Permission: true },
     })
-    memberId = regularMember.id
+    memberId = regularMemberWithPermission!.id
 
+    const memberFullName = `${memberUser.firstName} ${memberUser.lastName}`.trim()
     memberToken = app.jwt.sign({
       sub: memberUser.id,
       email: memberUser.email,
-      name: memberUser.name,
+      name: memberFullName,
       type: 'member',
-      memberId: regularMember.id,
-      role: regularMember.role,
-      branchId: regularMember.branchId,
+      memberId: regularMemberWithPermission!.id,
+      role: regularMemberWithPermission!.role,
+      branchId: regularMemberWithPermission!.branchId,
       churchId: church.id,
-      permissions: regularMember.Permission.map(p => p.type),
+      permissions: regularMemberWithPermission!.Permission.map(p => p.type),
     })
   })
 

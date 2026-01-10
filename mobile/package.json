@@ -13,7 +13,10 @@
     "web": "expo start --web",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "test:e2e": "maestro test e2e/maestro",
+    "test:e2e:ios": "maestro test e2e/maestro --device ios",
+    "test:e2e:android": "maestro test e2e/maestro --device android"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",

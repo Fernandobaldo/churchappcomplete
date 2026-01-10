@@ -10,7 +10,8 @@ import Fastify from 'fastify'
 import fastifyJwt from '@fastify/jwt'
 import request from 'supertest'
 import { registerRoutes } from '../../../src/routes/registerRoutes'
-import { resetTestDatabase } from '../../utils/resetTestDatabase'
+import { resetTestDatabase } from '../../utils/db'
+import { createTestUser } from '../../utils/testFactories'
 import {
   createAdminUser,
   createAdminUsersFixtures,
@@ -52,12 +53,11 @@ describe('Admin Auth Routes - Integration Tests', () => {
     finance = fixtures.finance
 
     // Cria um usuário comum (não admin) para testar negação de acesso
-    regularUser = await prisma.user.create({
-      data: {
-        name: 'Regular User',
-        email: 'regular@test.com',
-        password: 'password123',
-      },
+    regularUser = await createTestUser({
+      firstName: 'Regular',
+      lastName: 'User',
+      email: 'regular@test.com',
+      password: 'password123',
     })
   })
 

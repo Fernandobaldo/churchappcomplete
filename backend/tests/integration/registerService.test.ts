@@ -12,6 +12,14 @@ import { SubscriptionStatus } from '@prisma/client'
 import { registerUserService } from '../../src/services/auth/registerService'
 import { resetTestDatabase } from '../utils/resetTestDatabase'
 import bcrypt from 'bcryptjs'
+import { 
+  createTestUser,
+  createTestPlan,
+  createTestSubscription,
+  createTestChurch,
+  createTestBranch,
+  createTestMember,
+} from '../utils/testFactories'
 
 describe('RegisterService - Novo Modelo User + Member', () => {
   let adminUser: any
@@ -25,56 +33,45 @@ describe('RegisterService - Novo Modelo User + Member', () => {
     // Criar plano
     plan = await prisma.plan.findFirst({ where: { name: 'Free Plan' } })
     if (!plan) {
-      plan = await prisma.plan.create({
-        data: {
-          name: 'Free Plan',
-          price: 0,
-          features: ['basic'],
-          maxMembers: 10,
-          maxBranches: 1,
-        },
+      plan = await createTestPlan({
+        name: 'Free Plan',
+        price: 0,
+        features: ['basic'],
+        maxMembers: 10,
+        maxBranches: 1,
       })
     }
 
     // Criar User admin
-    adminUser = await prisma.user.create({
-      data: {
-        name: 'Admin Teste',
-        email: 'admin@test.com',
-        password: await bcrypt.hash('password123', 10),
-        Subscription: {
-          create: {
-            planId: plan.id,
-            status: SubscriptionStatus.active,
-          },
-        },
-      },
+    adminUser = await createTestUser({
+      firstName: 'Admin',
+      lastName: 'Teste',
+      email: 'admin@test.com',
+      password: 'password123',
     })
+    
+    await createTestSubscription(adminUser.id, plan.id, SubscriptionStatus.active)
 
     // Criar igreja e branch
-    const church = await prisma.church.create({
-      data: { name: 'Igreja Teste' },
+    const church = await createTestChurch({
+      name: 'Igreja Teste',
     })
 
-    const branch = await prisma.branch.create({
-      data: {
-        name: 'Sede',
-        churchId: church.id,
-        isMainBranch: true,
-      },
+    const branch = await createTestBranch({
+      name: 'Sede',
+      churchId: church.id,
+      isMainBranch: true,
     })
 
     branchId = branch.id
 
     // Criar Member associado ao User admin
-    adminMember = await prisma.member.create({
-      data: {
-        name: 'Admin Teste',
-        email: 'admin@test.com',
-        role: 'ADMINGERAL',
-        branchId: branch.id,
-        userId: adminUser.id,
-      },
+    adminMember = await createTestMember({
+      name: 'Admin Teste',
+      email: 'admin@test.com',
+      role: 'ADMINGERAL',
+      branchId: branch.id,
+      userId: adminUser.id,
     })
   })
 
@@ -264,12 +261,11 @@ describe('RegisterService - Novo Modelo User + Member', () => {
       const existingEmail = `existing-${Date.now()}@test.com`
       
       // Cria User primeiro
-      await prisma.user.create({
-        data: {
-          name: 'User Existente',
-          email: existingEmail,
-          password: await bcrypt.hash('senha123', 10),
-        },
+      await createTestUser({
+        firstName: 'User',
+        lastName: 'Existente',
+        email: existingEmail,
+        password: 'senha123',
       })
 
       // Tenta criar Member com mesmo email

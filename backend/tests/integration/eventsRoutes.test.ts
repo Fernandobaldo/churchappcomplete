@@ -1,132 +1,143 @@
+// IMPORTANTE: Carregar .env.test ANTES de qualquer importação
 import dotenv from 'dotenv'
-
 dotenv.config({ path: '.env.test' })
 
 process.env.NODE_ENV = 'test'
 process.env.VITEST = 'true'
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import Fastify from 'fastify'
-import fastifyJwt from '@fastify/jwt'
+import { beforeAll, afterAll, beforeEach, describe, it, expect } from 'vitest'
 import request from 'supertest'
 import { prisma } from '../../src/lib/prisma'
-import bcrypt from 'bcryptjs'
-import { resetTestDatabase } from '../utils/resetTestDatabase'
-import { registerRoutes } from '../../src/routes/registerRoutes'
-import { authenticate } from '../../src/middlewares/authenticate'
-import { logTestResponse } from '../utils/testResponseHelper'
+import { resetTestDatabase } from '../utils/db'
+import { createTestApp } from '../utils/createTestApp'
+import { generateTestToken } from '../utils/auth'
+import { 
+  createTestUser, 
+  createTestMember, 
+  createTestChurch, 
+  createTestBranch, 
+  createTestPlan, 
+  createTestSubscription 
+} from '../utils/testFactories'
+import type { FastifyInstance } from 'fastify'
+import { SubscriptionStatus } from '@prisma/client'
 
-describe('Events Routes', () => {
-  const app = Fastify()
-  let userToken: string
-  let userId: string
+describe('Events Routes - Integration Tests', () => {
+  let app: FastifyInstance
+  let planId: string
+  let adminUser: any
+  let adminMember: any
+  let adminToken: string
   let branchId: string
-  let memberId: string
   let churchId: string
 
   beforeAll(async () => {
-    if (!process.env.JWT_SECRET) {
-      process.env.JWT_SECRET = 'churchapp-secret-key'
-    }
-
-    app.register(fastifyJwt, {
-      secret: process.env.JWT_SECRET || 'churchapp-secret-key',
-    })
-
-    app.decorate('authenticate', authenticate)
-
-    await registerRoutes(app)
-    await app.ready()
-
+    app = await createTestApp()
     await resetTestDatabase()
 
-    // Criar plano
-    const plan = await prisma.plan.findFirst({ where: { name: 'Free Plan' } }) || 
-      await prisma.plan.create({
-        data: {
-          name: 'Free Plan',
-          price: 0,
-          features: ['basic'],
-          maxMembers: 10,
-          maxBranches: 1,
-        },
-      })
+    // Criar plano para testes
+    const plan = await createTestPlan({
+      name: 'Free Plan',
+      maxMembers: 10,
+      maxBranches: 1,
+    })
+    planId = plan.id
+  })
 
-    // Criar igreja
-    const church = await prisma.church.create({
-      data: {
-        name: 'Igreja Teste',
-      },
+  beforeEach(async () => {
+    await resetTestDatabase()
+
+    // Criar plano novamente após reset
+    const plan = await createTestPlan({
+      name: 'Free Plan',
+      maxMembers: 10,
+      maxBranches: 1,
+    })
+    planId = plan.id
+
+    // Criar User
+    adminUser = await createTestUser({
+      email: `admin-${Date.now()}@test.com`,
+      firstName: 'Admin',
+      lastName: 'User',
+      password: 'password123',
+    })
+
+    await createTestSubscription(adminUser.id, planId, SubscriptionStatus.active)
+
+    // Criar Church
+    const church = await createTestChurch({
+      name: 'Igreja Teste',
+      createdByUserId: adminUser.id,
     })
     churchId = church.id
 
-    // Criar filial
-    const branch = await prisma.branch.create({
-      data: {
-        name: 'Filial Teste',
-        churchId: church.id,
-      },
+    // Criar Branch
+    const branch = await createTestBranch({
+      churchId: church.id,
+      name: 'Filial Teste',
+      isMainBranch: true,
     })
     branchId = branch.id
 
-    // Criar usuário
-    const hashedPassword = await bcrypt.hash('password123', 10)
-    const user = await prisma.user.create({
+    // Criar Member com permissão events_manage
+    adminMember = await createTestMember({
+      userId: adminUser.id,
+      email: adminUser.email,
+      role: 'ADMINFILIAL' as any,
+      branchId: branch.id,
+    })
+
+    // Criar Permission para events_manage
+    await prisma.permission.create({
       data: {
-        name: 'Test User',
-        email: 'test@example.com',
-        password: hashedPassword,
+        memberId: adminMember.id,
+        type: 'events_manage',
       },
     })
-    userId = user.id
 
-    // Criar membro com permissão events_manage
-    const member = await prisma.member.create({
-      data: {
-        name: 'Test Member',
-        email: 'member@example.com',
-        branchId: branch.id,
-        role: 'ADMINFILIAL',
-        userId: user.id,
-        Permission: {
-          create: { type: 'events_manage' },
-        },
-      },
+    // Buscar member com permissions para gerar token
+    const memberWithPermissions = await prisma.member.findUnique({
+      where: { id: adminMember.id },
       include: { Permission: true },
     })
-    memberId = member.id
 
-    // Gerar token
-    userToken = app.jwt.sign({
-      sub: user.id,
-      email: user.email,
-      name: user.name,
-      type: 'user',
-      memberId: member.id,
-      role: member.role,
-      branchId: member.branchId,
+    adminToken = await generateTestToken(app, {
+      sub: adminUser.id,
+      email: adminUser.email,
+      name: `${adminUser.firstName} ${adminUser.lastName}`.trim(),
+      type: 'member',
+      memberId: adminMember.id,
+      role: adminMember.role,
+      branchId: branch.id,
       churchId: church.id,
-      permissions: member.Permission.map(p => p.type),
+      permissions: memberWithPermissions!.Permission.map(p => p.type),
+      onboardingCompleted: true,
     })
   })
 
   afterAll(async () => {
+    await resetTestDatabase()
     await app.close()
   })
 
   describe('GET /events', () => {
-    it('deve retornar lista vazia quando não há eventos', async () => {
+    // Teste 1: 200/201 Success
+    it('deve retornar lista vazia quando não há eventos (200 OK)', async () => {
+      // Given: Usuário autenticado sem eventos
+      // When: GET /events
       const response = await request(app.server)
         .get('/events')
-        .set('Authorization', `Bearer ${userToken}`)
+        .set('Authorization', `Bearer ${adminToken}`)
 
-      logTestResponse(response, 200)
+      // Then: Retorna 200 com array vazio
       expect(response.status).toBe(200)
       expect(response.body).toEqual([])
     })
 
+    // Teste 2: 200/201 Success - Com eventos
     it('deve retornar eventos da filial do usuário', async () => {
-      // Criar evento
+      // Given: Evento criado na filial do usuário
       const event = await prisma.event.create({
         data: {
           title: 'Evento Teste',
@@ -139,11 +150,12 @@ describe('Events Routes', () => {
         },
       })
 
+      // When: GET /events
       const response = await request(app.server)
         .get('/events')
-        .set('Authorization', `Bearer ${userToken}`)
+        .set('Authorization', `Bearer ${adminToken}`)
 
-      logTestResponse(response, 200)
+      // Then: Retorna 200 com array contendo o evento
       expect(response.status).toBe(200)
       expect(Array.isArray(response.body)).toBe(true)
       expect(response.body.length).toBeGreaterThan(0)
@@ -151,45 +163,68 @@ describe('Events Routes', () => {
       expect(response.body[0]).toHaveProperty('title', 'Evento Teste')
     })
 
+    // Teste 3: 401 Unauthenticated
+    it('deve retornar 401 se usuário não autenticado', async () => {
+      // Given: Requisição sem token
+      // When: GET /events sem Authorization
+      const response = await request(app.server).get('/events')
+
+      // Then: Retorna 401
+      expect(response.status).toBe(401)
+    })
+
+    // Teste 4: Edge case - Usuário sem branchId
     it('deve retornar array vazio quando usuário não tem branchId', async () => {
-      // Criar usuário sem membro
-      const userWithoutMember = await prisma.user.create({
-        data: {
-          name: 'User Without Member',
-          email: 'nowmember@example.com',
-          password: await bcrypt.hash('password123', 10),
-        },
+      // Given: Usuário sem member/branchId
+      const userWithoutMember = await createTestUser({
+        email: `nowmember-${Date.now()}@test.com`,
+        firstName: 'User',
+        lastName: 'Without Member',
       })
 
-      const tokenWithoutMember = app.jwt.sign({
+      await createTestSubscription(userWithoutMember.id, planId, SubscriptionStatus.active)
+
+      const tokenWithoutMember = await generateTestToken(app, {
         sub: userWithoutMember.id,
         email: userWithoutMember.email,
-        name: userWithoutMember.name,
+        name: `${userWithoutMember.firstName} ${userWithoutMember.lastName}`.trim(),
         type: 'user',
+        memberId: null,
+        role: null,
+        branchId: null,
+        churchId: null,
+        permissions: [],
+        onboardingCompleted: false,
       })
 
+      // When: GET /events
       const response = await request(app.server)
         .get('/events')
         .set('Authorization', `Bearer ${tokenWithoutMember}`)
 
-      logTestResponse(response, 200)
+      // Then: Retorna 200 com array vazio
       expect(response.status).toBe(200)
       expect(response.body).toEqual([])
     })
   })
 
   describe('GET /events/next', () => {
-    it('deve retornar null quando não há eventos futuros', async () => {
+    // Teste 1: 200/201 Success - Sem eventos futuros
+    it('deve retornar null quando não há eventos futuros (200 OK)', async () => {
+      // Given: Usuário autenticado sem eventos futuros
+      // When: GET /events/next
       const response = await request(app.server)
         .get('/events/next')
-        .set('Authorization', `Bearer ${userToken}`)
+        .set('Authorization', `Bearer ${adminToken}`)
 
-      logTestResponse(response, 200)
+      // Then: Retorna 200 com null
       expect(response.status).toBe(200)
       expect(response.body).toBeNull()
     })
 
+    // Teste 2: 200/201 Success - Com evento futuro
     it('deve retornar próximo evento futuro', async () => {
+      // Given: Evento futuro criado
       const futureDate = new Date()
       futureDate.setDate(futureDate.getDate() + 1)
 
@@ -205,45 +240,65 @@ describe('Events Routes', () => {
         },
       })
 
+      // When: GET /events/next
       const response = await request(app.server)
         .get('/events/next')
-        .set('Authorization', `Bearer ${userToken}`)
+        .set('Authorization', `Bearer ${adminToken}`)
 
-      logTestResponse(response, 200)
+      // Then: Retorna 200 com próximo evento
       expect(response.status).toBe(200)
       expect(response.body).not.toBeNull()
       expect(response.body).toHaveProperty('id', event.id)
       expect(response.body).toHaveProperty('title', 'Próximo Evento')
     })
 
+    // Teste 3: 401 Unauthenticated
+    it('deve retornar 401 se usuário não autenticado', async () => {
+      // Given: Requisição sem token
+      // When: GET /events/next sem Authorization
+      const response = await request(app.server).get('/events/next')
+
+      // Then: Retorna 401
+      expect(response.status).toBe(401)
+    })
+
+    // Teste 4: Edge case - Usuário sem branchId
     it('deve retornar null quando usuário não tem branchId', async () => {
-      const userWithoutMember = await prisma.user.create({
-        data: {
-          name: 'User Without Member 2',
-          email: 'nowmember2@example.com',
-          password: await bcrypt.hash('password123', 10),
-        },
+      // Given: Usuário sem member/branchId
+      const userWithoutMember = await createTestUser({
+        email: `nowmember2-${Date.now()}@test.com`,
       })
 
-      const tokenWithoutMember = app.jwt.sign({
+      await createTestSubscription(userWithoutMember.id, planId, SubscriptionStatus.active)
+
+      const tokenWithoutMember = await generateTestToken(app, {
         sub: userWithoutMember.id,
         email: userWithoutMember.email,
-        name: userWithoutMember.name,
+        name: `${userWithoutMember.firstName} ${userWithoutMember.lastName}`.trim(),
         type: 'user',
+        memberId: null,
+        role: null,
+        branchId: null,
+        churchId: null,
+        permissions: [],
+        onboardingCompleted: false,
       })
 
+      // When: GET /events/next
       const response = await request(app.server)
         .get('/events/next')
         .set('Authorization', `Bearer ${tokenWithoutMember}`)
 
-      logTestResponse(response, 200)
+      // Then: Retorna 200 com null
       expect(response.status).toBe(200)
       expect(response.body).toBeNull()
     })
   })
 
   describe('GET /events/:id', () => {
-    it('deve retornar evento por ID', async () => {
+    // Teste 1: 200/201 Success
+    it('deve retornar evento por ID (200 OK)', async () => {
+      // Given: Evento criado
       const event = await prisma.event.create({
         data: {
           title: 'Evento Detalhes',
@@ -256,32 +311,50 @@ describe('Events Routes', () => {
         },
       })
 
+      // When: GET /events/:id
       const response = await request(app.server)
         .get(`/events/${event.id}`)
-        .set('Authorization', `Bearer ${userToken}`)
+        .set('Authorization', `Bearer ${adminToken}`)
 
-      logTestResponse(response, 200)
+      // Then: Retorna 200 com dados do evento
       expect(response.status).toBe(200)
       expect(response.body).toHaveProperty('id', event.id)
       expect(response.body).toHaveProperty('title', 'Evento Detalhes')
       expect(response.body).toHaveProperty('Branch')
     })
 
+    // Teste 2: 404 Not Found
     it('deve retornar 404 quando evento não existe', async () => {
+      // Given: ID de evento inexistente
       const fakeId = 'cmic00000000000000000000000'
 
+      // When: GET /events/:id
       const response = await request(app.server)
         .get(`/events/${fakeId}`)
-        .set('Authorization', `Bearer ${userToken}`)
+        .set('Authorization', `Bearer ${adminToken}`)
 
-      logTestResponse(response, 404)
+      // Then: Retorna 404
       expect(response.status).toBe(404)
       expect(response.body).toHaveProperty('message', 'Evento não encontrado')
+    })
+
+    // Teste 3: 401 Unauthenticated
+    it('deve retornar 401 se usuário não autenticado', async () => {
+      // Given: Requisição sem token
+      const fakeId = 'cmic00000000000000000000000'
+
+      // When: GET /events/:id sem Authorization
+      const response = await request(app.server).get(`/events/${fakeId}`)
+
+      // Then: Retorna 401
+      expect(response.status).toBe(401)
     })
   })
 
   describe('POST /events', () => {
-    it('deve criar evento com sucesso', async () => {
+    // Teste 1: 200/201 Success
+    it('deve criar evento com sucesso (201 Created)', async () => {
+      // Given: Dados válidos de evento
       const eventData = {
         title: 'Novo Evento',
         description: 'Descrição do novo evento',
@@ -292,19 +365,22 @@ describe('Events Routes', () => {
         hasDonation: false,
       }
 
+      // When: POST /events
       const response = await request(app.server)
         .post('/events')
-        .set('Authorization', `Bearer ${userToken}`)
+        .set('Authorization', `Bearer ${adminToken}`)
         .send(eventData)
 
-      logTestResponse(response, 201)
+      // Then: Retorna 201 com evento criado
       expect(response.status).toBe(201)
       expect(response.body).toHaveProperty('id')
       expect(response.body).toHaveProperty('title', 'Novo Evento')
       expect(response.body).toHaveProperty('branchId', branchId)
     })
 
+    // Teste 2: 200/201 Success - Com doação
     it('deve criar evento com doação', async () => {
+      // Given: Dados válidos de evento com doação
       const eventData = {
         title: 'Evento com Doação',
         description: 'Descrição',
@@ -317,95 +393,83 @@ describe('Events Routes', () => {
         donationLink: 'https://example.com/doacao',
       }
 
+      // When: POST /events
       const response = await request(app.server)
         .post('/events')
-        .set('Authorization', `Bearer ${userToken}`)
+        .set('Authorization', `Bearer ${adminToken}`)
         .send(eventData)
 
-      logTestResponse(response, 201)
+      // Then: Retorna 201 com evento criado e dados de doação
       expect(response.status).toBe(201)
       expect(response.body).toHaveProperty('hasDonation', true)
       expect(response.body).toHaveProperty('donationReason', 'Construção do templo')
       expect(response.body).toHaveProperty('donationLink', 'https://example.com/doacao')
     })
 
-    it('deve retornar 400 quando usuário não tem branchId', async () => {
-      const userWithoutMember = await prisma.user.create({
-        data: {
-          name: 'User Without Member 3',
-          email: 'nowmember3@example.com',
-          password: await bcrypt.hash('password123', 10),
-        },
-      })
-
-      const tokenWithoutMember = app.jwt.sign({
-        sub: userWithoutMember.id,
-        email: userWithoutMember.email,
-        name: userWithoutMember.name,
-        type: 'user',
-      })
-
-      const eventData = {
-        title: 'Evento Teste',
-        startDate: new Date('2025-01-15T10:00:00Z').toISOString(),
-        endDate: new Date('2025-01-15T12:00:00Z').toISOString(),
-        location: 'Local',
-      }
-
-      const response = await request(app.server)
-        .post('/events')
-        .set('Authorization', `Bearer ${tokenWithoutMember}`)
-        .send(eventData)
-
-      expect(response.status).toBe(400)
-      expect(response.body).toHaveProperty('message')
-    })
-
+    // Teste 3: 400 Invalid payload
     it('deve retornar 400 quando dados inválidos', async () => {
+      // Given: Dados incompletos (faltando campos obrigatórios)
       const eventData = {
-        // Faltando campos obrigatórios
         title: 'Evento Incompleto',
       }
 
+      // When: POST /events
       const response = await request(app.server)
         .post('/events')
-        .set('Authorization', `Bearer ${userToken}`)
+        .set('Authorization', `Bearer ${adminToken}`)
         .send(eventData)
 
+      // Then: Retorna 400
       expect(response.status).toBe(400)
       expect(response.body).toHaveProperty('error', 'Dados inválidos')
     })
 
+    // Teste 4: 401 Unauthenticated
+    it('deve retornar 401 se usuário não autenticado', async () => {
+      // Given: Dados válidos sem token
+      const eventData = {
+        title: 'Novo Evento',
+        startDate: new Date('2025-01-15T10:00:00Z').toISOString(),
+        endDate: new Date('2025-01-15T12:00:00Z').toISOString(),
+        location: 'Local',
+      }
+
+      // When: POST /events sem Authorization
+      const response = await request(app.server)
+        .post('/events')
+        .send(eventData)
+
+      // Then: Retorna 401
+      expect(response.status).toBe(401)
+    })
+
+    // Teste 5: 403 Forbidden
     it('deve retornar 403 quando usuário não tem permissão', async () => {
-      // Criar membro sem permissão events_manage
-      const userWithoutPermission = await prisma.user.create({
-        data: {
-          name: 'User No Permission',
-          email: 'nopermission@example.com',
-          password: await bcrypt.hash('password123', 10),
-        },
+      // Given: Usuário sem permissão events_manage
+      const userWithoutPermission = await createTestUser({
+        email: `nopermission-${Date.now()}@test.com`,
       })
 
-      const memberWithoutPermission = await prisma.member.create({
-        data: {
-          name: 'Member No Permission',
-          email: 'membernoperm@example.com',
-          branchId: branchId,
-          role: 'MEMBER',
-          userId: userWithoutPermission.id,
-        },
+      await createTestSubscription(userWithoutPermission.id, planId, SubscriptionStatus.active)
+
+      const memberWithoutPermission = await createTestMember({
+        userId: userWithoutPermission.id,
+        email: userWithoutPermission.email,
+        role: 'MEMBER' as any,
+        branchId: branchId,
       })
 
-      const tokenWithoutPermission = app.jwt.sign({
+      const tokenWithoutPermission = await generateTestToken(app, {
         sub: userWithoutPermission.id,
         email: userWithoutPermission.email,
-        name: userWithoutPermission.name,
-        type: 'user',
+        name: `${userWithoutPermission.firstName} ${userWithoutPermission.lastName}`.trim(),
+        type: 'member',
         memberId: memberWithoutPermission.id,
         role: memberWithoutPermission.role,
-        branchId: memberWithoutPermission.branchId,
+        branchId: branchId,
         churchId: churchId,
         permissions: [],
+        onboardingCompleted: true,
       })
 
       const eventData = {
@@ -415,17 +479,94 @@ describe('Events Routes', () => {
         location: 'Local',
       }
 
+      // When: POST /events
       const response = await request(app.server)
         .post('/events')
         .set('Authorization', `Bearer ${tokenWithoutPermission}`)
         .send(eventData)
 
+      // Then: Retorna 403
       expect(response.status).toBe(403)
+    })
+
+    // Teste 6: 400 - Edge case - Usuário sem branchId
+    it('deve retornar 400 quando usuário não tem branchId', async () => {
+      // Given: Usuário sem member/branchId
+      const userWithoutMember = await createTestUser({
+        email: `nowmember3-${Date.now()}@test.com`,
+      })
+
+      await createTestSubscription(userWithoutMember.id, planId, SubscriptionStatus.active)
+
+      const tokenWithoutMember = await generateTestToken(app, {
+        sub: userWithoutMember.id,
+        email: userWithoutMember.email,
+        name: `${userWithoutMember.firstName} ${userWithoutMember.lastName}`.trim(),
+        type: 'user',
+        memberId: null,
+        role: null,
+        branchId: null,
+        churchId: null,
+        permissions: [],
+        onboardingCompleted: false,
+      })
+
+      const eventData = {
+        title: 'Evento Teste',
+        startDate: new Date('2025-01-15T10:00:00Z').toISOString(),
+        endDate: new Date('2025-01-15T12:00:00Z').toISOString(),
+        location: 'Local',
+      }
+
+      // When: POST /events
+      const response = await request(app.server)
+        .post('/events')
+        .set('Authorization', `Bearer ${tokenWithoutMember}`)
+        .send(eventData)
+
+      // Then: Retorna 400
+      expect(response.status).toBe(400)
+      expect(response.body).toHaveProperty('message')
+    })
+
+    // Teste 7: DB side-effect assertions
+    it('deve criar evento no banco de dados', async () => {
+      // Given: Dados válidos de evento
+      const eventData = {
+        title: 'Evento DB Test',
+        description: 'Teste de side-effect',
+        location: 'Local Teste',
+        startDate: new Date('2025-01-15T10:00:00Z').toISOString(),
+        endDate: new Date('2025-01-15T12:00:00Z').toISOString(),
+        time: '10:00',
+        hasDonation: false,
+      }
+
+      // When: POST /events
+      const response = await request(app.server)
+        .post('/events')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(eventData)
+
+      expect(response.status).toBe(201)
+      const eventId = response.body.id
+
+      // Then: Evento foi criado no banco
+      const eventInDb = await prisma.event.findUnique({
+        where: { id: eventId },
+      })
+
+      expect(eventInDb).not.toBeNull()
+      expect(eventInDb?.title).toBe('Evento DB Test')
+      expect(eventInDb?.branchId).toBe(branchId)
+      expect(eventInDb?.description).toBe('Teste de side-effect')
     })
   })
 
   describe('PUT /events/:id', () => {
-    it('deve atualizar evento com sucesso', async () => {
+    // Teste 1: 200/201 Success
+    it('deve atualizar evento com sucesso (200 OK)', async () => {
+      // Given: Evento existente
       const event = await prisma.event.create({
         data: {
           title: 'Evento Original',
@@ -446,34 +587,52 @@ describe('Events Routes', () => {
         endDate: new Date('2025-02-02T12:00:00Z').toISOString(),
       }
 
+      // When: PUT /events/:id
       const response = await request(app.server)
         .put(`/events/${event.id}`)
-        .set('Authorization', `Bearer ${userToken}`)
+        .set('Authorization', `Bearer ${adminToken}`)
         .send(updateData)
 
-      logTestResponse(response, 200)
+      // Then: Retorna 200 com evento atualizado
       expect(response.status).toBe(200)
       expect(response.body).toHaveProperty('title', 'Evento Atualizado')
       expect(response.body).toHaveProperty('description', 'Nova descrição')
       expect(response.body).toHaveProperty('location', 'Novo local')
     })
 
+    // Teste 2: 404 Not Found
     it('deve retornar 404 quando evento não existe', async () => {
+      // Given: ID de evento inexistente
       const fakeId = 'cmic00000000000000000000000'
-
       const updateData = {
         title: 'Evento Atualizado',
       }
 
+      // When: PUT /events/:id
       const response = await request(app.server)
         .put(`/events/${fakeId}`)
-        .set('Authorization', `Bearer ${userToken}`)
+        .set('Authorization', `Bearer ${adminToken}`)
         .send(updateData)
 
-      logTestResponse(response, 404)
+      // Then: Retorna 404
       expect(response.status).toBe(404)
     })
+
+    // Teste 3: 401 Unauthenticated
+    it('deve retornar 401 se usuário não autenticado', async () => {
+      // Given: Requisição sem token
+      const fakeId = 'cmic00000000000000000000000'
+      const updateData = {
+        title: 'Evento Atualizado',
+      }
+
+      // When: PUT /events/:id sem Authorization
+      const response = await request(app.server)
+        .put(`/events/${fakeId}`)
+        .send(updateData)
+
+      // Then: Retorna 401
+      expect(response.status).toBe(401)
+    })
   })
-
 })
-

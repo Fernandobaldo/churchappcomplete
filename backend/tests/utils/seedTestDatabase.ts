@@ -54,7 +54,8 @@ export async function seedTestDatabase() {
     try {
       user = await prisma.user.create({
     data: {
-      name: 'Usuário SaaS',
+      firstName: 'Usuário',
+      lastName: 'SaaS',
       email: 'user@example.com',
       password: await bcrypt.hash('password123', 10),
     },
@@ -129,7 +130,8 @@ export async function seedTestDatabase() {
     try {
       memberUser = await prisma.user.create({
         data: {
-          name: 'Membro Teste',
+          firstName: 'Membro',
+          lastName: 'Teste',
           email: 'member@example.com',
           password: await bcrypt.hash('password123', 10),
         },
