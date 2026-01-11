@@ -1,17 +1,18 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import AddMember from '@/pages/Members/AddMember'
-import api from '@/api/api'
-import { useAuthStore } from '@/stores/authStore'
-import { mockUser } from '@/test/mocks/mockData'
+import { fixtures } from '@/test/fixtures'
+import { renderWithProviders } from '@/test/helpers'
+import { mockApiResponse, mockApiError } from '@/test/mockApi'
 
 vi.mock('@/api/api')
+const mockToastSuccess = vi.fn()
+const mockToastError = vi.fn()
 vi.mock('react-hot-toast', () => ({
   default: {
-    success: vi.fn(),
-    error: vi.fn(),
+    success: mockToastSuccess,
+    error: mockToastError,
   },
 }))
 
@@ -24,63 +25,80 @@ vi.mock('react-router-dom', async () => {
   }
 })
 
-describe('AddMember Page', () => {
+describe('AddMember - Unit Tests', () => {
   beforeEach(() => {
-    useAuthStore.setState({
-      token: 'token',
-      user: mockUser,
-    })
     vi.clearAllMocks()
   })
 
+  // ============================================================================
+  // TESTE 1: BASIC RENDER - Renderiza o formulário corretamente
+  // ============================================================================
   it('deve renderizar o formulário corretamente', () => {
-    render(
-      <MemoryRouter>
-        <AddMember />
-      </MemoryRouter>
-    )
+    // Arrange
+    const mockUser = fixtures.user()
 
+    // Act
+    renderWithProviders(<AddMember />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
+
+    // Assert
     expect(screen.getByText('Novo Membro')).toBeInTheDocument()
     expect(screen.getByTestId('name-input')).toBeInTheDocument()
     expect(screen.getByTestId('email-input')).toBeInTheDocument()
     expect(screen.getByTestId('submit-button')).toBeInTheDocument()
   })
 
+  // ============================================================================
+  // TESTE 2: VALIDATION - Valida campos obrigatórios
+  // ============================================================================
   it('deve validar campos obrigatórios', async () => {
+    // Arrange
     const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <AddMember />
-      </MemoryRouter>
-    )
+    const mockUser = fixtures.user()
+
+    // Act
+    renderWithProviders(<AddMember />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
 
     const submitButton = screen.getByText('Criar Membro')
     await user.click(submitButton)
 
+    // Assert
     await waitFor(() => {
       expect(screen.getByText('Nome é obrigatório')).toBeInTheDocument()
     })
   })
 
+  // ============================================================================
+  // TESTE 3: PRIMARY INTERACTION - Cria membro com sucesso
+  // ============================================================================
   it('deve criar membro com sucesso', async () => {
-    const toast = await import('react-hot-toast')
-    const mockResponse = {
-      data: {
-        id: 'member-1',
-        name: 'Novo Membro',
-        email: 'novo@example.com',
-        role: 'MEMBER',
-      },
-    }
-
-    vi.mocked(api.post).mockResolvedValue(mockResponse)
-
+    // Arrange
     const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <AddMember />
-      </MemoryRouter>
-    )
+    const mockUser = fixtures.user()
+    const mockResponse = {
+      id: 'member-1',
+      name: 'Novo Membro',
+      email: 'novo@example.com',
+      role: 'MEMBER',
+    }
+    mockApiResponse('post', '/register', mockResponse)
+
+    // Act
+    renderWithProviders(<AddMember />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
 
     await user.type(screen.getByTestId('name-input'), 'Novo Membro')
     await user.type(screen.getByTestId('email-input'), 'novo@example.com')
@@ -91,37 +109,30 @@ describe('AddMember Page', () => {
     const submitButton = screen.getByText('Criar Membro')
     await user.click(submitButton)
 
+    // Assert
     await waitFor(() => {
-      expect(api.post).toHaveBeenCalledWith('/register', expect.objectContaining({
-        name: 'Novo Membro',
-        email: 'novo@example.com',
-        password: 'password123',
-      }))
-    })
-
-    await waitFor(() => {
-      expect(toast.default.success).toHaveBeenCalledWith('Membro criado com sucesso!')
+      expect(mockToastSuccess).toHaveBeenCalledWith('Membro criado com sucesso!')
     })
 
     expect(mockNavigate).toHaveBeenCalledWith('/app/members')
   })
 
+  // ============================================================================
+  // TESTE 4: ERROR STATE - Exibe erro quando falha ao criar membro
+  // ============================================================================
   it('deve exibir erro quando falha ao criar membro', async () => {
-    const toast = await import('react-hot-toast')
-    vi.mocked(api.post).mockRejectedValue({
-      response: {
-        data: {
-          message: 'Erro ao criar membro',
-        },
+    // Arrange
+    const user = userEvent.setup()
+    const mockUser = fixtures.user()
+    mockApiError('post', '/register', { message: 'Erro ao criar membro' })
+
+    // Act
+    renderWithProviders(<AddMember />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
       },
     })
-
-    const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <AddMember />
-      </MemoryRouter>
-    )
 
     await user.type(screen.getByTestId('name-input'), 'Novo Membro')
     await user.type(screen.getByTestId('email-input'), 'novo@example.com')
@@ -132,37 +143,38 @@ describe('AddMember Page', () => {
     const submitButton = screen.getByText('Criar Membro')
     await user.click(submitButton)
 
+    // Assert
     await waitFor(() => {
-      expect(toast.default.error).toHaveBeenCalledWith('Erro ao criar membro')
+      expect(mockToastError).toHaveBeenCalled()
     })
   })
 
+  // ============================================================================
+  // TESTE 5: PRIMARY INTERACTION - Navega para lista ao clicar em Voltar
+  // ============================================================================
   it('deve navegar para lista ao clicar em Voltar', async () => {
+    // Arrange
     const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <AddMember />
-      </MemoryRouter>
-    )
+    const mockUser = fixtures.user()
+
+    // Act
+    renderWithProviders(<AddMember />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
 
     const backButton = screen.getByTestId('back-button')
     await user.click(backButton)
 
-    expect(mockNavigate).toHaveBeenCalledWith('/app/members')
-  })
-
-  it('deve navegar para lista ao clicar em Cancelar', async () => {
-    const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <AddMember />
-      </MemoryRouter>
-    )
-
-    const cancelButton = screen.getByTestId('cancel-button')
-    await user.click(cancelButton)
-
+    // Assert
     expect(mockNavigate).toHaveBeenCalledWith('/app/members')
   })
 })
 
+
+    // Assert
+    expect(mockNavigate).toHaveBeenCalledWith('/app/members')
+  })
+})

@@ -133,6 +133,14 @@ export default function Branches() {
       }
 
       toast.success(`${branches.length} filial(is) salva(s) com sucesso!`)
+      
+      // Marcar etapa branches como completa
+      try {
+        await api.post('/onboarding/progress/branches')
+      } catch (progressError) {
+        console.error('Erro ao marcar progresso:', progressError)
+      }
+      
       navigate('/onboarding/settings')
     } catch (error: any) {
       console.error('Erro ao salvar filiais:', error)

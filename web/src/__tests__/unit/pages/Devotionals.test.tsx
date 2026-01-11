@@ -1,16 +1,18 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Devotionals from '@/pages/Devotionals'
 import api from '@/api/api'
-import { useAuthStore } from '@/stores/authStore'
-import { mockUser } from '@/test/mocks/mockData'
+import { fixtures } from '@/test/fixtures'
+import { renderWithProviders } from '@/test/helpers'
+import { mockApiResponse, mockApiError } from '@/test/mockApi'
 
 vi.mock('@/api/api')
+const mockToastError = vi.fn()
 vi.mock('react-hot-toast', () => ({
   default: {
-    error: vi.fn(),
+    error: mockToastError,
+    success: vi.fn(),
   },
 }))
 
@@ -23,28 +25,37 @@ vi.mock('react-router-dom', async () => {
   }
 })
 
-describe('Devotionals Page', () => {
+describe('Devotionals - Unit Tests', () => {
   beforeEach(() => {
-    useAuthStore.setState({
-      token: 'token',
-      user: mockUser,
-    })
     vi.clearAllMocks()
   })
 
+  // ============================================================================
+  // TESTE 1: LOADING STATE - Exibe loading inicial
+  // ============================================================================
   it('deve exibir loading inicial', () => {
+    // Arrange
     vi.mocked(api.get).mockImplementation(() => new Promise(() => {})) // Nunca resolve
+    const mockUser = fixtures.user()
 
-    render(
-      <MemoryRouter>
-        <Devotionals />
-      </MemoryRouter>
-    )
+    // Act
+    renderWithProviders(<Devotionals />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
 
+    // Assert
     expect(screen.getByText('Carregando devocionais...')).toBeInTheDocument()
   })
 
+  // ============================================================================
+  // TESTE 2: PRIMARY INTERACTION - Carrega e exibe lista de devocionais
+  // ============================================================================
   it('deve carregar e exibir lista de devocionais', async () => {
+    // Arrange
+    const mockUser = fixtures.user()
     const mockDevotionals = [
       {
         id: 'devotional-1',
@@ -59,15 +70,17 @@ describe('Devotionals Page', () => {
         createdAt: new Date().toISOString(),
       },
     ]
+    mockApiResponse('get', '/devotionals', mockDevotionals)
 
-    vi.mocked(api.get).mockResolvedValue({ data: mockDevotionals })
+    // Act
+    renderWithProviders(<Devotionals />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
 
-    render(
-      <MemoryRouter>
-        <Devotionals />
-      </MemoryRouter>
-    )
-
+    // Assert
     await waitFor(() => {
       expect(screen.getByText('Devocional Teste')).toBeInTheDocument()
     })
@@ -77,15 +90,23 @@ describe('Devotionals Page', () => {
     expect(screen.getByText('5')).toBeInTheDocument()
   })
 
+  // ============================================================================
+  // TESTE 3: EMPTY STATE - Exibe mensagem quando não há devocionais
+  // ============================================================================
   it('deve exibir mensagem quando não há devocionais', async () => {
-    vi.mocked(api.get).mockResolvedValue({ data: [] })
+    // Arrange
+    const mockUser = fixtures.user()
+    mockApiResponse('get', '/devotionals', [])
 
-    render(
-      <MemoryRouter>
-        <Devotionals />
-      </MemoryRouter>
-    )
+    // Act
+    renderWithProviders(<Devotionals />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
 
+    // Assert
     await waitFor(() => {
       expect(screen.getByText('Nenhum devocional cadastrado')).toBeInTheDocument()
     })
@@ -94,15 +115,22 @@ describe('Devotionals Page', () => {
     expect(createButton).toBeInTheDocument()
   })
 
+  // ============================================================================
+  // TESTE 4: PRIMARY INTERACTION - Navega para criar devocional
+  // ============================================================================
   it('deve navegar para criar devocional ao clicar em "Novo Devocional"', async () => {
-    vi.mocked(api.get).mockResolvedValue({ data: [] })
-
+    // Arrange
     const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <Devotionals />
-      </MemoryRouter>
-    )
+    const mockUser = fixtures.user()
+    mockApiResponse('get', '/devotionals', [])
+
+    // Act
+    renderWithProviders(<Devotionals />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
 
     await waitFor(() => {
       expect(screen.getByText('Novo Devocional')).toBeInTheDocument()
@@ -111,10 +139,17 @@ describe('Devotionals Page', () => {
     const newButton = screen.getByText('Novo Devocional')
     await user.click(newButton)
 
+    // Assert
     expect(mockNavigate).toHaveBeenCalledWith('/app/devotionals/new')
   })
 
+  // ============================================================================
+  // TESTE 5: PRIMARY INTERACTION - Navega para detalhes ao clicar em um card
+  // ============================================================================
   it('deve navegar para detalhes ao clicar em um card', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    const mockUser = fixtures.user()
     const mockDevotionals = [
       {
         id: 'devotional-1',
@@ -129,15 +164,15 @@ describe('Devotionals Page', () => {
         createdAt: new Date().toISOString(),
       },
     ]
+    mockApiResponse('get', '/devotionals', mockDevotionals)
 
-    vi.mocked(api.get).mockResolvedValue({ data: mockDevotionals })
-
-    const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <Devotionals />
-      </MemoryRouter>
-    )
+    // Act
+    renderWithProviders(<Devotionals />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
 
     await waitFor(() => {
       expect(screen.getByText('Devocional Teste')).toBeInTheDocument()
@@ -146,21 +181,72 @@ describe('Devotionals Page', () => {
     const card = screen.getByText('Devocional Teste').closest('div')
     await user.click(card!)
 
+    // Assert
     expect(mockNavigate).toHaveBeenCalledWith('/app/devotionals/devotional-1')
   })
 
+  // ============================================================================
+  // TESTE 6: ERROR STATE - Exibe erro quando falha ao carregar devocionais
+  // ============================================================================
   it('deve exibir erro quando falha ao carregar devocionais', async () => {
-    const toast = await import('react-hot-toast')
-    vi.mocked(api.get).mockRejectedValue(new Error('Erro na API'))
+    // Arrange
+    const mockUser = fixtures.user()
+    mockApiError('get', '/devotionals', new Error('Erro na API'))
 
-    render(
-      <MemoryRouter>
-        <Devotionals />
-      </MemoryRouter>
-    )
+    // Act
+    renderWithProviders(<Devotionals />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
+
+    // Assert
+    await waitFor(() => {
+      expect(mockToastError).toHaveBeenCalledWith('Erro ao carregar devocionais')
+    })
+  })
+})
+
+
+
+    renderWithProviders(<Devotionals />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
 
     await waitFor(() => {
-      expect(toast.default.error).toHaveBeenCalledWith('Erro ao carregar devocionais')
+      expect(screen.getByText('Devocional Teste')).toBeInTheDocument()
+    })
+
+    const card = screen.getByText('Devocional Teste').closest('div')
+    await user.click(card!)
+
+    // Assert
+    expect(mockNavigate).toHaveBeenCalledWith('/app/devotionals/devotional-1')
+  })
+
+  // ============================================================================
+  // TESTE 6: ERROR STATE - Exibe erro quando falha ao carregar devocionais
+  // ============================================================================
+  it('deve exibir erro quando falha ao carregar devocionais', async () => {
+    // Arrange
+    const mockUser = fixtures.user()
+    mockApiError('get', '/devotionals', new Error('Erro na API'))
+
+    // Act
+    renderWithProviders(<Devotionals />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
+
+    // Assert
+    await waitFor(() => {
+      expect(mockToastError).toHaveBeenCalledWith('Erro ao carregar devocionais')
     })
   })
 })

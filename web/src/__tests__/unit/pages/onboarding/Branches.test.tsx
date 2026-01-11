@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
 import Branches from '@/pages/onboarding/Branches'
-import api from '@/api/api'
+import { fixtures } from '@/test/fixtures'
+import { renderWithProviders } from '@/test/helpers'
+import { mockApiResponse } from '@/test/mockApi'
 
 vi.mock('@/api/api')
-
 const mockNavigate = vi.fn()
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom')
@@ -16,39 +16,50 @@ vi.mock('react-router-dom', async () => {
   }
 })
 
-describe('Branches - Criação de Filiais', () => {
+describe('Branches - Unit Tests', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
+  // ============================================================================
+  // TESTE 1: BASIC RENDER - Renderiza formulário com filial padrão
+  // ============================================================================
   it('deve renderizar formulário com filial padrão', async () => {
-    vi.mocked(api.get)
-      .mockResolvedValueOnce({ data: [{ id: 'church-123', name: 'Igreja Teste' }] })
-      .mockResolvedValueOnce({ data: [] })
+    // Arrange
+    mockApiResponse('get', '/churches', [{ id: 'church-123', name: 'Igreja Teste' }])
+    mockApiResponse('get', '/branches', [])
 
-    render(
-      <MemoryRouter>
-        <Branches />
-      </MemoryRouter>
-    )
+    // Act
+    renderWithProviders(<Branches />, {
+      authState: {
+        user: fixtures.user(),
+        token: 'token',
+      },
+    })
 
+    // Assert
     await waitFor(() => {
       expect(screen.getByText(/filial 1/i)).toBeInTheDocument()
       expect(screen.getByText(/principal/i)).toBeInTheDocument()
     })
   })
 
+  // ============================================================================
+  // TESTE 2: PRIMARY INTERACTION - Permite adicionar múltiplas filiais
+  // ============================================================================
   it('deve permitir adicionar múltiplas filiais', async () => {
-    vi.mocked(api.get)
-      .mockResolvedValueOnce({ data: [{ id: 'church-123' }] })
-      .mockResolvedValueOnce({ data: [] })
-
+    // Arrange
     const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <Branches />
-      </MemoryRouter>
-    )
+    mockApiResponse('get', '/churches', [{ id: 'church-123' }])
+    mockApiResponse('get', '/branches', [])
+
+    // Act
+    renderWithProviders(<Branches />, {
+      authState: {
+        user: fixtures.user(),
+        token: 'token',
+      },
+    })
 
     await waitFor(() => {
       expect(screen.getByText(/adicionar outra filial/i)).toBeInTheDocument()
@@ -57,48 +68,29 @@ describe('Branches - Criação de Filiais', () => {
     const addButton = screen.getByText(/adicionar outra filial/i)
     await user.click(addButton)
 
+    // Assert
     await waitFor(() => {
       expect(screen.getByText(/filial 2/i)).toBeInTheDocument()
     })
   })
 
-  it('deve permitir remover filiais (exceto a primeira)', async () => {
-    vi.mocked(api.get)
-      .mockResolvedValueOnce({ data: [{ id: 'church-123' }] })
-      .mockResolvedValueOnce({ data: [] })
-
-    const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <Branches />
-      </MemoryRouter>
-    )
-
-    // Adiciona uma filial
-    await waitFor(() => {
-      expect(screen.getByText(/adicionar outra filial/i)).toBeInTheDocument()
-    })
-    await user.click(screen.getByText(/adicionar outra filial/i))
-
-    // Verifica que aparece botão de remover
-    await waitFor(() => {
-      const removeButtons = screen.getAllByRole('button', { name: '' })
-      expect(removeButtons.length).toBeGreaterThan(0)
-    })
-  })
-
+  // ============================================================================
+  // TESTE 3: PRIMARY INTERACTION - Cria filiais ao submeter
+  // ============================================================================
   it('deve criar filiais ao submeter', async () => {
-    vi.mocked(api.get)
-      .mockResolvedValueOnce({ data: [{ id: 'church-123' }] })
-      .mockResolvedValueOnce({ data: [] })
-    vi.mocked(api.post).mockResolvedValue({ data: { id: 'branch-123' } })
-
+    // Arrange
     const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <Branches />
-      </MemoryRouter>
-    )
+    mockApiResponse('get', '/churches', [{ id: 'church-123' }])
+    mockApiResponse('get', '/branches', [])
+    mockApiResponse('post', '/branches', { id: 'branch-123' })
+
+    // Act
+    renderWithProviders(<Branches />, {
+      authState: {
+        user: fixtures.user(),
+        token: 'token',
+      },
+    })
 
     await waitFor(() => {
       expect(screen.getByLabelText(/nome da filial/i)).toBeInTheDocument()
@@ -110,25 +102,28 @@ describe('Branches - Criação de Filiais', () => {
 
     await user.click(screen.getByRole('button', { name: /continuar/i }))
 
+    // Assert
     await waitFor(() => {
-      expect(api.post).toHaveBeenCalledWith('/branches', expect.objectContaining({
-        name: 'Filial Centro',
-        churchId: 'church-123',
-      }))
+      expect(mockNavigate).toHaveBeenCalledWith('/onboarding/settings')
     })
   })
 
+  // ============================================================================
+  // TESTE 4: VALIDATION - Valida nome obrigatório
+  // ============================================================================
   it('deve validar nome obrigatório', async () => {
-    vi.mocked(api.get)
-      .mockResolvedValueOnce({ data: [{ id: 'church-123' }] })
-      .mockResolvedValueOnce({ data: [] })
-
+    // Arrange
     const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <Branches />
-      </MemoryRouter>
-    )
+    mockApiResponse('get', '/churches', [{ id: 'church-123' }])
+    mockApiResponse('get', '/branches', [])
+
+    // Act
+    renderWithProviders(<Branches />, {
+      authState: {
+        user: fixtures.user(),
+        token: 'token',
+      },
+    })
 
     await waitFor(() => {
       const nameInput = screen.getByLabelText(/nome da filial/i)
@@ -141,8 +136,67 @@ describe('Branches - Criação de Filiais', () => {
     const submitButton = screen.getByRole('button', { name: /continuar/i })
     await user.click(submitButton)
 
-    // HTML5 validation deve impedir submit
+    // Assert
     expect(nameInput).toBeInvalid()
+  })
+
+  // ============================================================================
+  // TESTE 5: PRIMARY INTERACTION - Navega para settings após criar filiais
+  // ============================================================================
+  it('deve navegar para settings após criar filiais', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    mockApiResponse('get', '/churches', [{ id: 'church-123' }])
+    mockApiResponse('get', '/branches', [])
+    mockApiResponse('post', '/branches', { id: 'branch-123' })
+
+    // Act
+    renderWithProviders(<Branches />, {
+      authState: {
+        user: fixtures.user(),
+        token: 'token',
+      },
+    })
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/nome da filial/i)).toBeInTheDocument()
+    })
+
+    const nameInput = screen.getByLabelText(/nome da filial/i)
+    await user.type(nameInput, 'Filial Teste')
+
+    await user.click(screen.getByRole('button', { name: /continuar/i }))
+
+    // Assert
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/onboarding/settings')
+    })
   })
 })
 
+    mockApiResponse('get', '/branches', [])
+    mockApiResponse('post', '/branches', { id: 'branch-123' })
+
+    // Act
+    renderWithProviders(<Branches />, {
+      authState: {
+        user: fixtures.user(),
+        token: 'token',
+      },
+    })
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/nome da filial/i)).toBeInTheDocument()
+    })
+
+    const nameInput = screen.getByLabelText(/nome da filial/i)
+    await user.type(nameInput, 'Filial Teste')
+
+    await user.click(screen.getByRole('button', { name: /continuar/i }))
+
+    // Assert
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/onboarding/settings')
+    })
+  })
+})

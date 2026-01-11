@@ -1,13 +1,60 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Church, Building2, Users } from 'lucide-react'
+import toast from 'react-hot-toast'
+import api from '../../api/api'
+import { useAuthStore } from '../../stores/authStore'
 import OnboardingHeader from '../../components/OnboardingHeader'
 
 type StructureType = 'simple' | 'branches' | 'existing' | null
 
 export default function Start() {
   const navigate = useNavigate()
+  const { user } = useAuthStore()
   const [selectedStructure, setSelectedStructure] = useState<StructureType>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const checkOnboardingState = async () => {
+      try {
+        const response = await api.get('/onboarding/state')
+        const state = response.data
+
+        if (state.status === 'COMPLETE') {
+          // Onboarding completo, não deveria chegar aqui (OnboardingRoute redireciona)
+          // Mas se chegar, redireciona
+          navigate('/app/dashboard')
+          return
+        } else if (state.status === 'PENDING') {
+          // Onboarding pendente, preencher dados e continuar
+          if (state.church) {
+            // Salvar dados da igreja para prefill
+            localStorage.setItem('onboarding_church_id', state.church.id)
+            localStorage.setItem('onboarding_church_name', state.church.name || '')
+            localStorage.setItem('onboarding_church_address', state.church.address || '')
+          }
+          
+          if (state.branch) {
+            // Se tem branch, pode ser estrutura com filiais
+            localStorage.setItem('onboarding_structure', 'branches')
+            setSelectedStructure('branches')
+          } else {
+            // Se não tem branch, pode ser estrutura simples
+            localStorage.setItem('onboarding_structure', 'simple')
+            setSelectedStructure('simple')
+          }
+        }
+        // Se status é NEW, deixa o usuário escolher normalmente
+      } catch (error: any) {
+        console.error('Erro ao verificar estado de onboarding:', error)
+        // Em caso de erro, continua normalmente
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    checkOnboardingState()
+  }, [navigate])
 
   const handleContinue = () => {
     if (!selectedStructure) {
@@ -20,9 +67,20 @@ export default function Start() {
       navigate('/onboarding/church')
     } else if (selectedStructure === 'existing') {
       // Por enquanto, apenas mostra mensagem
-      alert('Funcionalidade de entrar em igreja existente será implementada em breve.')
+      toast.error('Funcionalidade de entrar em igreja existente será implementada em breve.')
       // TODO: Implementar fluxo de convite
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-gray-600">Carregando...</p>
+        </div>
+      </div>
+    )
   }
 
   return (

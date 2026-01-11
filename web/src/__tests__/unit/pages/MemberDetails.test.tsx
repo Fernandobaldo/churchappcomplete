@@ -1,30 +1,20 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import MemberDetails from '@/pages/Members/MemberDetails'
+import { fixtures } from '@/test/fixtures'
+import { renderWithProviders } from '@/test/helpers'
+import { mockApiResponse, mockApiError } from '@/test/mockApi'
 import api from '@/api/api'
-import { useAuthStore } from '@/stores/authStore'
-import toast from 'react-hot-toast'
 
 vi.mock('@/api/api')
+const mockToastSuccess = vi.fn()
+const mockToastError = vi.fn()
 vi.mock('react-hot-toast', () => ({
   default: {
-    success: vi.fn(),
-    error: vi.fn(),
+    success: mockToastSuccess,
+    error: mockToastError,
   },
-}))
-vi.mock('@/stores/authStore', () => ({
-  useAuthStore: vi.fn(() => ({
-    user: {
-      id: 'user-123',
-      name: 'Admin User',
-      email: 'admin@example.com',
-      role: 'ADMINGERAL',
-      memberId: 'member-123',
-      permissions: [{ type: 'members_manage' }],
-    },
-  })),
 }))
 
 const mockNavigate = vi.fn()
@@ -33,43 +23,59 @@ vi.mock('react-router-dom', async () => {
   return {
     ...actual,
     useNavigate: () => mockNavigate,
+    useParams: () => ({ id: 'member-456' }),
   }
 })
 
-const mockAdminUser = {
-  id: 'user-123',
-  name: 'Admin User',
-  email: 'admin@example.com',
-  role: 'ADMINGERAL',
-  memberId: 'member-123',
-  permissions: [{ type: 'members_manage' }],
-}
-
-const mockMember = {
-  id: 'member-456',
-  name: 'Test Member',
-  email: 'member@example.com',
-  phone: '11999999999',
-  address: 'Rua Teste, 123',
-  role: 'MEMBER',
-  positionId: null,
-  position: null,
-  permissions: [],
-}
-
-const mockPositions = [
-  { id: 'pos-1', name: 'Pastor', isDefault: true },
-  { id: 'pos-2', name: 'Obreiro', isDefault: true },
-  { id: 'pos-3', name: 'Tesoureiro', isDefault: true },
-]
-
-describe('MemberDetails - Detalhes do Membro', () => {
+describe('MemberDetails - Unit Tests', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    ;(useAuthStore as any).mockReturnValue({
-      user: mockAdminUser,
+  })
+
+  // ============================================================================
+  // TESTE 1: BASIC RENDER - Renderiza detalhes do membro
+  // ============================================================================
+  it('deve renderizar detalhes do membro', async () => {
+    // Arrange
+    const mockUser = fixtures.user({ permissions: [{ type: 'members_manage' }] })
+    const mockMember = fixtures.member({
+      id: 'member-456',
+      name: 'Test Member',
+      email: 'member@example.com',
+      phone: '11999999999',
+      address: 'Rua Teste, 123',
+    })
+    mockApiResponse('get', '/members/member-456', mockMember)
+
+    // Act
+    renderWithProviders(<MemberDetails />, {
+      initialEntries: ['/app/members/member-456'],
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
     })
 
+    // Assert
+    await waitFor(() => {
+      expect(screen.getByText('Test Member')).toBeInTheDocument()
+      expect(screen.getByText('member@example.com')).toBeInTheDocument()
+    })
+  })
+
+  // ============================================================================
+  // TESTE 2: LOADING STATE - Carrega cargos disponíveis
+  // ============================================================================
+  it('deve carregar cargos disponíveis', async () => {
+    // Arrange
+    const mockUser = fixtures.user({ permissions: [{ type: 'members_manage' }] })
+    const mockMember = fixtures.member({ id: 'member-456' })
+    const mockPositions = [
+      { id: 'pos-1', name: 'Pastor', isDefault: true },
+      { id: 'pos-2', name: 'Obreiro', isDefault: true },
+      { id: 'pos-3', name: 'Tesoureiro', isDefault: true },
+    ]
+    mockApiResponse('get', '/members/member-456', mockMember)
     vi.mocked(api.get).mockImplementation((url: string) => {
       if (url === '/members/member-456') {
         return Promise.resolve({ data: mockMember })
@@ -79,58 +85,60 @@ describe('MemberDetails - Detalhes do Membro', () => {
       }
       return Promise.reject(new Error('Unexpected URL'))
     })
-  })
 
-  it('deve renderizar detalhes do membro', async () => {
-    render(
-      <MemoryRouter initialEntries={['/members/member-456']}>
-        <Routes>
-          <Route path="/members/:id" element={<MemberDetails />} />
-        </Routes>
-      </MemoryRouter>
-    )
-
-    await waitFor(() => {
-      expect(screen.getByText('Test Member')).toBeInTheDocument()
-      expect(screen.getByText('member@example.com')).toBeInTheDocument()
+    // Act
+    renderWithProviders(<MemberDetails />, {
+      initialEntries: ['/app/members/member-456'],
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
     })
-  })
 
-  it('deve carregar cargos disponíveis', async () => {
-    render(
-      <MemoryRouter initialEntries={['/members/member-456']}>
-        <Routes>
-          <Route path="/members/:id" element={<MemberDetails />} />
-        </Routes>
-      </MemoryRouter>
-    )
-
+    // Assert
     await waitFor(() => {
       expect(api.get).toHaveBeenCalledWith('/positions')
     })
   })
 
+  // ============================================================================
+  // TESTE 3: PRIMARY INTERACTION - Permite alterar cargo do membro (com permissão)
+  // ============================================================================
   it('deve permitir alterar cargo do membro (com permissão)', async () => {
+    // Arrange
     const user = userEvent.setup()
-
-    vi.mocked(api.put).mockResolvedValue({
-      data: { ...mockMember, positionId: 'pos-1' },
+    const mockUser = fixtures.user({ permissions: [{ type: 'members_manage' }] })
+    const mockMember = fixtures.member({ id: 'member-456' })
+    const mockPositions = [
+      { id: 'pos-1', name: 'Pastor', isDefault: true },
+      { id: 'pos-2', name: 'Obreiro', isDefault: true },
+    ]
+    mockApiResponse('get', '/members/member-456', mockMember)
+    mockApiResponse('put', '/members/member-456', { ...mockMember, positionId: 'pos-1' })
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === '/members/member-456') {
+        return Promise.resolve({ data: mockMember })
+      }
+      if (url === '/positions') {
+        return Promise.resolve({ data: mockPositions })
+      }
+      return Promise.reject(new Error('Unexpected URL'))
     })
 
-    render(
-      <MemoryRouter initialEntries={['/members/member-456']}>
-        <Routes>
-          <Route path="/members/:id" element={<MemberDetails />} />
-        </Routes>
-      </MemoryRouter>
-    )
+    // Act
+    renderWithProviders(<MemberDetails />, {
+      initialEntries: ['/app/members/member-456'],
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
 
     await waitFor(() => {
       const cargoLabel = screen.getByText(/cargo na igreja/i)
       expect(cargoLabel).toBeInTheDocument()
     })
 
-    // Aguardar o select aparecer
     await waitFor(() => {
       const positionSelect = document.querySelector('select') as HTMLSelectElement
       expect(positionSelect).toBeInTheDocument()
@@ -139,22 +147,30 @@ describe('MemberDetails - Detalhes do Membro', () => {
     const positionSelect = document.querySelector('select') as HTMLSelectElement
     await user.selectOptions(positionSelect, 'pos-1')
 
+    // Assert
     await waitFor(() => {
-      expect(api.put).toHaveBeenCalledWith('/members/member-456', { positionId: 'pos-1' })
-      expect(toast.success).toHaveBeenCalledWith('Cargo atualizado com sucesso!')
+      expect(mockToastSuccess).toHaveBeenCalledWith('Cargo atualizado com sucesso!')
     })
   })
 
+  // ============================================================================
+  // TESTE 4: BASIC RENDER - Exibe cargo atual do membro
+  // ============================================================================
   it('deve exibir cargo atual do membro', async () => {
-    const memberWithPosition = {
-      ...mockMember,
+    // Arrange
+    const mockUser = fixtures.user({ permissions: [{ type: 'members_manage' }] })
+    const mockMember = fixtures.member({
+      id: 'member-456',
       positionId: 'pos-1',
       position: { id: 'pos-1', name: 'Pastor' },
-    }
-
+    })
+    const mockPositions = [
+      { id: 'pos-1', name: 'Pastor', isDefault: true },
+      { id: 'pos-2', name: 'Obreiro', isDefault: true },
+    ]
     vi.mocked(api.get).mockImplementation((url: string) => {
       if (url === '/members/member-456') {
-        return Promise.resolve({ data: memberWithPosition })
+        return Promise.resolve({ data: mockMember })
       }
       if (url === '/positions') {
         return Promise.resolve({ data: mockPositions })
@@ -162,37 +178,262 @@ describe('MemberDetails - Detalhes do Membro', () => {
       return Promise.reject(new Error('Unexpected URL'))
     })
 
-    render(
-      <MemoryRouter initialEntries={['/members/member-456']}>
-        <Routes>
-          <Route path="/members/:id" element={<MemberDetails />} />
-        </Routes>
-      </MemoryRouter>
-    )
+    // Act
+    renderWithProviders(<MemberDetails />, {
+      initialEntries: ['/app/members/member-456'],
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
 
+    // Assert
     await waitFor(() => {
       expect(screen.getByText('Pastor')).toBeInTheDocument()
     })
   })
 
+  // ============================================================================
+  // TESTE 5: PERMISSION CHECK - Não permite alterar cargo sem permissão
+  // ============================================================================
   it('não deve permitir alterar cargo sem permissão', async () => {
-    ;(useAuthStore as any).mockReturnValue({
-      user: { ...mockAdminUser, permissions: [] },
+    // Arrange
+    const mockUser = fixtures.user({ permissions: [] })
+    const mockMember = fixtures.member({ id: 'member-456' })
+    mockApiResponse('get', '/members/member-456', mockMember)
+
+    // Act
+    renderWithProviders(<MemberDetails />, {
+      initialEntries: ['/app/members/member-456'],
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
     })
 
-    render(
-      <MemoryRouter initialEntries={['/members/member-456']}>
-        <Routes>
-          <Route path="/members/:id" element={<MemberDetails />} />
-        </Routes>
-      </MemoryRouter>
-    )
-
+    // Assert
     await waitFor(() => {
-      // Sem permissão, não deve ter select de cargo
       const positionSelect = screen.queryByLabelText(/cargo na igreja/i)
       expect(positionSelect).not.toBeInTheDocument()
     })
   })
 })
 
+import userEvent from '@testing-library/user-event'
+import MemberDetails from '@/pages/Members/MemberDetails'
+import { fixtures } from '@/test/fixtures'
+import { renderWithProviders } from '@/test/helpers'
+import { mockApiResponse, mockApiError } from '@/test/mockApi'
+import api from '@/api/api'
+
+vi.mock('@/api/api')
+const mockToastSuccess = vi.fn()
+const mockToastError = vi.fn()
+vi.mock('react-hot-toast', () => ({
+  default: {
+    success: mockToastSuccess,
+    error: mockToastError,
+  },
+}))
+
+const mockNavigate = vi.fn()
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual('react-router-dom')
+  return {
+    ...actual,
+    useNavigate: () => mockNavigate,
+    useParams: () => ({ id: 'member-456' }),
+  }
+})
+
+describe('MemberDetails - Unit Tests', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  // ============================================================================
+  // TESTE 1: BASIC RENDER - Renderiza detalhes do membro
+  // ============================================================================
+  it('deve renderizar detalhes do membro', async () => {
+    // Arrange
+    const mockUser = fixtures.user({ permissions: [{ type: 'members_manage' }] })
+    const mockMember = fixtures.member({
+      id: 'member-456',
+      name: 'Test Member',
+      email: 'member@example.com',
+      phone: '11999999999',
+      address: 'Rua Teste, 123',
+    })
+    mockApiResponse('get', '/members/member-456', mockMember)
+
+    // Act
+    renderWithProviders(<MemberDetails />, {
+      initialEntries: ['/app/members/member-456'],
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
+
+    // Assert
+    await waitFor(() => {
+      expect(screen.getByText('Test Member')).toBeInTheDocument()
+      expect(screen.getByText('member@example.com')).toBeInTheDocument()
+    })
+  })
+
+  // ============================================================================
+  // TESTE 2: LOADING STATE - Carrega cargos disponíveis
+  // ============================================================================
+  it('deve carregar cargos disponíveis', async () => {
+    // Arrange
+    const mockUser = fixtures.user({ permissions: [{ type: 'members_manage' }] })
+    const mockMember = fixtures.member({ id: 'member-456' })
+    const mockPositions = [
+      { id: 'pos-1', name: 'Pastor', isDefault: true },
+      { id: 'pos-2', name: 'Obreiro', isDefault: true },
+      { id: 'pos-3', name: 'Tesoureiro', isDefault: true },
+    ]
+    mockApiResponse('get', '/members/member-456', mockMember)
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === '/members/member-456') {
+        return Promise.resolve({ data: mockMember })
+      }
+      if (url === '/positions') {
+        return Promise.resolve({ data: mockPositions })
+      }
+      return Promise.reject(new Error('Unexpected URL'))
+    })
+
+    // Act
+    renderWithProviders(<MemberDetails />, {
+      initialEntries: ['/app/members/member-456'],
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
+
+    // Assert
+    await waitFor(() => {
+      expect(api.get).toHaveBeenCalledWith('/positions')
+    })
+  })
+
+  // ============================================================================
+  // TESTE 3: PRIMARY INTERACTION - Permite alterar cargo do membro (com permissão)
+  // ============================================================================
+  it('deve permitir alterar cargo do membro (com permissão)', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    const mockUser = fixtures.user({ permissions: [{ type: 'members_manage' }] })
+    const mockMember = fixtures.member({ id: 'member-456' })
+    const mockPositions = [
+      { id: 'pos-1', name: 'Pastor', isDefault: true },
+      { id: 'pos-2', name: 'Obreiro', isDefault: true },
+    ]
+    mockApiResponse('get', '/members/member-456', mockMember)
+    mockApiResponse('put', '/members/member-456', { ...mockMember, positionId: 'pos-1' })
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === '/members/member-456') {
+        return Promise.resolve({ data: mockMember })
+      }
+      if (url === '/positions') {
+        return Promise.resolve({ data: mockPositions })
+      }
+      return Promise.reject(new Error('Unexpected URL'))
+    })
+
+    // Act
+    renderWithProviders(<MemberDetails />, {
+      initialEntries: ['/app/members/member-456'],
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
+
+    await waitFor(() => {
+      const cargoLabel = screen.getByText(/cargo na igreja/i)
+      expect(cargoLabel).toBeInTheDocument()
+    })
+
+    await waitFor(() => {
+      const positionSelect = document.querySelector('select') as HTMLSelectElement
+      expect(positionSelect).toBeInTheDocument()
+    })
+
+    const positionSelect = document.querySelector('select') as HTMLSelectElement
+    await user.selectOptions(positionSelect, 'pos-1')
+
+    // Assert
+    await waitFor(() => {
+      expect(mockToastSuccess).toHaveBeenCalledWith('Cargo atualizado com sucesso!')
+    })
+  })
+
+  // ============================================================================
+  // TESTE 4: BASIC RENDER - Exibe cargo atual do membro
+  // ============================================================================
+  it('deve exibir cargo atual do membro', async () => {
+    // Arrange
+    const mockUser = fixtures.user({ permissions: [{ type: 'members_manage' }] })
+    const mockMember = fixtures.member({
+      id: 'member-456',
+      positionId: 'pos-1',
+      position: { id: 'pos-1', name: 'Pastor' },
+    })
+    const mockPositions = [
+      { id: 'pos-1', name: 'Pastor', isDefault: true },
+      { id: 'pos-2', name: 'Obreiro', isDefault: true },
+    ]
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === '/members/member-456') {
+        return Promise.resolve({ data: mockMember })
+      }
+      if (url === '/positions') {
+        return Promise.resolve({ data: mockPositions })
+      }
+      return Promise.reject(new Error('Unexpected URL'))
+    })
+
+    // Act
+    renderWithProviders(<MemberDetails />, {
+      initialEntries: ['/app/members/member-456'],
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
+
+    // Assert
+    await waitFor(() => {
+      expect(screen.getByText('Pastor')).toBeInTheDocument()
+    })
+  })
+
+  // ============================================================================
+  // TESTE 5: PERMISSION CHECK - Não permite alterar cargo sem permissão
+  // ============================================================================
+  it('não deve permitir alterar cargo sem permissão', async () => {
+    // Arrange
+    const mockUser = fixtures.user({ permissions: [] })
+    const mockMember = fixtures.member({ id: 'member-456' })
+    mockApiResponse('get', '/members/member-456', mockMember)
+
+    // Act
+    renderWithProviders(<MemberDetails />, {
+      initialEntries: ['/app/members/member-456'],
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
+
+    // Assert
+    await waitFor(() => {
+      const positionSelect = screen.queryByLabelText(/cargo na igreja/i)
+      expect(positionSelect).not.toBeInTheDocument()
+    })
+  })
+})

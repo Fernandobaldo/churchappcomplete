@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import api from '@/api/api'
 import { useAuthStore } from '@/stores/authStore'
 
-// Mock do módulo api
 vi.mock('@/api/api', () => {
   const mockApi = {
     get: vi.fn(),
@@ -30,10 +29,14 @@ describe('Churches Endpoints - Unit Tests', () => {
   })
 
   describe('GET /churches', () => {
+    // ============================================================================
+    // TESTE 1: EMPTY STATE - Retorna array vazio quando usuário não tem igreja configurada
+    // ============================================================================
     it('deve retornar array vazio quando usuário não tem igreja configurada (sem branchId)', async () => {
-      useAuthStore.setState({ 
-        token: 'mock-token', 
-        user: { 
+      // Arrange
+      useAuthStore.setState({
+        token: 'mock-token',
+        user: {
           id: 'user-123',
           email: 'test@example.com',
           name: 'Test User',
@@ -41,25 +44,30 @@ describe('Churches Endpoints - Unit Tests', () => {
           branchId: '',
           permissions: [],
           token: 'mock-token',
-        } 
+        },
       })
 
       const mockResponse = {
         data: [],
       }
-
       vi.mocked(api.get).mockResolvedValue(mockResponse)
 
+      // Act
       const response = await api.get('/churches')
 
+      // Assert
       expect(api.get).toHaveBeenCalledWith('/churches')
       expect(response.data).toEqual([])
     })
 
+    // ============================================================================
+    // TESTE 2: SUCCESS - Retorna apenas a igreja do usuário quando tem branchId
+    // ============================================================================
     it('deve retornar apenas a igreja do usuário quando tem branchId', async () => {
-      useAuthStore.setState({ 
-        token: 'mock-token', 
-        user: { 
+      // Arrange
+      useAuthStore.setState({
+        token: 'mock-token',
+        user: {
           id: 'user-123',
           email: 'test@example.com',
           name: 'Test User',
@@ -67,7 +75,7 @@ describe('Churches Endpoints - Unit Tests', () => {
           branchId: 'branch-123',
           permissions: [],
           token: 'mock-token',
-        } 
+        },
       })
 
       const mockResponse = {
@@ -81,11 +89,12 @@ describe('Churches Endpoints - Unit Tests', () => {
           },
         ],
       }
-
       vi.mocked(api.get).mockResolvedValue(mockResponse)
 
+      // Act
       const response = await api.get('/churches')
 
+      // Assert
       expect(api.get).toHaveBeenCalledWith('/churches')
       expect(response.data).toBeInstanceOf(Array)
       expect(response.data.length).toBe(1)
@@ -94,9 +103,9 @@ describe('Churches Endpoints - Unit Tests', () => {
     })
 
     it('não deve retornar igrejas de outros usuários', async () => {
-      useAuthStore.setState({ 
-        token: 'mock-token', 
-        user: { 
+      useAuthStore.setState({
+        token: 'mock-token',
+        user: {
           id: 'user-123',
           email: 'test@example.com',
           name: 'Test User',
@@ -104,7 +113,7 @@ describe('Churches Endpoints - Unit Tests', () => {
           branchId: 'branch-123',
           permissions: [],
           token: 'mock-token',
-        } 
+        },
       })
 
       const mockResponse = {
@@ -123,13 +132,16 @@ describe('Churches Endpoints - Unit Tests', () => {
 
       expect(response.data.length).toBe(1)
       expect(response.data[0].name).toBe('Igreja do Usuário')
-      // Não deve conter igrejas de outros usuários
       expect(response.data.find((c: any) => c.id === 'church-other')).toBeUndefined()
     })
   })
 
   describe('POST /churches', () => {
+    // ============================================================================
+    // TESTE 3: SUCCESS - Cria igreja com sucesso
+    // ============================================================================
     it('deve criar igreja com sucesso', async () => {
+      // Arrange
       const mockResponse = {
         data: {
           church: {
@@ -148,9 +160,9 @@ describe('Churches Endpoints - Unit Tests', () => {
           token: 'new-jwt-token',
         },
       }
-
       vi.mocked(api.post).mockResolvedValue(mockResponse)
 
+      // Act
       const response = await api.post('/churches', {
         name: 'Nova Igreja',
         logoUrl: 'https://example.com/logo.png',
@@ -158,6 +170,7 @@ describe('Churches Endpoints - Unit Tests', () => {
         branchName: 'Sede',
       })
 
+      // Assert
       expect(api.post).toHaveBeenCalledWith('/churches', {
         name: 'Nova Igreja',
         logoUrl: 'https://example.com/logo.png',
@@ -168,9 +181,12 @@ describe('Churches Endpoints - Unit Tests', () => {
       expect(response.data).toHaveProperty('token')
     })
 
+    // ============================================================================
+    // TESTE 4: UNAUTHORIZED - Retorna erro 401 quando não autenticado
+    // ============================================================================
     it('deve retornar erro 401 quando não autenticado', async () => {
+      // Arrange
       useAuthStore.setState({ token: null, user: null })
-
       const mockError = {
         response: {
           status: 401,
@@ -179,9 +195,9 @@ describe('Churches Endpoints - Unit Tests', () => {
           },
         },
       }
-
       vi.mocked(api.post).mockRejectedValue(mockError)
 
+      // Act & Assert
       await expect(
         api.post('/churches', {
           name: 'Nova Igreja',
@@ -195,7 +211,11 @@ describe('Churches Endpoints - Unit Tests', () => {
   })
 
   describe('PUT /churches/:id', () => {
+    // ============================================================================
+    // TESTE 5: SUCCESS - Atualiza igreja com sucesso
+    // ============================================================================
     it('deve atualizar igreja com sucesso', async () => {
+      // Arrange
       const mockResponse = {
         data: {
           id: 'church-1',
@@ -203,14 +223,15 @@ describe('Churches Endpoints - Unit Tests', () => {
           logoUrl: 'https://example.com/new-logo.png',
         },
       }
-
       vi.mocked(api.put).mockResolvedValue(mockResponse)
 
+      // Act
       const response = await api.put('/churches/church-1', {
         name: 'Igreja Atualizada',
         logoUrl: 'https://example.com/new-logo.png',
       })
 
+      // Assert
       expect(api.put).toHaveBeenCalledWith('/churches/church-1', {
         name: 'Igreja Atualizada',
         logoUrl: 'https://example.com/new-logo.png',
@@ -218,7 +239,11 @@ describe('Churches Endpoints - Unit Tests', () => {
       expect(response.data.name).toBe('Igreja Atualizada')
     })
 
+    // ============================================================================
+    // TESTE 6: NOT FOUND - Retorna erro 404 quando igreja não existe
+    // ============================================================================
     it('deve retornar erro 404 quando igreja não existe', async () => {
+      // Arrange
       const mockError = {
         response: {
           status: 404,
@@ -227,9 +252,9 @@ describe('Churches Endpoints - Unit Tests', () => {
           },
         },
       }
-
       vi.mocked(api.put).mockRejectedValue(mockError)
 
+      // Act & Assert
       await expect(
         api.put('/churches/invalid-id', {
           name: 'Igreja Teste',
@@ -243,3 +268,26 @@ describe('Churches Endpoints - Unit Tests', () => {
   })
 })
 
+      const mockError = {
+        response: {
+          status: 404,
+          data: {
+            message: 'Igreja não encontrada',
+          },
+        },
+      }
+      vi.mocked(api.put).mockRejectedValue(mockError)
+
+      // Act & Assert
+      await expect(
+        api.put('/churches/invalid-id', {
+          name: 'Igreja Teste',
+        })
+      ).rejects.toMatchObject({
+        response: {
+          status: 404,
+        },
+      })
+    })
+  })
+})

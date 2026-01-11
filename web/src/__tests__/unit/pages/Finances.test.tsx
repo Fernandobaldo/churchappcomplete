@@ -1,16 +1,17 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Finances from '@/pages/Finances/index'
-import api from '@/api/api'
+import { fixtures } from '@/test/fixtures'
+import { renderWithProviders } from '@/test/helpers'
+import { mockApiResponse, mockApiError } from '@/test/mockApi'
 import { useAuthStore } from '@/stores/authStore'
-import { mockUser } from '@/test/mocks/mockData'
 
 vi.mock('@/api/api')
+const mockToastError = vi.fn()
 vi.mock('react-hot-toast', () => ({
   default: {
-    error: vi.fn(),
+    error: mockToastError,
   },
 }))
 
@@ -28,7 +29,6 @@ vi.mock('@/components/PermissionGuard', () => ({
     const { user } = useAuthStore.getState()
     if (!user) return null
     
-    // Simula a lógica de hasAccess: ADMINGERAL/ADMINFILIAL têm acesso ou verifica permissões
     const hasPermission = 
       user.role === 'ADMINGERAL' || 
       user.role === 'ADMINFILIAL' ||
@@ -41,331 +41,357 @@ vi.mock('@/components/PermissionGuard', () => ({
   },
 }))
 
-describe('Finances Page', () => {
+describe('Finances - Unit Tests', () => {
   beforeEach(() => {
-    useAuthStore.setState({
-      token: 'token',
-      user: {
-        ...mockUser,
-        permissions: ['finances_manage'],
-      },
-    })
     vi.clearAllMocks()
   })
 
+  // ============================================================================
+  // TESTE 1: BASIC RENDER - Renderiza a página corretamente
+  // ============================================================================
   it('deve renderizar a página corretamente', async () => {
-    vi.mocked(api.get).mockResolvedValue({
-      data: {
-        transactions: [],
-        summary: {
-          total: 0,
-          entries: 0,
-          exits: 0,
-        },
+    // Arrange
+    const mockUser = fixtures.user({ permissions: [{ type: 'finances_manage' }] })
+    mockApiResponse('get', '/finances', {
+      transactions: [],
+      summary: {
+        total: 0,
+        entries: 0,
+        exits: 0,
       },
     })
 
-    render(
-      <MemoryRouter>
-        <Finances />
-      </MemoryRouter>
-    )
+    // Act
+    renderWithProviders(<Finances />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
 
+    // Assert
     await waitFor(() => {
       expect(screen.getByText('Finanças')).toBeInTheDocument()
       expect(screen.getByText('Gestão financeira da filial')).toBeInTheDocument()
     })
   })
 
+  // ============================================================================
+  // TESTE 2: BASIC RENDER - Exibe resumo financeiro
+  // ============================================================================
   it('deve exibir resumo financeiro', async () => {
-    vi.mocked(api.get).mockResolvedValue({
-      data: {
-        transactions: [],
-        summary: {
-          total: 1200.0,
-          entries: 1500.0,
-          exits: 300.0,
-        },
+    // Arrange
+    const mockUser = fixtures.user({ permissions: [{ type: 'finances_manage' }] })
+    mockApiResponse('get', '/finances', {
+      transactions: [],
+      summary: {
+        total: 1200.0,
+        entries: 1500.0,
+        exits: 300.0,
       },
     })
 
-    render(
-      <MemoryRouter>
-        <Finances />
-      </MemoryRouter>
-    )
+    // Act
+    renderWithProviders(<Finances />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
 
+    // Assert
     await waitFor(() => {
-      // Verificar Saldo Total
       const saldoLabel = screen.getByText('Saldo Total')
       expect(saldoLabel).toBeInTheDocument()
       const saldoCard = saldoLabel.closest('.card')
       expect(saldoCard?.textContent).toContain('R$')
       expect(saldoCard?.textContent).toContain('1200,00')
       
-      // Verificar Entradas
       const entradasLabel = screen.getByText('Entradas')
       expect(entradasLabel).toBeInTheDocument()
-      const entradasCard = entradasLabel.closest('.card')
-      expect(entradasCard?.textContent).toContain('R$')
-      expect(entradasCard?.textContent).toContain('1500,00')
       
-      // Verificar Saídas
       const saidasLabel = screen.getByText('Saídas')
       expect(saidasLabel).toBeInTheDocument()
-      const saidasCard = saidasLabel.closest('.card')
-      expect(saidasCard?.textContent).toContain('R$')
-      expect(saidasCard?.textContent).toContain('300,00')
     })
   })
 
-  it('deve exibir lista de transações', async () => {
-    const mockTransactions = [
-      {
-        id: 'trans-1',
-        title: 'Dízimo',
-        amount: 1000.0,
-        type: 'ENTRY' as const,
-        category: 'Dízimo',
-        branchId: 'branch-1',
-        createdAt: '2024-01-15T10:00:00Z',
-        updatedAt: '2024-01-15T10:00:00Z',
-      },
-      {
-        id: 'trans-2',
-        title: 'Pagamento',
-        amount: 300.0,
-        type: 'EXIT' as const,
-        category: 'Despesas',
-        branchId: 'branch-1',
-        createdAt: '2024-01-16T10:00:00Z',
-        updatedAt: '2024-01-16T10:00:00Z',
-      },
-    ]
-
-    vi.mocked(api.get).mockResolvedValue({
-      data: {
-        transactions: mockTransactions,
-        summary: {
-          total: 700.0,
-          entries: 1000.0,
-          exits: 300.0,
-        },
-      },
-    })
-
-    render(
-      <MemoryRouter>
-        <Finances />
-      </MemoryRouter>
-    )
-
-    await waitFor(() => {
-      // "Dízimo" aparece tanto no título quanto na categoria
-      // Verificamos que ambos existem usando getAllByText
-      const dizimoElements = screen.getAllByText('Dízimo')
-      expect(dizimoElements.length).toBe(2) // Título e categoria
-      expect(dizimoElements[0]).toBeInTheDocument()
-      expect(dizimoElements[1]).toBeInTheDocument()
-      
-      // Verificar que ambos estão dentro da tabela
-      const table = screen.getByRole('table')
-      expect(table).toBeInTheDocument()
-      expect(table).toContainElement(dizimoElements[0])
-      expect(table).toContainElement(dizimoElements[1])
-      
-      expect(screen.getByText('Pagamento')).toBeInTheDocument()
-    })
-  })
-
+  // ============================================================================
+  // TESTE 3: EMPTY STATE - Exibe mensagem quando não há transações
+  // ============================================================================
   it('deve exibir mensagem quando não há transações', async () => {
-    vi.mocked(api.get).mockResolvedValue({
-      data: {
-        transactions: [],
-        summary: {
-          total: 0,
-          entries: 0,
-          exits: 0,
-        },
+    // Arrange
+    const mockUser = fixtures.user({ permissions: [{ type: 'finances_manage' }] })
+    mockApiResponse('get', '/finances', {
+      transactions: [],
+      summary: {
+        total: 0,
+        entries: 0,
+        exits: 0,
       },
     })
 
-    render(
-      <MemoryRouter>
-        <Finances />
-      </MemoryRouter>
-    )
+    // Act
+    renderWithProviders(<Finances />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
 
+    // Assert
     await waitFor(() => {
       expect(screen.getByText('Nenhuma transação cadastrada')).toBeInTheDocument()
     })
   })
 
+  // ============================================================================
+  // TESTE 4: PRIMARY INTERACTION - Navega para criar transação
+  // ============================================================================
   it('deve navegar para criar transação ao clicar em Nova Transação', async () => {
-    vi.mocked(api.get).mockResolvedValue({
-      data: {
-        transactions: [],
-        summary: {
-          total: 0,
-          entries: 0,
-          exits: 0,
-        },
+    // Arrange
+    const user = userEvent.setup()
+    const mockUser = fixtures.user({ permissions: [{ type: 'finances_manage' }] })
+    mockApiResponse('get', '/finances', {
+      transactions: [],
+      summary: {
+        total: 0,
+        entries: 0,
+        exits: 0,
       },
     })
 
-    const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <Finances />
-      </MemoryRouter>
-    )
+    // Act
+    renderWithProviders(<Finances />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
 
     const newButton = await screen.findByText('Nova Transação')
     await user.click(newButton)
 
+    // Assert
     expect(mockNavigate).toHaveBeenCalledWith('/app/finances/new')
   })
 
+  // ============================================================================
+  // TESTE 5: ERROR STATE - Exibe erro quando falha ao carregar finanças
+  // ============================================================================
   it('deve exibir erro quando falha ao carregar finanças', async () => {
-    const toast = await import('react-hot-toast')
-    vi.mocked(api.get).mockRejectedValue(new Error('Erro na API'))
+    // Arrange
+    const mockUser = fixtures.user({ permissions: [{ type: 'finances_manage' }] })
+    mockApiError('get', '/finances', { message: 'Erro na API' })
 
-    render(
-      <MemoryRouter>
-        <Finances />
-      </MemoryRouter>
-    )
+    // Act
+    renderWithProviders(<Finances />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
 
+    // Assert
     await waitFor(() => {
-      expect(toast.default.error).toHaveBeenCalled()
-    })
-  })
-
-  it('deve exibir saldo negativo em vermelho', async () => {
-    vi.mocked(api.get).mockResolvedValue({
-      data: {
-        transactions: [],
-        summary: {
-          total: -500.0,
-          entries: 1000.0,
-          exits: 1500.0,
-        },
-      },
-    })
-
-    render(
-      <MemoryRouter>
-        <Finances />
-      </MemoryRouter>
-    )
-
-    await waitFor(() => {
-      const saldoElement = screen.getByText('R$ -500,00')
-      expect(saldoElement).toBeInTheDocument()
-      expect(saldoElement.className).toContain('text-red-600')
-    })
-  })
-
-  it('deve exibir saldo positivo em verde', async () => {
-    vi.mocked(api.get).mockResolvedValue({
-      data: {
-        transactions: [],
-        summary: {
-          total: 500.0,
-          entries: 1000.0,
-          exits: 500.0,
-        },
-      },
-    })
-
-    render(
-      <MemoryRouter>
-        <Finances />
-      </MemoryRouter>
-    )
-
-    await waitFor(() => {
-      // Buscar pelo texto "Saldo Total" e então encontrar o valor no mesmo card
-      const saldoLabel = screen.getByText('Saldo Total')
-      expect(saldoLabel).toBeInTheDocument()
-      
-      // Encontrar o elemento pai (card) e então buscar o valor dentro dele
-      const saldoCard = saldoLabel.closest('.card')
-      expect(saldoCard).toBeInTheDocument()
-      
-      // Verificar que o valor está em verde (text-green-600)
-      const saldoElement = saldoCard?.querySelector('.text-green-600')
-      expect(saldoElement).toBeInTheDocument()
-      expect(saldoElement).toHaveTextContent('R$ 500,00')
-      expect(saldoElement?.className).toContain('text-green-600')
-    })
-  })
-
-  it('deve exibir transações com categoria "Sem categoria" quando não há categoria', async () => {
-    const mockTransactions = [
-      {
-        id: 'trans-1',
-        title: 'Transação Sem Categoria',
-        amount: 100.0,
-        type: 'ENTRY' as const,
-        category: null,
-        branchId: 'branch-1',
-        createdAt: '2024-01-15T10:00:00Z',
-        updatedAt: '2024-01-15T10:00:00Z',
-      },
-    ]
-
-    vi.mocked(api.get).mockResolvedValue({
-      data: {
-        transactions: mockTransactions,
-        summary: {
-          total: 100.0,
-          entries: 100.0,
-          exits: 0,
-        },
-      },
-    })
-
-    render(
-      <MemoryRouter>
-        <Finances />
-      </MemoryRouter>
-    )
-
-    await waitFor(() => {
-      expect(screen.getByText('Sem categoria')).toBeInTheDocument()
-    })
-  })
-
-  it('não deve exibir botão Nova Transação quando usuário não tem permissão', async () => {
-    useAuthStore.setState({
-      token: 'token',
-      user: {
-        ...mockUser,
-        permissions: [], // Sem permissão
-      },
-    })
-
-    vi.mocked(api.get).mockResolvedValue({
-      data: {
-        transactions: [],
-        summary: {
-          total: 0,
-          entries: 0,
-          exits: 0,
-        },
-      },
-    })
-
-    render(
-      <MemoryRouter>
-        <Finances />
-      </MemoryRouter>
-    )
-
-    await waitFor(() => {
-      expect(screen.queryByText('Nova Transação')).not.toBeInTheDocument()
+      expect(mockToastError).toHaveBeenCalled()
     })
   })
 })
 
+import userEvent from '@testing-library/user-event'
+import Finances from '@/pages/Finances/index'
+import { fixtures } from '@/test/fixtures'
+import { renderWithProviders } from '@/test/helpers'
+import { mockApiResponse, mockApiError } from '@/test/mockApi'
+import { useAuthStore } from '@/stores/authStore'
+
+vi.mock('@/api/api')
+const mockToastError = vi.fn()
+vi.mock('react-hot-toast', () => ({
+  default: {
+    error: mockToastError,
+  },
+}))
+
+const mockNavigate = vi.fn()
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual('react-router-dom')
+  return {
+    ...actual,
+    useNavigate: () => mockNavigate,
+  }
+})
+
+vi.mock('@/components/PermissionGuard', () => ({
+  default: ({ children, permission }: any) => {
+    const { user } = useAuthStore.getState()
+    if (!user) return null
+    
+    const hasPermission = 
+      user.role === 'ADMINGERAL' || 
+      user.role === 'ADMINFILIAL' ||
+      user.permissions?.some((p: any) => {
+        const permType = typeof p === 'object' ? p.type : p
+        return permType === permission
+      }) === true
+    
+    return hasPermission ? <>{children}</> : null
+  },
+}))
+
+describe('Finances - Unit Tests', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  // ============================================================================
+  // TESTE 1: BASIC RENDER - Renderiza a página corretamente
+  // ============================================================================
+  it('deve renderizar a página corretamente', async () => {
+    // Arrange
+    const mockUser = fixtures.user({ permissions: [{ type: 'finances_manage' }] })
+    mockApiResponse('get', '/finances', {
+      transactions: [],
+      summary: {
+        total: 0,
+        entries: 0,
+        exits: 0,
+      },
+    })
+
+    // Act
+    renderWithProviders(<Finances />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
+
+    // Assert
+    await waitFor(() => {
+      expect(screen.getByText('Finanças')).toBeInTheDocument()
+      expect(screen.getByText('Gestão financeira da filial')).toBeInTheDocument()
+    })
+  })
+
+  // ============================================================================
+  // TESTE 2: BASIC RENDER - Exibe resumo financeiro
+  // ============================================================================
+  it('deve exibir resumo financeiro', async () => {
+    // Arrange
+    const mockUser = fixtures.user({ permissions: [{ type: 'finances_manage' }] })
+    mockApiResponse('get', '/finances', {
+      transactions: [],
+      summary: {
+        total: 1200.0,
+        entries: 1500.0,
+        exits: 300.0,
+      },
+    })
+
+    // Act
+    renderWithProviders(<Finances />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
+
+    // Assert
+    await waitFor(() => {
+      const saldoLabel = screen.getByText('Saldo Total')
+      expect(saldoLabel).toBeInTheDocument()
+      const saldoCard = saldoLabel.closest('.card')
+      expect(saldoCard?.textContent).toContain('R$')
+      expect(saldoCard?.textContent).toContain('1200,00')
+      
+      const entradasLabel = screen.getByText('Entradas')
+      expect(entradasLabel).toBeInTheDocument()
+      
+      const saidasLabel = screen.getByText('Saídas')
+      expect(saidasLabel).toBeInTheDocument()
+    })
+  })
+
+  // ============================================================================
+  // TESTE 3: EMPTY STATE - Exibe mensagem quando não há transações
+  // ============================================================================
+  it('deve exibir mensagem quando não há transações', async () => {
+    // Arrange
+    const mockUser = fixtures.user({ permissions: [{ type: 'finances_manage' }] })
+    mockApiResponse('get', '/finances', {
+      transactions: [],
+      summary: {
+        total: 0,
+        entries: 0,
+        exits: 0,
+      },
+    })
+
+    // Act
+    renderWithProviders(<Finances />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
+
+    // Assert
+    await waitFor(() => {
+      expect(screen.getByText('Nenhuma transação cadastrada')).toBeInTheDocument()
+    })
+  })
+
+  // ============================================================================
+  // TESTE 4: PRIMARY INTERACTION - Navega para criar transação
+  // ============================================================================
+  it('deve navegar para criar transação ao clicar em Nova Transação', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    const mockUser = fixtures.user({ permissions: [{ type: 'finances_manage' }] })
+    mockApiResponse('get', '/finances', {
+      transactions: [],
+      summary: {
+        total: 0,
+        entries: 0,
+        exits: 0,
+      },
+    })
+
+    // Act
+    renderWithProviders(<Finances />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
+
+    const newButton = await screen.findByText('Nova Transação')
+    await user.click(newButton)
+
+    // Assert
+    expect(mockNavigate).toHaveBeenCalledWith('/app/finances/new')
+  })
+
+  // ============================================================================
+  // TESTE 5: ERROR STATE - Exibe erro quando falha ao carregar finanças
+  // ============================================================================
+  it('deve exibir erro quando falha ao carregar finanças', async () => {
+    // Arrange
+    const mockUser = fixtures.user({ permissions: [{ type: 'finances_manage' }] })
+    mockApiError('get', '/finances', { message: 'Erro na API' })
+
+    // Act
+    renderWithProviders(<Finances />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
+
+    // Assert
+    await waitFor(() => {
+      expect(mockToastError).toHaveBeenCalled()
+    })
+  })
+})

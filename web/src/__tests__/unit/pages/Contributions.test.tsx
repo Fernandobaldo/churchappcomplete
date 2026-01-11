@@ -1,16 +1,17 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Contributions from '@/pages/Contributions/index'
-import api from '@/api/api'
-import { useAuthStore } from '@/stores/authStore'
-import { mockUser } from '@/test/mocks/mockData'
+import { fixtures } from '@/test/fixtures'
+import { renderWithProviders } from '@/test/helpers'
+import { mockApiResponse, mockApiError } from '@/test/mockApi'
 
 vi.mock('@/api/api')
+const mockToastError = vi.fn()
 vi.mock('react-hot-toast', () => ({
   default: {
-    error: vi.fn(),
+    error: mockToastError,
+    success: vi.fn(),
   },
 }))
 
@@ -23,33 +24,40 @@ vi.mock('react-router-dom', async () => {
   }
 })
 
-describe('Contributions Page', () => {
+describe('Contributions - Unit Tests', () => {
   beforeEach(() => {
-    useAuthStore.setState({
-      token: 'token',
-      user: mockUser,
-    })
     vi.clearAllMocks()
   })
 
+  // ============================================================================
+  // TESTE 1: BASIC RENDER - Renderiza a página corretamente
+  // ============================================================================
   it('deve renderizar a página corretamente', async () => {
-    vi.mocked(api.get).mockResolvedValue({
-      data: [],
+    // Arrange
+    const mockUser = fixtures.user()
+    mockApiResponse('get', '/contributions', [])
+
+    // Act
+    renderWithProviders(<Contributions />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
     })
 
-    render(
-      <MemoryRouter>
-        <Contributions />
-      </MemoryRouter>
-    )
-
+    // Assert
     await waitFor(() => {
       expect(screen.getByText('Contribuições')).toBeInTheDocument()
       expect(screen.getByText('Nova Contribuição')).toBeInTheDocument()
     })
   })
 
+  // ============================================================================
+  // TESTE 2: PRIMARY INTERACTION - Exibe lista de contribuições
+  // ============================================================================
   it('deve exibir lista de contribuições', async () => {
+    // Arrange
+    const mockUser = fixtures.user()
     const mockContributions = [
       {
         id: 'contrib-1',
@@ -72,54 +80,136 @@ describe('Contributions Page', () => {
         PaymentMethods: [],
       },
     ]
+    mockApiResponse('get', '/contributions', mockContributions)
 
-    vi.mocked(api.get).mockResolvedValue({
-      data: mockContributions,
+    // Act
+    renderWithProviders(<Contributions />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
     })
 
-    render(
-      <MemoryRouter>
-        <Contributions />
-      </MemoryRouter>
-    )
-
+    // Assert
     await waitFor(() => {
       expect(screen.getByText('Campanha de Construção')).toBeInTheDocument()
       expect(screen.getByText('Campanha de Missões')).toBeInTheDocument()
     })
   })
 
+  // ============================================================================
+  // TESTE 3: PRIMARY INTERACTION - Navega para criar contribuição
+  // ============================================================================
   it('deve navegar para criar contribuição ao clicar em Nova Contribuição', async () => {
-    vi.mocked(api.get).mockResolvedValue({
-      data: [],
-    })
-
+    // Arrange
     const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <Contributions />
-      </MemoryRouter>
-    )
+    const mockUser = fixtures.user()
+    mockApiResponse('get', '/contributions', [])
+
+    // Act
+    renderWithProviders(<Contributions />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
 
     const newButton = await screen.findByText('Nova Contribuição')
     await user.click(newButton)
 
+    // Assert
     expect(mockNavigate).toHaveBeenCalledWith('/app/contributions/new')
   })
 
+  // ============================================================================
+  // TESTE 4: ERROR STATE - Exibe erro quando falha ao carregar contribuições
+  // ============================================================================
   it('deve exibir erro quando falha ao carregar contribuições', async () => {
-    const toast = await import('react-hot-toast')
-    vi.mocked(api.get).mockRejectedValue(new Error('Erro na API'))
+    // Arrange
+    const mockUser = fixtures.user()
+    mockApiError('get', '/contributions', { message: 'Erro na API' })
 
-    render(
-      <MemoryRouter>
-        <Contributions />
-      </MemoryRouter>
-    )
+    // Act
+    renderWithProviders(<Contributions />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
 
+    // Assert
     await waitFor(() => {
-      expect(toast.default.error).toHaveBeenCalledWith('Erro ao carregar contribuições')
+      expect(mockToastError).toHaveBeenCalledWith('Erro ao carregar contribuições')
+    })
+  })
+
+  // ============================================================================
+  // TESTE 5: EMPTY STATE - Exibe mensagem quando não há contribuições
+  // ============================================================================
+  it('deve exibir mensagem quando não há contribuições', async () => {
+    // Arrange
+    const mockUser = fixtures.user()
+    mockApiResponse('get', '/contributions', [])
+
+    // Act
+    renderWithProviders(<Contributions />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
+
+    // Assert
+    await waitFor(() => {
+      // Verifica se a página renderiza sem erros quando lista está vazia
+      expect(screen.getByText('Contribuições')).toBeInTheDocument()
     })
   })
 })
 
+
+  // ============================================================================
+  // TESTE 4: ERROR STATE - Exibe erro quando falha ao carregar contribuições
+  // ============================================================================
+  it('deve exibir erro quando falha ao carregar contribuições', async () => {
+    // Arrange
+    const mockUser = fixtures.user()
+    mockApiError('get', '/contributions', { message: 'Erro na API' })
+
+    // Act
+    renderWithProviders(<Contributions />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
+
+    // Assert
+    await waitFor(() => {
+      expect(mockToastError).toHaveBeenCalledWith('Erro ao carregar contribuições')
+    })
+  })
+
+  // ============================================================================
+  // TESTE 5: EMPTY STATE - Exibe mensagem quando não há contribuições
+  // ============================================================================
+  it('deve exibir mensagem quando não há contribuições', async () => {
+    // Arrange
+    const mockUser = fixtures.user()
+    mockApiResponse('get', '/contributions', [])
+
+    // Act
+    renderWithProviders(<Contributions />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
+
+    // Assert
+    await waitFor(() => {
+      // Verifica se a página renderiza sem erros quando lista está vazia
+      expect(screen.getByText('Contribuições')).toBeInTheDocument()
+    })
+  })
+})

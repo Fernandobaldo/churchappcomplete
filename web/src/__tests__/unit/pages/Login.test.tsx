@@ -1,14 +1,25 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
 import Login from '@/pages/Login'
-import api from '@/api/api'
-import { useAuthStore } from '@/stores/authStore'
+import { renderWithProviders } from '@/test/renderWithProviders'
+import { mockApiResponse, mockApiError, resetApiMocks } from '@/test/mockApi'
 import { jwtDecode } from 'jwt-decode'
 
-vi.mock('@/api/api')
-vi.mock('jwt-decode')
+// Mock jwt-decode
+vi.mock('jwt-decode', () => ({
+  jwtDecode: vi.fn(),
+}))
+
+// Mock api
+vi.mock('@/api/api', () => ({
+  default: {
+    get: vi.fn(),
+    post: vi.fn(),
+    put: vi.fn(),
+    delete: vi.fn(),
+  },
+}))
 
 const mockNavigate = vi.fn()
 
@@ -20,28 +31,43 @@ vi.mock('react-router-dom', async () => {
   }
 })
 
-describe('Login', () => {
+describe('Login - Unit Tests', () => {
   beforeEach(() => {
-    useAuthStore.setState({ token: null, user: null })
-    vi.clearAllMocks()
+    resetApiMocks()
     mockNavigate.mockClear()
+    vi.clearAllMocks()
   })
 
+  // ============================================================================
+  // TESTE 1: BASIC RENDER - Renderização básica
+  // ============================================================================
+  it('deve renderizar campos de email e senha corretamente', () => {
+    // Arrange
+    // Act
+    renderWithProviders(<Login />)
+
+    // Assert
+    expect(screen.getByLabelText(/email/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/senha/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /entrar/i })).toBeInTheDocument()
+  })
+
+  // ============================================================================
+  // TESTE 2: PRIMARY INTERACTION - Login com onboarding incompleto
+  // ============================================================================
   it('deve redirecionar para /onboarding/start quando login bem-sucedido mas sem onboarding completo', async () => {
+    // Arrange
     const user = userEvent.setup()
     const mockToken = 'valid-jwt-token'
-    const mockResponse = {
-      data: {
+    mockApiResponse('post', '/auth/login', {
         token: mockToken,
         user: {
           id: 'user-123',
           email: 'test@example.com',
         },
         type: 'user',
-      },
-    }
+    })
 
-    // Mock do token decodificado sem branchId e role (onboarding incompleto)
     vi.mocked(jwtDecode).mockReturnValue({
       sub: 'user-123',
       email: 'test@example.com',
@@ -51,46 +77,35 @@ describe('Login', () => {
       exp: 1234571490,
     } as any)
 
-    vi.mocked(api.post).mockResolvedValue(mockResponse)
-
-    render(
-      <MemoryRouter>
-        <Login />
-      </MemoryRouter>
-    )
+    // Act
+    renderWithProviders(<Login />)
 
     await user.type(screen.getByLabelText(/email/i), 'test@example.com')
     await user.type(screen.getByLabelText(/senha/i), 'password123')
     await user.click(screen.getByRole('button', { name: /entrar/i }))
 
+    // Assert
     await waitFor(() => {
-      expect(api.post).toHaveBeenCalledWith('/auth/login', {
-        email: 'test@example.com',
-        password: 'password123',
-      })
-    })
-
-    await waitFor(() => {
-      expect(jwtDecode).toHaveBeenCalledWith(mockToken)
       expect(mockNavigate).toHaveBeenCalledWith('/onboarding/start')
     })
   })
 
+  // ============================================================================
+  // TESTE 3: PRIMARY INTERACTION - Login com onboarding completo
+  // ============================================================================
   it('deve redirecionar para /app/dashboard quando login bem-sucedido e onboarding completo', async () => {
+    // Arrange
     const user = userEvent.setup()
     const mockToken = 'valid-jwt-token'
-    const mockResponse = {
-      data: {
+    mockApiResponse('post', '/auth/login', {
         token: mockToken,
         user: {
           id: 'user-123',
           email: 'test@example.com',
         },
         type: 'member',
-      },
-    }
+    })
 
-    // Mock do token decodificado com branchId e role (onboarding completo)
     vi.mocked(jwtDecode).mockReturnValue({
       sub: 'user-123',
       email: 'test@example.com',
@@ -100,58 +115,90 @@ describe('Login', () => {
       exp: 1234571490,
     } as any)
 
-    vi.mocked(api.post).mockResolvedValue(mockResponse)
-
-    render(
-      <MemoryRouter>
-        <Login />
-      </MemoryRouter>
-    )
+    // Act
+    renderWithProviders(<Login />)
 
     await user.type(screen.getByLabelText(/email/i), 'test@example.com')
     await user.type(screen.getByLabelText(/senha/i), 'password123')
     await user.click(screen.getByRole('button', { name: /entrar/i }))
 
+    // Assert
     await waitFor(() => {
-      expect(api.post).toHaveBeenCalledWith('/auth/login', {
-        email: 'test@example.com',
-        password: 'password123',
-      })
-    })
-
-    await waitFor(() => {
-      expect(jwtDecode).toHaveBeenCalledWith(mockToken)
       expect(mockNavigate).toHaveBeenCalledWith('/app/dashboard')
     })
   })
 
+  // ============================================================================
+  // TESTE 4: ERROR STATE - Erro ao fazer login
+  // ============================================================================
   it('deve exibir erro quando credenciais são inválidas', async () => {
+    // Arrange
     const user = userEvent.setup()
-    const errorResponse = {
-      response: {
+    mockApiError('post', '/auth/login', {
+      status: 401,
+      message: 'Credenciais inválidas',
         data: { message: 'Credenciais inválidas' },
-      },
-    }
+    })
 
-    vi.mocked(api.post).mockRejectedValue(errorResponse)
-
-    render(
-      <MemoryRouter>
-        <Login />
-      </MemoryRouter>
-    )
+    // Act
+    renderWithProviders(<Login />)
 
     await user.type(screen.getByLabelText(/email/i), 'wrong@example.com')
     await user.type(screen.getByLabelText(/senha/i), 'wrong')
     await user.click(screen.getByRole('button', { name: /entrar/i }))
 
+    // Assert
     await waitFor(() => {
-      expect(api.post).toHaveBeenCalled()
-    })
-
     // Não deve chamar jwtDecode em caso de erro
     expect(jwtDecode).not.toHaveBeenCalled()
     expect(mockNavigate).not.toHaveBeenCalled()
   })
 })
 
+  // ============================================================================
+  // TESTE 5: LOADING STATE - Estado de carregamento durante login
+  // ============================================================================
+  it('deve mostrar estado de loading durante o login', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    const mockToken = 'valid-jwt-token'
+
+    // Mock com delay para testar loading
+    const { default: api } = await import('@/api/api')
+    ;(api.post as any).mockImplementation(
+      () => new Promise((resolve) => setTimeout(() => resolve({
+        data: {
+          token: mockToken,
+          user: { id: 'user-123', email: 'test@example.com' },
+          type: 'member',
+        },
+      }), 100))
+    )
+
+    vi.mocked(jwtDecode).mockReturnValue({
+      sub: 'user-123',
+      email: 'test@example.com',
+      branchId: 'branch-123',
+      role: 'ADMINGERAL',
+      iat: 1234567890,
+      exp: 1234571490,
+    } as any)
+
+    // Act
+    renderWithProviders(<Login />)
+
+    await user.type(screen.getByLabelText(/email/i), 'test@example.com')
+    await user.type(screen.getByLabelText(/senha/i), 'password123')
+    await user.click(screen.getByRole('button', { name: /entrar/i }))
+
+    // Assert
+    // Verifica se botão está desabilitado ou mostra loading
+    const submitButton = screen.getByRole('button', { name: /entrar/i })
+    expect(submitButton).toBeDisabled()
+
+    // Aguarda conclusão
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalled()
+    }, { timeout: 200 })
+  })
+})

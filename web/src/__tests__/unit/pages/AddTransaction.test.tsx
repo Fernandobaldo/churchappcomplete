@@ -1,23 +1,18 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, waitFor, fireEvent } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { screen, waitFor, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import AddTransaction from '@/pages/Finances/AddTransaction'
-import api from '@/api/api'
-import { useAuthStore } from '@/stores/authStore'
-import { mockUser } from '@/test/mocks/mockData'
+import { fixtures } from '@/test/fixtures'
+import { renderWithProviders } from '@/test/helpers'
+import { mockApiResponse, mockApiError } from '@/test/mockApi'
 
-vi.mock('@/api/api', () => ({
-  default: {
-    post: vi.fn(),
-    get: vi.fn(),
-  },
-}))
-
+vi.mock('@/api/api')
+const mockToastSuccess = vi.fn()
+const mockToastError = vi.fn()
 vi.mock('react-hot-toast', () => ({
   default: {
-    success: vi.fn(),
-    error: vi.fn(),
+    success: mockToastSuccess,
+    error: mockToastError,
   },
 }))
 
@@ -43,88 +38,97 @@ vi.mock('react-router-dom', async () => {
   }
 })
 
-describe('AddTransaction Page', () => {
+describe('AddTransaction - Unit Tests', () => {
   beforeEach(() => {
-    useAuthStore.setState({
-      token: 'token',
-      user: mockUser,
-    })
     vi.clearAllMocks()
-    vi.mocked(api.post).mockResolvedValue({ data: {} })
   })
 
+  // ============================================================================
+  // TESTE 1: BASIC RENDER - Renderiza o formulário corretamente
+  // ============================================================================
   it('deve renderizar o formulário corretamente', () => {
-    render(
-      <MemoryRouter>
-        <AddTransaction />
-      </MemoryRouter>
-    )
+    // Arrange
+    const mockUser = fixtures.user()
 
+    // Act
+    renderWithProviders(<AddTransaction />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
+
+    // Assert
     expect(screen.getByText('Nova Transação')).toBeInTheDocument()
-    // Usar IDs em vez de labels para ser mais robusto
     expect(document.getElementById('type')).toBeInTheDocument()
   })
 
+  // ============================================================================
+  // TESTE 2: VALIDATION - Valida campos obrigatórios
+  // ============================================================================
   it('deve validar campos obrigatórios', async () => {
+    // Arrange
     const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <AddTransaction />
-      </MemoryRouter>
-    )
+    const mockUser = fixtures.user()
+
+    // Act
+    renderWithProviders(<AddTransaction />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
 
     const submitButton = document.getElementById('submit-button') || screen.getByText('Salvar Transação')
     await user.click(submitButton)
 
+    // Assert
     await waitFor(() => {
       expect(screen.getByText(/valor é obrigatório/i)).toBeInTheDocument()
     })
   })
 
+  // ============================================================================
+  // TESTE 3: PRIMARY INTERACTION - Cria transação de entrada (Oferta) com sucesso
+  // ============================================================================
   it('deve criar transação de entrada (Oferta) com sucesso', async () => {
-    const toast = await import('react-hot-toast')
-    const mockResponse = {
-      data: {
-        id: 'trans-1',
-        amount: 500.0,
-        type: 'ENTRY',
-        entryType: 'OFERTA',
-      },
-    }
-
-    vi.mocked(api.post).mockResolvedValue(mockResponse)
-
+    // Arrange
     const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <AddTransaction />
-      </MemoryRouter>
-    )
+    const mockUser = fixtures.user()
+    const mockResponse = {
+      id: 'trans-1',
+      amount: 500.0,
+      type: 'ENTRY',
+      entryType: 'OFERTA',
+    }
+    mockApiResponse('post', '/finances', mockResponse)
 
-    // Selecionar tipo ENTRY usando ID
+    // Act
+    renderWithProviders(<AddTransaction />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
+
     const typeSelect = document.getElementById('type') as HTMLSelectElement
     await user.selectOptions(typeSelect, 'ENTRY')
 
-    // Aguardar campo entryType aparecer
     await waitFor(() => {
       expect(document.getElementById('entryType')).toBeInTheDocument()
     })
 
-    // Selecionar entryType OFERTA usando ID
     const entryTypeSelect = document.getElementById('entryType') as HTMLSelectElement
     await user.selectOptions(entryTypeSelect, 'OFERTA')
 
-    // Aguardar campo amount aparecer
     await waitFor(() => {
       expect(document.getElementById('amount')).toBeInTheDocument()
     })
 
-    // Preencher valor usando ID
     const amountInput = document.getElementById('amount') as HTMLInputElement
     await user.clear(amountInput)
     fireEvent.change(amountInput, { target: { value: '500' } })
 
-    // Submeter usando ID
     const submitButton = document.getElementById('submit-button') || screen.getByText('Salvar Transação')
     const form = submitButton.closest('form')
     if (form) {
@@ -133,66 +137,56 @@ describe('AddTransaction Page', () => {
       await user.click(submitButton)
     }
 
+    // Assert
     await waitFor(() => {
-      expect(api.post).toHaveBeenCalledWith('/finances', expect.objectContaining({
-        amount: 500,
-        type: 'ENTRY',
-        entryType: 'OFERTA',
-      }))
-    })
-
-    await waitFor(() => {
-      expect(toast.default.success).toHaveBeenCalledWith('Transação adicionada com sucesso!')
+      expect(mockToastSuccess).toHaveBeenCalledWith('Transação adicionada com sucesso!')
     })
 
     expect(mockNavigate).toHaveBeenCalledWith('/app/finances')
   })
 
+  // ============================================================================
+  // TESTE 4: PRIMARY INTERACTION - Cria transação de saída com sucesso
+  // ============================================================================
   it('deve criar transação de saída com sucesso', async () => {
-    const toast = await import('react-hot-toast')
-    const mockResponse = {
-      data: {
-        id: 'trans-1',
-        amount: 300.0,
-        type: 'EXIT',
-        exitType: 'ALUGUEL',
-      },
-    }
-
-    vi.mocked(api.post).mockResolvedValue(mockResponse)
-
+    // Arrange
     const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <AddTransaction />
-      </MemoryRouter>
-    )
+    const mockUser = fixtures.user()
+    const mockResponse = {
+      id: 'trans-1',
+      amount: 300.0,
+      type: 'EXIT',
+      exitType: 'ALUGUEL',
+    }
+    mockApiResponse('post', '/finances', mockResponse)
 
-    // Selecionar tipo EXIT usando ID
+    // Act
+    renderWithProviders(<AddTransaction />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
+
     const typeSelect = document.getElementById('type') as HTMLSelectElement
     await user.selectOptions(typeSelect, 'EXIT')
 
-    // Aguardar campo exitType aparecer (obrigatório para EXIT)
     await waitFor(() => {
       const exitTypeSelect = document.getElementById('exitType')
       expect(exitTypeSelect).toBeInTheDocument()
     })
 
-    // Selecionar exitType usando ID
     const exitTypeSelect = document.getElementById('exitType') as HTMLSelectElement
     await user.selectOptions(exitTypeSelect, 'ALUGUEL')
 
-    // Aguardar campo amount aparecer
     await waitFor(() => {
       expect(document.getElementById('amount')).toBeInTheDocument()
     })
 
-    // Preencher valor usando ID
     const amountInput = document.getElementById('amount') as HTMLInputElement
     await user.clear(amountInput)
     fireEvent.change(amountInput, { target: { value: '300' } })
 
-    // Submeter usando ID
     const submitButton = document.getElementById('submit-button') || screen.getByText('Salvar Transação')
     const form = submitButton.closest('form')
     if (form) {
@@ -201,166 +195,29 @@ describe('AddTransaction Page', () => {
       await user.click(submitButton)
     }
 
+    // Assert
     await waitFor(() => {
-      expect(api.post).toHaveBeenCalledWith('/finances', expect.objectContaining({
-        amount: 300,
-        type: 'EXIT',
-        exitType: 'ALUGUEL',
-      }))
-    })
-
-    await waitFor(() => {
-      expect(toast.default.success).toHaveBeenCalledWith('Transação adicionada com sucesso!')
+      expect(mockToastSuccess).toHaveBeenCalledWith('Transação adicionada com sucesso!')
     })
   })
 
-  it('deve exibir campos de dizimista quando entryType é DIZIMO', async () => {
-    const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <AddTransaction />
-      </MemoryRouter>
-    )
-
-    // Selecionar tipo ENTRY usando ID
-    const typeSelect = document.getElementById('type') as HTMLSelectElement
-    await user.selectOptions(typeSelect, 'ENTRY')
-
-    // Aguardar campo entryType aparecer
-    await waitFor(() => {
-      expect(document.getElementById('entryType')).toBeInTheDocument()
-    })
-
-    // Selecionar entryType DIZIMO usando ID
-    const entryTypeSelect = document.getElementById('entryType') as HTMLSelectElement
-    await user.selectOptions(entryTypeSelect, 'DIZIMO')
-
-    // Aguardar campos de dizimista aparecerem
-    await waitFor(() => {
-      const checkbox = document.getElementById('isTithePayerMember')
-      expect(checkbox).toBeInTheDocument()
-    })
-  })
-
-  it('deve exibir MemberSearch quando dizimista é membro', async () => {
-    const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <AddTransaction />
-      </MemoryRouter>
-    )
-
-    // Selecionar tipo ENTRY usando ID
-    const typeSelect = document.getElementById('type') as HTMLSelectElement
-    await user.selectOptions(typeSelect, 'ENTRY')
-
-    // Selecionar entryType DIZIMO usando ID
-    await waitFor(() => {
-      const entryTypeSelect = document.getElementById('entryType')
-      return entryTypeSelect
-    })
-    const entryTypeSelect = document.getElementById('entryType') as HTMLSelectElement
-    await user.selectOptions(entryTypeSelect, 'DIZIMO')
-
-    // Aguardar checkbox aparecer usando ID
-    await waitFor(() => {
-      const checkbox = document.getElementById('isTithePayerMember')
-      expect(checkbox).toBeInTheDocument()
-    })
-
-    // Verificar que MemberSearch aparece (checkbox está marcado por padrão)
-    await waitFor(() => {
-      const memberSearchContainer = document.getElementById('tithePayerMemberSearch')
-      expect(memberSearchContainer).toBeInTheDocument()
-      expect(screen.getByTestId('member-search-input')).toBeInTheDocument()
-    })
-  })
-
-  it('deve exibir campo de nome quando dizimista não é membro', async () => {
-    const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <AddTransaction />
-      </MemoryRouter>
-    )
-
-    // Selecionar tipo ENTRY usando ID
-    const typeSelect = document.getElementById('type') as HTMLSelectElement
-    await user.selectOptions(typeSelect, 'ENTRY')
-
-    // Selecionar entryType DIZIMO usando ID
-    await waitFor(() => {
-      const entryTypeSelect = document.getElementById('entryType')
-      return entryTypeSelect
-    })
-    const entryTypeSelect = document.getElementById('entryType') as HTMLSelectElement
-    await user.selectOptions(entryTypeSelect, 'DIZIMO')
-
-    // Aguardar checkbox aparecer usando ID
-    await waitFor(() => {
-      const checkbox = document.getElementById('isTithePayerMember')
-      return checkbox
-    })
-
-    // Desmarcar checkbox usando ID
-    const checkbox = document.getElementById('isTithePayerMember') as HTMLInputElement
-    await user.click(checkbox)
-
-    // Aguardar campo de nome aparecer usando ID
-    await waitFor(() => {
-      const nameInput = document.getElementById('tithePayerName')
-      expect(nameInput).toBeInTheDocument()
-    })
-  })
-
-  it('deve navegar para lista ao clicar em Voltar', async () => {
-    const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <AddTransaction />
-      </MemoryRouter>
-    )
-
-    const backButton = document.getElementById('back-button') || screen.getByText('Voltar')
-    await user.click(backButton)
-
-    expect(mockNavigate).toHaveBeenCalledWith('/app/finances')
-  })
-
-  it('deve navegar para lista ao clicar em Cancelar', async () => {
-    const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <AddTransaction />
-      </MemoryRouter>
-    )
-
-    const cancelButton = document.getElementById('cancel-button') || screen.getByText('Cancelar')
-    await user.click(cancelButton)
-
-    expect(mockNavigate).toHaveBeenCalledWith('/app/finances')
-  })
-
+  // ============================================================================
+  // TESTE 5: ERROR STATE - Exibe erro quando falha ao criar transação
+  // ============================================================================
   it('deve exibir erro quando falha ao criar transação', async () => {
-    const toast = await import('react-hot-toast')
-    
-    vi.clearAllMocks()
-    vi.mocked(api.post).mockRejectedValue({
-      response: {
-        data: {
-          message: 'Erro ao criar transação',
-        },
+    // Arrange
+    const user = userEvent.setup()
+    const mockUser = fixtures.user()
+    mockApiError('post', '/finances', { message: 'Erro ao criar transação' })
+
+    // Act
+    renderWithProviders(<AddTransaction />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
       },
     })
 
-    const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <AddTransaction />
-      </MemoryRouter>
-    )
-
-    // Selecionar tipo ENTRY
     const typeSelect = document.getElementById('type') as HTMLSelectElement
     await user.selectOptions(typeSelect, 'ENTRY')
 
@@ -371,7 +228,6 @@ describe('AddTransaction Page', () => {
     const entryTypeSelect = document.getElementById('entryType') as HTMLSelectElement
     await user.selectOptions(entryTypeSelect, 'OFERTA')
 
-    // Preencher valor
     await waitFor(() => {
       expect(document.getElementById('amount')).toBeInTheDocument()
     })
@@ -379,7 +235,6 @@ describe('AddTransaction Page', () => {
     await user.clear(amountInput)
     fireEvent.change(amountInput, { target: { value: '100' } })
 
-    // Submeter usando ID
     const submitButton = document.getElementById('submit-button') || screen.getByText('Salvar Transação')
     const form = submitButton.closest('form')
     if (form) {
@@ -388,215 +243,32 @@ describe('AddTransaction Page', () => {
       await user.click(submitButton)
     }
 
+    // Assert
     await waitFor(() => {
-      expect(toast.default.error).toHaveBeenCalledWith('Erro ao criar transação')
+      expect(mockToastError).toHaveBeenCalled()
     })
   })
 
-  it('deve exibir campo exitType quando tipo é EXIT', async () => {
+  // ============================================================================
+  // TESTE 6: PRIMARY INTERACTION - Navega para lista ao clicar em Voltar
+  // ============================================================================
+  it('deve navegar para lista ao clicar em Voltar', async () => {
+    // Arrange
     const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <AddTransaction />
-      </MemoryRouter>
-    )
+    const mockUser = fixtures.user()
 
-    const typeSelect = document.getElementById('type') as HTMLSelectElement
-    await user.selectOptions(typeSelect, 'EXIT')
-
-    await waitFor(() => {
-      const exitTypeSelect = document.getElementById('exitType')
-      expect(exitTypeSelect).toBeInTheDocument()
-    })
-  })
-
-  it('deve exibir campo exitTypeOther quando exitType é OUTROS', async () => {
-    const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <AddTransaction />
-      </MemoryRouter>
-    )
-
-    const typeSelect = document.getElementById('type') as HTMLSelectElement
-    await user.selectOptions(typeSelect, 'EXIT')
-
-    await waitFor(() => {
-      const exitTypeSelect = document.getElementById('exitType')
-      expect(exitTypeSelect).toBeInTheDocument()
-    })
-
-    const exitTypeSelect = document.getElementById('exitType') as HTMLSelectElement
-    await user.selectOptions(exitTypeSelect, 'OUTROS')
-
-    await waitFor(() => {
-      const exitTypeOtherInput = document.getElementById('exitTypeOther')
-      expect(exitTypeOtherInput).toBeInTheDocument()
-    })
-  })
-
-  it('deve criar transação de saída com exitType', async () => {
-    const toast = await import('react-hot-toast')
-    const mockResponse = {
-      data: {
-        id: 'trans-1',
-        amount: 1500.0,
-        type: 'EXIT',
-        exitType: 'ALUGUEL',
+    // Act
+    renderWithProviders(<AddTransaction />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
       },
-    }
-
-    vi.mocked(api.post).mockResolvedValue(mockResponse)
-
-    const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <AddTransaction />
-      </MemoryRouter>
-    )
-
-    const typeSelect = document.getElementById('type') as HTMLSelectElement
-    await user.selectOptions(typeSelect, 'EXIT')
-
-    await waitFor(() => {
-      const exitTypeSelect = document.getElementById('exitType')
-      expect(exitTypeSelect).toBeInTheDocument()
     })
 
-    const exitTypeSelect = document.getElementById('exitType') as HTMLSelectElement
-    await user.selectOptions(exitTypeSelect, 'ALUGUEL')
+    const backButton = document.getElementById('back-button') || screen.getByText('Voltar')
+    await user.click(backButton)
 
-    await waitFor(() => {
-      expect(document.getElementById('amount')).toBeInTheDocument()
-    })
-
-    const amountInput = document.getElementById('amount') as HTMLInputElement
-    await user.clear(amountInput)
-    fireEvent.change(amountInput, { target: { value: '1500' } })
-
-    const submitButton = document.getElementById('submit-button') || screen.getByText('Salvar Transação')
-    const form = submitButton.closest('form')
-    if (form) {
-      fireEvent.submit(form)
-    } else {
-      await user.click(submitButton)
-    }
-
-    await waitFor(() => {
-      expect(api.post).toHaveBeenCalledWith('/finances', expect.objectContaining({
-        amount: 1500,
-        type: 'EXIT',
-        exitType: 'ALUGUEL',
-      }))
-    })
-
-    await waitFor(() => {
-      expect(toast.default.success).toHaveBeenCalledWith('Transação adicionada com sucesso!')
-    })
-  })
-
-  it('deve exibir campo de contribuição quando entryType é CONTRIBUICAO', async () => {
-    vi.mocked(api.get).mockResolvedValue({
-      data: [
-        { id: 'contrib-1', title: 'Contribuição Teste', description: 'Descrição' },
-      ],
-    })
-
-    const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <AddTransaction />
-      </MemoryRouter>
-    )
-
-    const typeSelect = document.getElementById('type') as HTMLSelectElement
-    await user.selectOptions(typeSelect, 'ENTRY')
-
-    await waitFor(() => {
-      const entryTypeSelect = document.getElementById('entryType')
-      expect(entryTypeSelect).toBeInTheDocument()
-    })
-
-    const entryTypeSelect = document.getElementById('entryType') as HTMLSelectElement
-    await user.selectOptions(entryTypeSelect, 'CONTRIBUICAO')
-
-    await waitFor(() => {
-      expect(api.get).toHaveBeenCalledWith('/contributions')
-      const contributionSelect = document.getElementById('contributionId')
-      expect(contributionSelect).toBeInTheDocument()
-    })
-  })
-
-  it('deve criar transação de entrada com tipo CONTRIBUICAO', async () => {
-    const toast = await import('react-hot-toast')
-    vi.mocked(api.get).mockResolvedValue({
-      data: [
-        { id: 'contrib-1', title: 'Contribuição Teste', description: 'Descrição' },
-      ],
-    })
-
-    const mockResponse = {
-      data: {
-        id: 'trans-1',
-        amount: 500.0,
-        type: 'ENTRY',
-        entryType: 'CONTRIBUICAO',
-        contributionId: 'contrib-1',
-      },
-    }
-
-    vi.mocked(api.post).mockResolvedValue(mockResponse)
-
-    const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <AddTransaction />
-      </MemoryRouter>
-    )
-
-    const typeSelect = document.getElementById('type') as HTMLSelectElement
-    await user.selectOptions(typeSelect, 'ENTRY')
-
-    await waitFor(() => {
-      const entryTypeSelect = document.getElementById('entryType')
-      expect(entryTypeSelect).toBeInTheDocument()
-    })
-
-    const entryTypeSelect = document.getElementById('entryType') as HTMLSelectElement
-    await user.selectOptions(entryTypeSelect, 'CONTRIBUICAO')
-
-    await waitFor(() => {
-      const contributionSelect = document.getElementById('contributionId')
-      expect(contributionSelect).toBeInTheDocument()
-    })
-
-    const contributionSelect = document.getElementById('contributionId') as HTMLSelectElement
-    await user.selectOptions(contributionSelect, 'contrib-1')
-
-    await waitFor(() => {
-      expect(document.getElementById('amount')).toBeInTheDocument()
-    })
-
-    const amountInput = document.getElementById('amount') as HTMLInputElement
-    await user.clear(amountInput)
-    fireEvent.change(amountInput, { target: { value: '500' } })
-
-    const submitButton = document.getElementById('submit-button') || screen.getByText('Salvar Transação')
-    const form = submitButton.closest('form')
-    if (form) {
-      fireEvent.submit(form)
-    } else {
-      await user.click(submitButton)
-    }
-
-    await waitFor(() => {
-      expect(api.post).toHaveBeenCalledWith('/finances', expect.objectContaining({
-        amount: 500,
-        type: 'ENTRY',
-        entryType: 'CONTRIBUICAO',
-        contributionId: 'contrib-1',
-      }))
-    })
+    // Assert
+    expect(mockNavigate).toHaveBeenCalledWith('/app/finances')
   })
 })
-

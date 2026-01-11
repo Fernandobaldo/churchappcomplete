@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { CheckCircle, Calendar, Heart, DollarSign, BookOpen, Users } from 'lucide-react'
+import api from '../../api/api'
 import OnboardingHeader from '../../components/OnboardingHeader'
 import { useAuthStore } from '../../stores/authStore'
 
@@ -59,18 +60,25 @@ export default function Settings() {
         toast.success(`${emails.length} convite(s) será(ão) enviado(s)!`)
       }
       
-      // Verifica se o token tem branchId e role antes de navegar
-      if (!user?.branchId || !user?.role) {
-        console.warn('⚠️ Token não tem branchId/role. O ProtectedRoute redirecionará se necessário.')
-        toast.info('Finalizando configuração...')
+      // Marcar etapa settings como completa
+      try {
+        await api.post('/onboarding/progress/settings')
+      } catch (progressError) {
+        console.error('Erro ao marcar progresso:', progressError)
       }
       
-      // Finaliza onboarding
-      navigate('/app/dashboard')
+      // Navega para tela de conclusão
+      navigate('/onboarding/concluido')
     } catch (error) {
       console.error('Erro ao enviar convites:', error)
       toast.error('Não foi possível enviar convites. Você pode enviar depois.')
-      navigate('/app/dashboard')
+      // Mesmo com erro, marca progresso e navega para conclusão
+      try {
+        await api.post('/onboarding/progress/settings')
+      } catch (progressError) {
+        console.error('Erro ao marcar progresso:', progressError)
+      }
+      navigate('/onboarding/concluido')
     } finally {
       setLoading(false)
     }

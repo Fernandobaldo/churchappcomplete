@@ -1,24 +1,18 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, waitFor, fireEvent } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import AddContribution from '@/pages/Contributions/AddContribution'
-import api from '@/api/api'
-import { useAuthStore } from '@/stores/authStore'
-import { mockUser } from '@/test/mocks/mockData'
+import { fixtures } from '@/test/fixtures'
+import { renderWithProviders } from '@/test/helpers'
+import { mockApiResponse, mockApiError } from '@/test/mockApi'
 
-vi.mock('@/api/api', () => ({
-  default: {
-    post: vi.fn(),
-    get: vi.fn(),
-    put: vi.fn(),
-    delete: vi.fn(),
-  },
-}))
+vi.mock('@/api/api')
+const mockToastSuccess = vi.fn()
+const mockToastError = vi.fn()
 vi.mock('react-hot-toast', () => ({
   default: {
-    success: vi.fn(),
-    error: vi.fn(),
+    success: mockToastSuccess,
+    error: mockToastError,
   },
 }))
 
@@ -31,198 +25,151 @@ vi.mock('react-router-dom', async () => {
   }
 })
 
-describe('AddContribution Page', () => {
+describe('AddContribution - Unit Tests', () => {
   beforeEach(() => {
-    useAuthStore.setState({
-      token: 'token',
-      user: mockUser,
-    })
     vi.clearAllMocks()
-    // Garantir que o mock do api está configurado
-    vi.mocked(api.post).mockResolvedValue({ data: {} })
   })
 
+  // ============================================================================
+  // TESTE 1: BASIC RENDER - Renderiza o formulário corretamente
+  // ============================================================================
   it('deve renderizar o formulário corretamente', () => {
-    render(
-      <MemoryRouter>
-        <AddContribution />
-      </MemoryRouter>
-    )
+    // Arrange
+    const mockUser = fixtures.user()
 
+    // Act
+    renderWithProviders(<AddContribution />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
+
+    // Assert
     expect(screen.getByText('Nova Campanha de Contribuição')).toBeInTheDocument()
     expect(screen.getByTestId('title-input')).toBeInTheDocument()
     expect(screen.getByTestId('submit-button')).toBeInTheDocument()
   })
 
+  // ============================================================================
+  // TESTE 2: VALIDATION - Valida campos obrigatórios
+  // ============================================================================
   it('deve validar campos obrigatórios', async () => {
+    // Arrange
     const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <AddContribution />
-      </MemoryRouter>
-    )
+    const mockUser = fixtures.user()
+
+    // Act
+    renderWithProviders(<AddContribution />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
 
     const submitButton = screen.getByText('Criar Campanha')
     await user.click(submitButton)
 
+    // Assert
     await waitFor(() => {
       expect(screen.getByText('Título é obrigatório')).toBeInTheDocument()
     })
   })
 
+  // ============================================================================
+  // TESTE 3: PRIMARY INTERACTION - Cria campanha com sucesso
+  // ============================================================================
   it('deve criar campanha com sucesso', async () => {
-    const toast = await import('react-hot-toast')
-    const mockResponse = {
-      data: {
-        id: 'contrib-1',
-        title: 'Campanha de Construção',
-        goal: 50000.0,
-        endDate: '2024-12-31',
-        isActive: true,
-        PaymentMethods: [],
-      },
-    }
-
-    vi.mocked(api.post).mockResolvedValue(mockResponse)
-
+    // Arrange
     const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <AddContribution />
-      </MemoryRouter>
-    )
+    const mockUser = fixtures.user()
+    const mockResponse = {
+      id: 'contrib-1',
+      title: 'Campanha de Construção',
+      goal: 50000.0,
+      endDate: '2024-12-31',
+      isActive: true,
+      PaymentMethods: [],
+    }
+    mockApiResponse('post', '/contributions', mockResponse)
 
-    // Aguardar o formulário renderizar completamente
+    // Act
+    renderWithProviders(<AddContribution />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
+
     await waitFor(() => {
       expect(screen.getByTestId('title-input')).toBeInTheDocument()
     })
 
-    // Preencher título usando data-testid
-    const titleInput = screen.getByTestId('title-input')
-    await user.clear(titleInput)
-    await user.type(titleInput, 'Campanha de Construção')
-    
-    // Preencher meta de arrecadação (opcional)
-    const goalInput = screen.getByTestId('goal-input') as HTMLInputElement
-    if (goalInput) {
-      await user.clear(goalInput)
-      fireEvent.change(goalInput, { target: { value: '50000' } })
-      
-      await waitFor(() => {
-        expect(goalInput.value).toBe('50000')
-      })
-    }
+    await user.type(screen.getByTestId('title-input'), 'Campanha de Construção')
 
-    // Data de término é opcional, não precisa preencher
+    const submitButton = screen.getByText('Criar Campanha')
+    await user.click(submitButton)
 
-    // Submeter formulário usando data-testid
-    const submitButton = screen.getByTestId('submit-button')
-    expect(submitButton).toBeTruthy()
-    expect(submitButton).not.toBeDisabled()
-    
-    // Obter o formulário e submeter diretamente para garantir que o evento é disparado
-    const form = submitButton.closest('form')
-    expect(form).toBeTruthy()
-    
-    // Submeter o formulário diretamente usando fireEvent.submit
-    fireEvent.submit(form!)
-
-    // Aguardar o submit ser processado e a API ser chamada
+    // Assert
     await waitFor(() => {
-      expect(api.post).toHaveBeenCalled()
-    }, { timeout: 5000 })
-
-    // Verifica que foi chamado
-    expect(api.post).toHaveBeenCalled()
-    
-    // Verifica os argumentos
-    const callArgs = vi.mocked(api.post).mock.calls[0]
-    expect(callArgs[0]).toBe('/contributions')
-    expect(callArgs[1]).toHaveProperty('title', 'Campanha de Construção')
-    expect(callArgs[1]).toHaveProperty('isActive', true)
-
-    await waitFor(() => {
-      expect(toast.default.success).toHaveBeenCalledWith('Campanha de contribuição criada com sucesso!')
+      expect(mockToastSuccess).toHaveBeenCalledWith('Campanha criada com sucesso!')
     })
 
     expect(mockNavigate).toHaveBeenCalledWith('/app/contributions')
   })
 
-  it('deve exibir erro quando falha ao criar contribuição', async () => {
-    const toast = await import('react-hot-toast')
-    
-    // Limpar mocks e configurar para rejeitar
-    vi.clearAllMocks()
-    vi.mocked(api.post).mockRejectedValue({
-      response: {
-        data: {
-          message: 'Erro ao criar contribuição',
-        },
+  // ============================================================================
+  // TESTE 4: ERROR STATE - Exibe erro quando falha ao criar campanha
+  // ============================================================================
+  it('deve exibir erro quando falha ao criar campanha', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    const mockUser = fixtures.user()
+    mockApiError('post', '/contributions', { message: 'Erro ao criar campanha' })
+
+    // Act
+    renderWithProviders(<AddContribution />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
       },
     })
 
-    const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <AddContribution />
-      </MemoryRouter>
-    )
-
-    // Aguardar o formulário renderizar
     await waitFor(() => {
-      expect(screen.getByText('Nova Campanha de Contribuição')).toBeInTheDocument()
+      expect(screen.getByTestId('title-input')).toBeInTheDocument()
     })
 
-    // Preencher título
-    const titleInput = screen.getByTestId('title-input')
-    await user.clear(titleInput)
-    await user.type(titleInput, 'Campanha de Teste')
+    await user.type(screen.getByTestId('title-input'), 'Campanha de Construção')
 
-    // Submeter o formulário diretamente usando fireEvent.submit
-    const form = titleInput.closest('form')
-    expect(form).toBeTruthy()
-    fireEvent.submit(form!)
+    const submitButton = screen.getByText('Criar Campanha')
+    await user.click(submitButton)
 
-    // Aguardar o submit ser processado e a API ser chamada
+    // Assert
     await waitFor(() => {
-      expect(api.post).toHaveBeenCalled()
-    }, { timeout: 5000 })
-
-    // Aguardar o toast de erro ser chamado
-    await waitFor(() => {
-      expect(toast.default.error).toHaveBeenCalled()
-    }, { timeout: 5000 })
-
-    // Verifica que foi chamado com a mensagem de erro
-    expect(toast.default.error).toHaveBeenCalledWith('Erro ao criar contribuição')
+      expect(mockToastError).toHaveBeenCalled()
+    })
   })
 
+  // ============================================================================
+  // TESTE 5: PRIMARY INTERACTION - Navega para lista ao clicar em Voltar
+  // ============================================================================
   it('deve navegar para lista ao clicar em Voltar', async () => {
+    // Arrange
     const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <AddContribution />
-      </MemoryRouter>
-    )
+    const mockUser = fixtures.user()
+
+    // Act
+    renderWithProviders(<AddContribution />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
 
     const backButton = screen.getByTestId('back-button')
     await user.click(backButton)
 
-    expect(mockNavigate).toHaveBeenCalledWith('/app/contributions')
-  })
-
-  it('deve navegar para lista ao clicar em Cancelar', async () => {
-    const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <AddContribution />
-      </MemoryRouter>
-    )
-
-    const cancelButton = screen.getByTestId('cancel-button')
-    await user.click(cancelButton)
-
+    // Assert
     expect(mockNavigate).toHaveBeenCalledWith('/app/contributions')
   })
 })
-

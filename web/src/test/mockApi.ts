@@ -30,6 +30,39 @@ import { vi } from 'vitest'
  * @param response - Response data
  * @param options - Additional options
  */
+// Armazenar mocks por método para acumular múltiplos mocks
+const mockRegistry: Record<string, Map<string, { response: any; options?: any }>> = {
+  get: new Map(),
+  post: new Map(),
+  put: new Map(),
+  delete: new Map(),
+}
+
+// Função helper para criar implementação que consulta o registry
+function createMockImplementation(method: 'get' | 'post' | 'put' | 'delete') {
+  return (requestUrl: string, ...args: any[]) => {
+    // Extrair apenas o path da URL (sem baseURL e query params)
+    const urlPath = requestUrl.split('?')[0].replace(/^https?:\/\/[^\/]+/, '').replace(/^\/+/, '/')
+    
+    // Verificar todos os mocks registrados para este método
+    for (const [mockUrl, mockConfig] of mockRegistry[method].entries()) {
+      const mockPath = mockUrl.split('?')[0].replace(/^\/+/, '/')
+      // Verificar match exato ou se a URL contém o path do mock
+      if (urlPath === mockPath || urlPath.includes(mockPath) || requestUrl.includes(mockUrl)) {
+        return Promise.resolve({
+          data: mockConfig.response,
+          status: mockConfig.options?.status || 200,
+          statusText: 'OK',
+          headers: mockConfig.options?.headers || {},
+          config: {},
+        })
+      }
+    }
+    // If URL doesn't match, return original mock behavior
+    return Promise.resolve({ data: null })
+  }
+}
+
 export function mockApiResponse(
   method: 'get' | 'post' | 'put' | 'delete',
   url: string | null,
@@ -42,20 +75,11 @@ export function mockApiResponse(
   const mockFn = api[method] as any
 
   if (url) {
-    // Mock with URL matching
-    mockFn.mockImplementation((requestUrl: string, ...args: any[]) => {
-      if (requestUrl === url || requestUrl.includes(url)) {
-        return Promise.resolve({
-          data: response,
-          status: options?.status || 200,
-          statusText: 'OK',
-          headers: options?.headers || {},
-          config: {},
-        })
-      }
-      // If URL doesn't match, return original mock behavior
-      return Promise.resolve({ data: null })
-    })
+    // Registrar mock no registry
+    mockRegistry[method].set(url, { response, options })
+    
+    // Reaplicar implementação que consulta o registry atualizado
+    mockFn.mockImplementation(createMockImplementation(method))
   } else {
     // Mock all requests for this method
     mockFn.mockResolvedValue({
@@ -118,11 +142,17 @@ export function resetApiMocks() {
   ;(api.put as any).mockReset()
   ;(api.delete as any).mockReset()
 
-  // Set default mock behavior (resolve with empty data)
-  ;(api.get as any).mockResolvedValue({ data: null })
-  ;(api.post as any).mockResolvedValue({ data: null })
-  ;(api.put as any).mockResolvedValue({ data: null })
-  ;(api.delete as any).mockResolvedValue({ data: null })
+  // Limpar registry de mocks
+  mockRegistry.get.clear()
+  mockRegistry.post.clear()
+  mockRegistry.put.clear()
+  mockRegistry.delete.clear()
+
+  // Configurar mock padrão que consulta o registry (permite que mocks customizados sejam adicionados depois)
+  ;(api.get as any).mockImplementation(createMockImplementation('get'))
+  ;(api.post as any).mockImplementation(createMockImplementation('post'))
+  ;(api.put as any).mockImplementation(createMockImplementation('put'))
+  ;(api.delete as any).mockImplementation(createMockImplementation('delete'))
 }
 
 /**

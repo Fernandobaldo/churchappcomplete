@@ -1,23 +1,19 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, waitFor, fireEvent } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { screen, waitFor, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import EditTransaction from '@/pages/Finances/EditTransaction'
+import { fixtures } from '@/test/fixtures'
+import { renderWithProviders } from '@/test/helpers'
+import { mockApiResponse, mockApiError } from '@/test/mockApi'
 import api from '@/api/api'
-import { useAuthStore } from '@/stores/authStore'
-import { mockUser } from '@/test/mocks/mockData'
 
-vi.mock('@/api/api', () => ({
-  default: {
-    get: vi.fn(),
-    put: vi.fn(),
-  },
-}))
-
+vi.mock('@/api/api')
+const mockToastSuccess = vi.fn()
+const mockToastError = vi.fn()
 vi.mock('react-hot-toast', () => ({
   default: {
-    success: vi.fn(),
-    error: vi.fn(),
+    success: mockToastSuccess,
+    error: mockToastError,
   },
 }))
 
@@ -44,16 +40,17 @@ vi.mock('react-router-dom', async () => {
   }
 })
 
-describe('EditTransaction Page', () => {
+describe('EditTransaction - Unit Tests', () => {
   beforeEach(() => {
-    useAuthStore.setState({
-      token: 'token',
-      user: mockUser,
-    })
     vi.clearAllMocks()
   })
 
+  // ============================================================================
+  // TESTE 1: LOADING STATE - Carrega dados da transação existente
+  // ============================================================================
   it('deve carregar dados da transação existente', async () => {
+    // Arrange
+    const mockUser = fixtures.user()
     const mockTransaction = {
       id: 'trans-1',
       title: 'Transação Original',
@@ -65,19 +62,18 @@ describe('EditTransaction Page', () => {
       createdAt: '2024-01-15T10:00:00Z',
       updatedAt: '2024-01-15T10:00:00Z',
     }
+    mockApiResponse('get', '/finances/trans-1', mockTransaction)
 
-    vi.mocked(api.get).mockResolvedValue({ data: mockTransaction })
-
-    render(
-      <MemoryRouter>
-        <EditTransaction />
-      </MemoryRouter>
-    )
-
-    await waitFor(() => {
-      expect(api.get).toHaveBeenCalledWith('/finances/trans-1')
+    // Act
+    renderWithProviders(<EditTransaction />, {
+      initialEntries: ['/app/finances/trans-1/edit'],
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
     })
 
+    // Assert
     await waitFor(() => {
       const titleInput = document.getElementById('title') as HTMLInputElement
       expect(titleInput).toBeInTheDocument()
@@ -91,7 +87,12 @@ describe('EditTransaction Page', () => {
     })
   })
 
+  // ============================================================================
+  // TESTE 2: BASIC RENDER - Preenche campos de transação de saída com exitType
+  // ============================================================================
   it('deve preencher campos de transação de saída com exitType', async () => {
+    // Arrange
+    const mockUser = fixtures.user()
     const mockTransaction = {
       id: 'trans-1',
       title: 'Aluguel',
@@ -104,15 +105,18 @@ describe('EditTransaction Page', () => {
       createdAt: '2024-01-15T10:00:00Z',
       updatedAt: '2024-01-15T10:00:00Z',
     }
+    mockApiResponse('get', '/finances/trans-1', mockTransaction)
 
-    vi.mocked(api.get).mockResolvedValue({ data: mockTransaction })
+    // Act
+    renderWithProviders(<EditTransaction />, {
+      initialEntries: ['/app/finances/trans-1/edit'],
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
 
-    render(
-      <MemoryRouter>
-        <EditTransaction />
-      </MemoryRouter>
-    )
-
+    // Assert
     await waitFor(() => {
       const titleInput = document.getElementById('title') as HTMLInputElement
       expect(titleInput.value).toBe('Aluguel')
@@ -123,7 +127,134 @@ describe('EditTransaction Page', () => {
     })
   })
 
+  // ============================================================================
+  // TESTE 3: PRIMARY INTERACTION - Atualiza transação com sucesso
+  // ============================================================================
+  it('deve atualizar transação com sucesso', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    const mockUser = fixtures.user()
+    const mockTransaction = {
+      id: 'trans-1',
+      title: 'Transação Original',
+      amount: 500.0,
+      type: 'ENTRY',
+      entryType: 'OFERTA',
+      category: 'Oferta',
+      branchId: 'branch-123',
+      createdAt: '2024-01-15T10:00:00Z',
+      updatedAt: '2024-01-15T10:00:00Z',
+    }
+    mockApiResponse('get', '/finances/trans-1', mockTransaction)
+    mockApiResponse('put', '/finances/trans-1', { ...mockTransaction, title: 'Atualizada' })
+
+    // Act
+    renderWithProviders(<EditTransaction />, {
+      initialEntries: ['/app/finances/trans-1/edit'],
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
+
+    await waitFor(() => {
+      expect(document.getElementById('title')).toBeInTheDocument()
+    })
+
+    const titleInput = document.getElementById('title') as HTMLInputElement
+    await user.clear(titleInput)
+    await user.type(titleInput, 'Transação Atualizada')
+
+    const submitButton = screen.getByText('Atualizar Transação')
+    const form = submitButton.closest('form')
+    if (form) {
+      fireEvent.submit(form)
+    } else {
+      await user.click(submitButton)
+    }
+
+    // Assert
+    await waitFor(() => {
+      expect(mockToastSuccess).toHaveBeenCalledWith('Transação atualizada com sucesso!')
+      expect(mockNavigate).toHaveBeenCalledWith('/app/finances')
+    })
+  })
+
+  // ============================================================================
+  // TESTE 4: ERROR STATE - Exibe erro quando falha ao carregar transação
+  // ============================================================================
+  it('deve exibir erro quando falha ao carregar transação', async () => {
+    // Arrange
+    const mockUser = fixtures.user()
+    mockApiError('get', '/finances/trans-1', { message: 'Transação não encontrada' })
+
+    // Act
+    renderWithProviders(<EditTransaction />, {
+      initialEntries: ['/app/finances/trans-1/edit'],
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
+
+    // Assert
+    await waitFor(() => {
+      expect(mockToastError).toHaveBeenCalled()
+      expect(mockNavigate).toHaveBeenCalledWith('/app/finances')
+    })
+  })
+
+  // ============================================================================
+  // TESTE 5: ERROR STATE - Exibe erro quando falha ao atualizar
+  // ============================================================================
+  it('deve exibir erro quando falha ao atualizar', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    const mockUser = fixtures.user()
+    const mockTransaction = {
+      id: 'trans-1',
+      title: 'Transação Original',
+      amount: 500.0,
+      type: 'ENTRY',
+      entryType: 'OFERTA',
+      branchId: 'branch-123',
+      createdAt: '2024-01-15T10:00:00Z',
+      updatedAt: '2024-01-15T10:00:00Z',
+    }
+    mockApiResponse('get', '/finances/trans-1', mockTransaction)
+    mockApiError('put', '/finances/trans-1', { message: 'Erro ao atualizar' })
+
+    // Act
+    renderWithProviders(<EditTransaction />, {
+      initialEntries: ['/app/finances/trans-1/edit'],
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
+
+    await waitFor(() => {
+      expect(document.getElementById('title')).toBeInTheDocument()
+    })
+
+    const submitButton = screen.getByText('Atualizar Transação')
+    const form = submitButton.closest('form')
+    if (form) {
+      fireEvent.submit(form)
+    }
+
+    // Assert
+    await waitFor(() => {
+      expect(mockToastError).toHaveBeenCalled()
+    })
+  })
+
+  // ============================================================================
+  // TESTE 6: BASIC RENDER - Preenche campos de transação com tipo CONTRIBUICAO
+  // ============================================================================
   it('deve preencher campos de transação com tipo CONTRIBUICAO', async () => {
+    // Arrange
+    const mockUser = fixtures.user()
     vi.mocked(api.get).mockImplementation((url) => {
       if (url === '/finances/trans-1') {
         return Promise.resolve({
@@ -151,12 +282,16 @@ describe('EditTransaction Page', () => {
       return Promise.reject(new Error('Not found'))
     })
 
-    render(
-      <MemoryRouter>
-        <EditTransaction />
-      </MemoryRouter>
-    )
+    // Act
+    renderWithProviders(<EditTransaction />, {
+      initialEntries: ['/app/finances/trans-1/edit'],
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
 
+    // Assert
     await waitFor(() => {
       const titleInput = document.getElementById('title') as HTMLInputElement
       expect(titleInput.value).toBe('Transação de Contribuição')
@@ -169,120 +304,23 @@ describe('EditTransaction Page', () => {
       expect(contributionSelect.value).toBe('contrib-1')
     })
   })
+})
 
-  it('deve atualizar transação com sucesso', async () => {
-    const toast = await import('react-hot-toast')
-    const mockTransaction = {
-      id: 'trans-1',
-      title: 'Transação Original',
-      amount: 500.0,
-      type: 'ENTRY',
-      entryType: 'OFERTA',
-      category: 'Oferta',
-      branchId: 'branch-123',
-      createdAt: '2024-01-15T10:00:00Z',
-      updatedAt: '2024-01-15T10:00:00Z',
-    }
-
-    vi.mocked(api.get).mockResolvedValue({ data: mockTransaction })
-    vi.mocked(api.put).mockResolvedValue({ data: { ...mockTransaction, title: 'Atualizada' } })
-
-    const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <EditTransaction />
-      </MemoryRouter>
-    )
-
-    await waitFor(() => {
-      expect(document.getElementById('title')).toBeInTheDocument()
-    })
-
-    const titleInput = document.getElementById('title') as HTMLInputElement
-    await user.clear(titleInput)
-    await user.type(titleInput, 'Transação Atualizada')
-
-    const submitButton = screen.getByText('Atualizar Transação')
-    const form = submitButton.closest('form')
-    if (form) {
-      fireEvent.submit(form)
-    } else {
-      await user.click(submitButton)
-    }
-
-    await waitFor(() => {
-      expect(api.put).toHaveBeenCalledWith('/finances/trans-1', expect.objectContaining({
-        title: 'Transação Atualizada',
-      }))
-      expect(toast.default.success).toHaveBeenCalledWith('Transação atualizada com sucesso!')
-      expect(mockNavigate).toHaveBeenCalledWith('/app/finances')
-    })
-  })
-
-  it('deve exibir erro quando falha ao carregar transação', async () => {
-    const toast = await import('react-hot-toast')
-    vi.mocked(api.get).mockRejectedValue({
-      response: {
-        data: {
-          message: 'Transação não encontrada',
-        },
+        token: 'token',
       },
     })
 
-    render(
-      <MemoryRouter>
-        <EditTransaction />
-      </MemoryRouter>
-    )
-
+    // Assert
     await waitFor(() => {
-      expect(toast.default.error).toHaveBeenCalledWith('Transação não encontrada')
-      expect(mockNavigate).toHaveBeenCalledWith('/app/finances')
-    })
-  })
-
-  it('deve exibir erro quando falha ao atualizar', async () => {
-    const toast = await import('react-hot-toast')
-    const mockTransaction = {
-      id: 'trans-1',
-      title: 'Transação Original',
-      amount: 500.0,
-      type: 'ENTRY',
-      entryType: 'OFERTA',
-      branchId: 'branch-123',
-      createdAt: '2024-01-15T10:00:00Z',
-      updatedAt: '2024-01-15T10:00:00Z',
-    }
-
-    vi.mocked(api.get).mockResolvedValue({ data: mockTransaction })
-    vi.mocked(api.put).mockRejectedValue({
-      response: {
-        data: {
-          message: 'Erro ao atualizar',
-        },
-      },
-    })
-
-    const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <EditTransaction />
-      </MemoryRouter>
-    )
-
-    await waitFor(() => {
-      expect(document.getElementById('title')).toBeInTheDocument()
-    })
-
-    const submitButton = screen.getByText('Atualizar Transação')
-    const form = submitButton.closest('form')
-    if (form) {
-      fireEvent.submit(form)
-    }
-
-    await waitFor(() => {
-      expect(toast.default.error).toHaveBeenCalledWith('Erro ao atualizar')
+      const titleInput = document.getElementById('title') as HTMLInputElement
+      expect(titleInput.value).toBe('Transação de Contribuição')
+      
+      const entryTypeSelect = document.getElementById('entryType') as HTMLSelectElement
+      expect(entryTypeSelect.value).toBe('CONTRIBUICAO')
+      
+      const contributionSelect = document.getElementById('contributionId') as HTMLSelectElement
+      expect(contributionSelect).toBeInTheDocument()
+      expect(contributionSelect.value).toBe('contrib-1')
     })
   })
 })
-

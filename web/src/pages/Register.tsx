@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import toast from 'react-hot-toast'
 import api from '../api/api'
@@ -42,11 +41,9 @@ interface RegisterForm {
   password: string
   phone: string
   document: string
-  churchName: string
 }
 
 export default function Register() {
-  const navigate = useNavigate()
   const { setUserFromToken } = useAuthStore()
   const [loading, setLoading] = useState(false)
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
@@ -129,13 +126,15 @@ export default function Register() {
             })
             avatarUrl = uploadResponse.data.url
             
-            // Atualiza o perfil com o avatar
+            // Atualiza o perfil com o avatar (se Member existir)
             try {
               const profileResponse = await api.get('/members/me')
               const memberId = profileResponse.data.id
               await api.put(`/members/${memberId}`, { avatarUrl })
             } catch (error) {
-              console.error('Erro ao atualizar avatar:', error)
+              // Member ainda não existe (normal após registro público)
+              // O avatar será atualizado após completar onboarding
+              console.log('Member ainda não existe, avatar será atualizado após onboarding')
             }
           } catch (uploadError: any) {
             console.error('Erro ao fazer upload do avatar:', uploadError)
@@ -143,24 +142,13 @@ export default function Register() {
           }
         }
         
-        // Tenta criar a igreja com filial
-        try {
-          await api.post('/churches', {
-            name: data.churchName,
-            withBranch: true,
-            branchName: 'Sede',
-          })
-          toast.success('Conta e igreja criadas com sucesso!')
-        } catch (churchError: any) {
-          // Se não conseguir criar a igreja, continua mesmo assim
-          console.warn('Não foi possível criar a igreja automaticamente:', churchError)
-          toast.success('Conta criada! Complete a configuração da igreja no próximo passo.')
-        }
+        toast.success('Conta criada com sucesso!')
         
-        navigate('/onboarding/start')
+        // O PublicRoute/OnboardingRoute vai redirecionar automaticamente para /onboarding/start
+        // quando detectar que não tem Member completo
         return
       } catch (firstError: any) {
-        // Se falhar, tenta o endpoint /public/register e depois cria a igreja
+        // Se falhar, tenta o endpoint /public/register
         if (firstError.response?.status === 400 || firstError.response?.status === 404 || firstError.response?.status === 401) {
           console.log('Endpoint /register não disponível, usando alternativa...')
           
@@ -180,7 +168,7 @@ export default function Register() {
             throw new Error('Token não recebido do servidor')
           }
           
-          // Salva o token temporariamente
+          // Salva o token
           setUserFromToken(token)
           
           // Upload do avatar se houver (após ter token)
@@ -195,13 +183,15 @@ export default function Register() {
               })
               avatarUrl = uploadResponse.data.url
               
-              // Atualiza o perfil com o avatar
+              // Atualiza o perfil com o avatar (se Member existir)
               try {
                 const profileResponse = await api.get('/members/me')
                 const memberId = profileResponse.data.id
                 await api.put(`/members/${memberId}`, { avatarUrl })
               } catch (error) {
-                console.error('Erro ao atualizar avatar:', error)
+                // Member ainda não existe (normal após registro público)
+                // O avatar será atualizado após completar onboarding
+                console.log('Member ainda não existe, avatar será atualizado após onboarding')
               }
             } catch (uploadError: any) {
               console.error('Erro ao fazer upload do avatar:', uploadError)
@@ -209,21 +199,10 @@ export default function Register() {
             }
           }
           
-          // Tenta criar a igreja com filial
-          try {
-            await api.post('/churches', {
-              name: data.churchName,
-              withBranch: true,
-              branchName: 'Sede',
-            })
-            toast.success('Conta e igreja criadas com sucesso!')
-          } catch (churchError: any) {
-            // Se não conseguir criar a igreja, continua mesmo assim
-            console.warn('Não foi possível criar a igreja automaticamente:', churchError)
-            toast.success('Conta criada! Complete a configuração da igreja no próximo passo.')
-          }
+          toast.success('Conta criada com sucesso!')
           
-          navigate('/onboarding/start')
+          // O PublicRoute/OnboardingRoute vai redirecionar automaticamente para /onboarding/start
+          // quando detectar que não tem Member completo
           return
         }
         throw firstError
@@ -416,25 +395,6 @@ export default function Register() {
                 </label>
               )}
               <p className="mt-1 text-xs text-gray-500">Máximo 5MB</p>
-            </div>
-
-            <div>
-              <label htmlFor="churchName" className="block text-sm font-medium text-gray-700 mb-1">
-                Nome da igreja
-              </label>
-              <input
-                id="churchName"
-                type="text"
-                {...register('churchName', {
-                  required: 'Nome da igreja é obrigatório',
-                  minLength: { value: 2, message: 'Nome da igreja deve ter pelo menos 2 caracteres' },
-                })}
-                className="input"
-                placeholder="Igreja Exemplo"
-              />
-              {errors.churchName && (
-                <p className="mt-1 text-sm text-red-600">{errors.churchName.message}</p>
-              )}
             </div>
 
             <button

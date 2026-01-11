@@ -13,6 +13,7 @@ export type User = {
   memberId?: string
   permissions: Permission[]
   token: string
+  onboardingCompleted?: boolean
 }
 
 type DecodedToken = {
@@ -27,6 +28,7 @@ type DecodedToken = {
   iat: number
   exp: number
   type?: 'user' | 'member'
+  onboardingCompleted?: boolean
 }
 
 type AuthStore = {
@@ -63,6 +65,7 @@ export const useAuthStore = create<AuthStore>()(
               memberId: decoded.memberId || undefined,
               permissions: permissionsArray,
               token,
+              onboardingCompleted: decoded.onboardingCompleted ?? false,
             },
             token,
           })

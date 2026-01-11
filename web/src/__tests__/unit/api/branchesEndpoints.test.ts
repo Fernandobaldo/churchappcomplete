@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import api from '@/api/api'
 import { useAuthStore } from '@/stores/authStore'
 
-// Mock do módulo api
 vi.mock('@/api/api', () => {
   const mockApi = {
     get: vi.fn(),
@@ -30,7 +29,11 @@ describe('Branches Endpoints - Unit Tests', () => {
   })
 
   describe('GET /branches', () => {
+    // ============================================================================
+    // TESTE 1: SUCCESS - Busca todas as filiais com sucesso
+    // ============================================================================
     it('deve buscar todas as filiais com sucesso', async () => {
+      // Arrange
       const mockResponse = {
         data: [
           {
@@ -47,11 +50,12 @@ describe('Branches Endpoints - Unit Tests', () => {
           },
         ],
       }
-
       vi.mocked(api.get).mockResolvedValue(mockResponse)
 
+      // Act
       const response = await api.get('/branches')
 
+      // Assert
       expect(api.get).toHaveBeenCalledWith('/branches')
       expect(response.data).toBeInstanceOf(Array)
       expect(response.data.length).toBe(2)
@@ -59,21 +63,30 @@ describe('Branches Endpoints - Unit Tests', () => {
       expect(response.data[0]).toHaveProperty('name')
     })
 
+    // ============================================================================
+    // TESTE 2: EMPTY STATE - Retorna array vazio quando não há filiais
+    // ============================================================================
     it('deve retornar array vazio quando não há filiais', async () => {
+      // Arrange
       const mockResponse = {
         data: [],
       }
-
       vi.mocked(api.get).mockResolvedValue(mockResponse)
 
+      // Act
       const response = await api.get('/branches')
 
+      // Assert
       expect(response.data).toEqual([])
     })
   })
 
   describe('POST /branches', () => {
+    // ============================================================================
+    // TESTE 3: SUCCESS - Cria filial com sucesso
+    // ============================================================================
     it('deve criar filial com sucesso', async () => {
+      // Arrange
       const mockResponse = {
         data: {
           id: 'branch-1',
@@ -82,14 +95,15 @@ describe('Branches Endpoints - Unit Tests', () => {
           isMainBranch: false,
         },
       }
-
       vi.mocked(api.post).mockResolvedValue(mockResponse)
 
+      // Act
       const response = await api.post('/branches', {
         name: 'Filial Centro',
         churchId: 'church-1',
       })
 
+      // Assert
       expect(api.post).toHaveBeenCalledWith('/branches', {
         name: 'Filial Centro',
         churchId: 'church-1',
@@ -98,7 +112,11 @@ describe('Branches Endpoints - Unit Tests', () => {
       expect(response.data.name).toBe('Filial Centro')
     })
 
+    // ============================================================================
+    // TESTE 4: VALIDATION FAILURE - Retorna erro 400 quando churchId não existe
+    // ============================================================================
     it('deve retornar erro 400 quando churchId não existe', async () => {
+      // Arrange
       const mockError = {
         response: {
           status: 400,
@@ -107,9 +125,9 @@ describe('Branches Endpoints - Unit Tests', () => {
           },
         },
       }
-
       vi.mocked(api.post).mockRejectedValue(mockError)
 
+      // Act & Assert
       await expect(
         api.post('/branches', {
           name: 'Filial Teste',
@@ -123,7 +141,11 @@ describe('Branches Endpoints - Unit Tests', () => {
       })
     })
 
+    // ============================================================================
+    // TESTE 5: FORBIDDEN - Retorna erro 403 quando limite de filiais é excedido
+    // ============================================================================
     it('deve retornar erro 403 quando limite de filiais é excedido', async () => {
+      // Arrange
       const mockError = {
         response: {
           status: 403,
@@ -132,9 +154,9 @@ describe('Branches Endpoints - Unit Tests', () => {
           },
         },
       }
-
       vi.mocked(api.post).mockRejectedValue(mockError)
 
+      // Act & Assert
       await expect(
         api.post('/branches', {
           name: 'Filial Teste',
@@ -150,3 +172,23 @@ describe('Branches Endpoints - Unit Tests', () => {
   })
 })
 
+          },
+        },
+      }
+      vi.mocked(api.post).mockRejectedValue(mockError)
+
+      // Act & Assert
+      await expect(
+        api.post('/branches', {
+          name: 'Filial Teste',
+          churchId: 'church-1',
+        })
+      ).rejects.toMatchObject({
+        response: {
+          status: 403,
+          data: { error: 'Limite do plano atingido' },
+        },
+      })
+    })
+  })
+})

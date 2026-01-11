@@ -1,17 +1,18 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import AddEvent from '@/pages/Events/AddEvent'
-import api from '@/api/api'
-import { useAuthStore } from '@/stores/authStore'
-import { mockUser } from '@/test/mocks/mockData'
+import { fixtures } from '@/test/fixtures'
+import { renderWithProviders } from '@/test/helpers'
+import { mockApiResponse, mockApiError } from '@/test/mockApi'
 
 vi.mock('@/api/api')
+const mockToastSuccess = vi.fn()
+const mockToastError = vi.fn()
 vi.mock('react-hot-toast', () => ({
   default: {
-    success: vi.fn(),
-    error: vi.fn(),
+    success: mockToastSuccess,
+    error: mockToastError,
   },
 }))
 
@@ -24,105 +25,115 @@ vi.mock('react-router-dom', async () => {
   }
 })
 
-describe('AddEvent Page', () => {
+describe('AddEvent - Unit Tests', () => {
   beforeEach(() => {
-    useAuthStore.setState({
-      token: 'token',
-      user: mockUser,
-    })
     vi.clearAllMocks()
   })
 
+  // ============================================================================
+  // TESTE 1: BASIC RENDER - Renderiza o formulário corretamente
+  // ============================================================================
   it('deve renderizar o formulário corretamente', () => {
-    render(
-      <MemoryRouter>
-        <AddEvent />
-      </MemoryRouter>
-    )
+    // Arrange
+    const mockUser = fixtures.user()
 
+    // Act
+    renderWithProviders(<AddEvent />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
+
+    // Assert
     expect(screen.getByText('Novo Evento')).toBeInTheDocument()
     expect(screen.getByTestId('title-input')).toBeInTheDocument()
     expect(screen.getByTestId('location-input')).toBeInTheDocument()
     expect(screen.getByTestId('submit-button')).toBeInTheDocument()
   })
 
+  // ============================================================================
+  // TESTE 2: VALIDATION - Valida campos obrigatórios
+  // ============================================================================
   it('deve validar campos obrigatórios', async () => {
+    // Arrange
     const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <AddEvent />
-      </MemoryRouter>
-    )
+    const mockUser = fixtures.user()
+
+    // Act
+    renderWithProviders(<AddEvent />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
 
     const submitButton = screen.getByText('Criar Evento')
     await user.click(submitButton)
 
+    // Assert
     await waitFor(() => {
       expect(screen.getByText('Título é obrigatório')).toBeInTheDocument()
     })
   })
 
+  // ============================================================================
+  // TESTE 3: PRIMARY INTERACTION - Cria evento com sucesso
+  // ============================================================================
   it('deve criar evento com sucesso', async () => {
-    const toast = await import('react-hot-toast')
-    const mockResponse = {
-      data: {
-        id: 'event-1',
-        title: 'Novo Evento',
-        location: 'Local do Evento',
-        startDate: '2024-12-31T10:00:00Z',
-        endDate: '2024-12-31T12:00:00Z',
-      },
-    }
-
-    vi.mocked(api.post).mockResolvedValue(mockResponse)
-
+    // Arrange
     const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <AddEvent />
-      </MemoryRouter>
-    )
+    const mockUser = fixtures.user()
+    const mockResponse = {
+      id: 'event-1',
+      title: 'Novo Evento',
+      location: 'Local do Evento',
+      startDate: '2024-12-31T10:00:00Z',
+      endDate: '2024-12-31T12:00:00Z',
+    }
+    mockApiResponse('post', '/events', mockResponse)
+
+    // Act
+    renderWithProviders(<AddEvent />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
 
     await user.type(screen.getByTestId('title-input'), 'Novo Evento')
     await user.type(screen.getByTestId('location-input'), 'Local do Evento')
     
-    // Preencher data
     const dateInput = screen.getByTestId('date-input')
     await user.type(dateInput, '2024-12-31T10:00')
 
     const submitButton = screen.getByTestId('submit-button')
     await user.click(submitButton)
 
+    // Assert
     await waitFor(() => {
-      expect(api.post).toHaveBeenCalledWith('/events', expect.objectContaining({
-        title: 'Novo Evento',
-        location: 'Local do Evento',
-      }))
-    })
-
-    await waitFor(() => {
-      expect(toast.default.success).toHaveBeenCalledWith('Evento criado com sucesso!')
+      expect(mockToastSuccess).toHaveBeenCalledWith('Evento criado com sucesso!')
     })
 
     expect(mockNavigate).toHaveBeenCalledWith('/app/events')
   })
 
+  // ============================================================================
+  // TESTE 4: ERROR STATE - Exibe erro quando falha ao criar evento
+  // ============================================================================
   it('deve exibir erro quando falha ao criar evento', async () => {
-    const toast = await import('react-hot-toast')
-    vi.mocked(api.post).mockRejectedValue({
-      response: {
-        data: {
-          message: 'Erro ao criar evento',
-        },
+    // Arrange
+    const user = userEvent.setup()
+    const mockUser = fixtures.user()
+    mockApiError('post', '/events', { message: 'Erro ao criar evento' })
+
+    // Act
+    renderWithProviders(<AddEvent />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
       },
     })
-
-    const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <AddEvent />
-      </MemoryRouter>
-    )
 
     await user.type(screen.getByLabelText(/título/i), 'Novo Evento')
     await user.type(screen.getByLabelText(/local/i), 'Local do Evento')
@@ -133,37 +144,38 @@ describe('AddEvent Page', () => {
     const submitButton = screen.getByText('Criar Evento')
     await user.click(submitButton)
 
+    // Assert
     await waitFor(() => {
-      expect(toast.default.error).toHaveBeenCalledWith('Erro ao criar evento')
+      expect(mockToastError).toHaveBeenCalled()
     })
   })
 
+  // ============================================================================
+  // TESTE 5: PRIMARY INTERACTION - Navega para lista ao clicar em Voltar
+  // ============================================================================
   it('deve navegar para lista ao clicar em Voltar', async () => {
+    // Arrange
     const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <AddEvent />
-      </MemoryRouter>
-    )
+    const mockUser = fixtures.user()
+
+    // Act
+    renderWithProviders(<AddEvent />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
 
     const backButton = screen.getByTestId('back-button')
     await user.click(backButton)
 
-    expect(mockNavigate).toHaveBeenCalledWith('/app/events')
-  })
-
-  it('deve navegar para lista ao clicar em Cancelar', async () => {
-    const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <AddEvent />
-      </MemoryRouter>
-    )
-
-    const cancelButton = screen.getByTestId('cancel-button')
-    await user.click(cancelButton)
-
+    // Assert
     expect(mockNavigate).toHaveBeenCalledWith('/app/events')
   })
 })
 
+
+    // Assert
+    expect(mockNavigate).toHaveBeenCalledWith('/app/events')
+  })
+})

@@ -1,9 +1,40 @@
-import { useNavigate } from 'react-router-dom'
+import { useState } from 'react'
 import { CheckCircle } from 'lucide-react'
+import toast from 'react-hot-toast'
+import api from '../../api/api'
+import { useAuthStore } from '../../stores/authStore'
 import OnboardingHeader from '../../components/OnboardingHeader'
 
 export default function Concluido() {
-  const navigate = useNavigate()
+  const { setUserFromToken } = useAuthStore()
+  const [loading, setLoading] = useState(false)
+
+  const handleGoToDashboard = async () => {
+    setLoading(true)
+    try {
+      // Marcar onboarding como completo
+      const response = await api.post('/onboarding/complete')
+      
+      // Se o backend retornar um token atualizado, atualizar o store
+      if (response.data.token) {
+        setUserFromToken(response.data.token)
+        toast.success('Onboarding concluído!')
+        // O OnboardingRoute irá redirecionar automaticamente quando detectar onboardingCompleted === true
+      } else {
+        // Se não retornar token, apenas mostra toast
+        toast.success('Onboarding concluído!')
+      }
+    } catch (error: any) {
+      console.error('Erro ao marcar onboarding como completo:', error)
+      toast.error(
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        'Erro ao concluir onboarding. Tente novamente.'
+      )
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -30,10 +61,11 @@ export default function Concluido() {
 
           <div className="mt-8">
             <button
-              onClick={() => navigate('/app/dashboard')}
-              className="btn-primary px-8 py-3 text-lg"
+              onClick={handleGoToDashboard}
+              disabled={loading}
+              className="btn-primary px-8 py-3 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Ir para o painel
+              {loading ? 'Finalizando...' : 'Ir para o painel'}
             </button>
           </div>
         </div>

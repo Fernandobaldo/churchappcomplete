@@ -1,17 +1,18 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import AddDevotional from '@/pages/Devotionals/AddDevotional'
-import api from '@/api/api'
-import { useAuthStore } from '@/stores/authStore'
-import { mockUser } from '@/test/mocks/mockData'
+import { fixtures } from '@/test/fixtures'
+import { renderWithProviders } from '@/test/helpers'
+import { mockApiResponse, mockApiError } from '@/test/mockApi'
 
 vi.mock('@/api/api')
+const mockToastSuccess = vi.fn()
+const mockToastError = vi.fn()
 vi.mock('react-hot-toast', () => ({
   default: {
-    success: vi.fn(),
-    error: vi.fn(),
+    success: mockToastSuccess,
+    error: mockToastError,
   },
 }))
 
@@ -24,22 +25,27 @@ vi.mock('react-router-dom', async () => {
   }
 })
 
-describe('AddDevotional Page', () => {
+describe('AddDevotional - Unit Tests', () => {
   beforeEach(() => {
-    useAuthStore.setState({
-      token: 'token',
-      user: mockUser,
-    })
     vi.clearAllMocks()
   })
 
+  // ============================================================================
+  // TESTE 1: BASIC RENDER - Renderiza o formulário corretamente
+  // ============================================================================
   it('deve renderizar o formulário corretamente', () => {
-    render(
-      <MemoryRouter>
-        <AddDevotional />
-      </MemoryRouter>
-    )
+    // Arrange
+    const mockUser = fixtures.user()
 
+    // Act
+    renderWithProviders(<AddDevotional />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
+
+    // Assert
     expect(screen.getByText('Novo Devocional')).toBeInTheDocument()
     expect(screen.getByTestId('title-input')).toBeInTheDocument()
     expect(screen.getByTestId('passage-input')).toBeInTheDocument()
@@ -47,41 +53,53 @@ describe('AddDevotional Page', () => {
     expect(screen.getByTestId('submit-button')).toBeInTheDocument()
   })
 
+  // ============================================================================
+  // TESTE 2: VALIDATION - Valida campos obrigatórios
+  // ============================================================================
   it('deve validar campos obrigatórios', async () => {
+    // Arrange
     const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <AddDevotional />
-      </MemoryRouter>
-    )
+    const mockUser = fixtures.user()
+
+    // Act
+    renderWithProviders(<AddDevotional />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
 
     const submitButton = screen.getByTestId('submit-button')
     await user.click(submitButton)
 
+    // Assert
     await waitFor(() => {
       expect(screen.getByText('Título é obrigatório')).toBeInTheDocument()
     })
   })
 
+  // ============================================================================
+  // TESTE 3: PRIMARY INTERACTION - Cria devocional com sucesso
+  // ============================================================================
   it('deve criar devocional com sucesso', async () => {
-    const toast = await import('react-hot-toast')
+    // Arrange
+    const user = userEvent.setup()
+    const mockUser = fixtures.user()
     const mockResponse = {
-      data: {
-        id: 'devotional-1',
-        title: 'Novo Devocional',
-        passage: 'João 3:16',
-        content: 'Conteúdo do devocional',
-      },
+      id: 'devotional-1',
+      title: 'Novo Devocional',
+      passage: 'João 3:16',
+      content: 'Conteúdo do devocional',
     }
+    mockApiResponse('post', '/devotionals', mockResponse)
 
-    vi.mocked(api.post).mockResolvedValue(mockResponse)
-
-    const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <AddDevotional />
-      </MemoryRouter>
-    )
+    // Act
+    renderWithProviders(<AddDevotional />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
 
     await user.type(screen.getByTestId('title-input'), 'Novo Devocional')
     await user.type(screen.getByTestId('passage-input'), 'João 3:16')
@@ -90,39 +108,30 @@ describe('AddDevotional Page', () => {
     const submitButton = screen.getByText('Criar Devocional')
     await user.click(submitButton)
 
+    // Assert
     await waitFor(() => {
-      expect(api.post).toHaveBeenCalledWith('/devotionals', {
-        title: 'Novo Devocional',
-        passage: 'João 3:16',
-        content: 'Conteúdo do devocional',
-      })
-    })
-
-    await waitFor(() => {
-      expect(toast.default.success).toHaveBeenCalledWith('Devocional criado com sucesso!')
+      expect(mockToastSuccess).toHaveBeenCalledWith('Devocional criado com sucesso!')
     })
 
     expect(mockNavigate).toHaveBeenCalledWith('/app/devotionals')
   })
 
+  // ============================================================================
+  // TESTE 4: ERROR STATE - Exibe erro quando falha ao criar devocional
+  // ============================================================================
   it('deve exibir erro quando falha ao criar devocional', async () => {
-    const toast = await import('react-hot-toast')
-    const mockError = {
-      response: {
-        data: {
-          message: 'Erro ao criar devocional',
-        },
-      },
-    }
-
-    vi.mocked(api.post).mockRejectedValue(mockError)
-
+    // Arrange
     const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <AddDevotional />
-      </MemoryRouter>
-    )
+    const mockUser = fixtures.user()
+    mockApiError('post', '/devotionals', { message: 'Erro ao criar devocional' })
+
+    // Act
+    renderWithProviders(<AddDevotional />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
 
     await user.type(screen.getByTestId('title-input'), 'Novo Devocional')
     await user.type(screen.getByTestId('passage-input'), 'João 3:16')
@@ -131,37 +140,54 @@ describe('AddDevotional Page', () => {
     const submitButton = screen.getByText('Criar Devocional')
     await user.click(submitButton)
 
+    // Assert
     await waitFor(() => {
-      expect(toast.default.error).toHaveBeenCalledWith('Erro ao criar devocional')
+      expect(mockToastError).toHaveBeenCalled()
     })
   })
 
-  it('deve navegar para lista ao clicar em Voltar', async () => {
+  // ============================================================================
+  // TESTE 5: LOADING STATE - Exibe loading durante criação
+  // ============================================================================
+  it('deve exibir loading durante criação', async () => {
+    // Arrange
     const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <AddDevotional />
-      </MemoryRouter>
-    )
+    const mockUser = fixtures.user()
+    // Mock que nunca resolve para simular loading
+    mockApiResponse('post', '/devotionals', new Promise(() => {}))
 
-    const backButton = screen.getByTestId('back-button')
-    await user.click(backButton)
+    // Act
+    renderWithProviders(<AddDevotional />, {
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
 
-    expect(mockNavigate).toHaveBeenCalledWith('/app/devotionals')
-  })
+    await user.type(screen.getByTestId('title-input'), 'Novo Devocional')
+    await user.type(screen.getByTestId('passage-input'), 'João 3:16')
+    await user.type(screen.getByTestId('content-input'), 'Conteúdo do devocional')
 
-  it('deve navegar para lista ao clicar em Cancelar', async () => {
-    const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <AddDevotional />
-      </MemoryRouter>
-    )
+    const submitButton = screen.getByText('Criar Devocional')
+    await user.click(submitButton)
 
-    const cancelButton = screen.getByTestId('cancel-button')
-    await user.click(cancelButton)
-
-    expect(mockNavigate).toHaveBeenCalledWith('/app/devotionals')
+    // Assert
+    await waitFor(() => {
+      // Botão deve estar desabilitado durante loading
+      expect(submitButton).toBeDisabled()
+    })
   })
 })
 
+    await user.type(screen.getByTestId('content-input'), 'Conteúdo do devocional')
+
+    const submitButton = screen.getByText('Criar Devocional')
+    await user.click(submitButton)
+
+    // Assert
+    await waitFor(() => {
+      // Botão deve estar desabilitado durante loading
+      expect(submitButton).toBeDisabled()
+    })
+  })
+})

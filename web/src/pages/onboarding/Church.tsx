@@ -110,6 +110,13 @@ export default function Church() {
           socialMedia: Object.keys(socialMedia).length > 0 ? socialMedia : undefined,
         })
         toast.success('Configurações da igreja atualizadas!')
+        
+        // Marcar etapa church como completa (mesmo ao atualizar)
+        try {
+          await api.post('/onboarding/progress/church')
+        } catch (progressError) {
+          console.error('Erro ao marcar progresso:', progressError)
+        }
       } else {
         // Cria uma nova igreja
         const response = await api.post('/churches', {
@@ -142,6 +149,13 @@ export default function Church() {
         }
         
         toast.success('Igreja criada com sucesso!')
+      }
+
+      // Marcar etapa church como completa
+      try {
+        await api.post('/onboarding/progress/church')
+      } catch (progressError) {
+        console.error('Erro ao marcar progresso:', progressError)
       }
 
       // Salva dados adicionais no localStorage para uso posterior

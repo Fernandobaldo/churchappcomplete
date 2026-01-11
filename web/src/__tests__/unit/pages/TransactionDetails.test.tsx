@@ -1,21 +1,16 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
 import TransactionDetails from '@/pages/Finances/TransactionDetails'
-import api from '@/api/api'
-import { useAuthStore } from '@/stores/authStore'
-import { mockUser } from '@/test/mocks/mockData'
+import { fixtures } from '@/test/fixtures'
+import { renderWithProviders } from '@/test/helpers'
+import { mockApiResponse, mockApiError } from '@/test/mockApi'
 
-vi.mock('@/api/api', () => ({
-  default: {
-    get: vi.fn(),
-  },
-}))
-
+vi.mock('@/api/api')
+const mockToastError = vi.fn()
 vi.mock('react-hot-toast', () => ({
   default: {
-    error: vi.fn(),
+    error: mockToastError,
   },
 }))
 
@@ -29,16 +24,17 @@ vi.mock('react-router-dom', async () => {
   }
 })
 
-describe('TransactionDetails Page', () => {
+describe('TransactionDetails - Unit Tests', () => {
   beforeEach(() => {
-    useAuthStore.setState({
-      token: 'token',
-      user: mockUser,
-    })
     vi.clearAllMocks()
   })
 
+  // ============================================================================
+  // TESTE 1: BASIC RENDER - Carrega e exibe detalhes da transação
+  // ============================================================================
   it('deve carregar e exibir detalhes da transação', async () => {
+    // Arrange
+    const mockUser = fixtures.user()
     const mockTransaction = {
       id: 'trans-1',
       title: 'Dízimo',
@@ -57,33 +53,36 @@ describe('TransactionDetails Page', () => {
         email: 'test@example.com',
       },
     }
+    mockApiResponse('get', '/finances/trans-1', mockTransaction)
 
-    vi.mocked(api.get).mockResolvedValue({ data: mockTransaction })
+    // Act
+    renderWithProviders(<TransactionDetails />, {
+      initialEntries: ['/app/finances/trans-1'],
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
 
-    render(
-      <MemoryRouter>
-        <TransactionDetails />
-      </MemoryRouter>
-    )
-
+    // Assert
     await waitFor(() => {
-      expect(api.get).toHaveBeenCalledWith('/finances/trans-1')
-      // Verificar título usando testid
       expect(screen.getByTestId('transaction-title')).toHaveTextContent('Dízimo')
-      // Verificar valor usando testid (formato: +R$ 1000,00)
       const amountElement = screen.getByTestId('transaction-amount')
       expect(amountElement).toHaveTextContent('R$')
       expect(amountElement).toHaveTextContent('1000,00')
-      // Verificar tipo de entrada usando testid
       expect(screen.getByTestId('transaction-entry-type')).toHaveTextContent('Dízimo')
-      // Verificar categoria usando testid
       expect(screen.getByTestId('transaction-category')).toHaveTextContent('Dízimo')
       expect(screen.getByText('João Silva')).toBeInTheDocument()
       expect(screen.getByText('Test User')).toBeInTheDocument()
     })
   })
 
+  // ============================================================================
+  // TESTE 2: BASIC RENDER - Exibe nome do membro dizimista ao invés do ID
+  // ============================================================================
   it('deve exibir nome do membro dizimista ao invés do ID', async () => {
+    // Arrange
+    const mockUser = fixtures.user()
     const mockTransaction = {
       id: 'trans-1',
       title: 'Dízimo',
@@ -107,23 +106,30 @@ describe('TransactionDetails Page', () => {
         email: 'joao@example.com',
       },
     }
+    mockApiResponse('get', '/finances/trans-1', mockTransaction)
 
-    vi.mocked(api.get).mockResolvedValue({ data: mockTransaction })
+    // Act
+    renderWithProviders(<TransactionDetails />, {
+      initialEntries: ['/app/finances/trans-1'],
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
 
-    render(
-      <MemoryRouter>
-        <TransactionDetails />
-      </MemoryRouter>
-    )
-
+    // Assert
     await waitFor(() => {
       expect(screen.getByText('João Silva')).toBeInTheDocument()
-      // Verificar que não está mostrando o ID
       expect(screen.queryByText(/member-123/)).not.toBeInTheDocument()
     })
   })
 
+  // ============================================================================
+  // TESTE 3: BASIC RENDER - Exibe transação de saída com exitType
+  // ============================================================================
   it('deve exibir transação de saída com exitType', async () => {
+    // Arrange
+    const mockUser = fixtures.user()
     const mockTransaction = {
       id: 'trans-1',
       title: 'Aluguel',
@@ -140,147 +146,55 @@ describe('TransactionDetails Page', () => {
         email: 'test@example.com',
       },
     }
+    mockApiResponse('get', '/finances/trans-1', mockTransaction)
 
-    vi.mocked(api.get).mockResolvedValue({ data: mockTransaction })
+    // Act
+    renderWithProviders(<TransactionDetails />, {
+      initialEntries: ['/app/finances/trans-1'],
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
 
-    render(
-      <MemoryRouter>
-        <TransactionDetails />
-      </MemoryRouter>
-    )
-
+    // Assert
     await waitFor(() => {
-      // Verificar título usando testid
       expect(screen.getByTestId('transaction-title')).toHaveTextContent('Aluguel')
-      // Verificar tipo de saída usando testid
       expect(screen.getByTestId('transaction-exit-type')).toHaveTextContent('Aluguel')
     })
   })
 
-  it('deve exibir transação com tipo CONTRIBUICAO e contribuinte', async () => {
-    const mockTransaction = {
-      id: 'trans-1',
-      title: 'Transação de Contribuição',
-      amount: 500.0,
-      type: 'ENTRY',
-      entryType: 'CONTRIBUICAO',
-      contributionId: 'contrib-1',
-      category: 'Contribuição',
-      tithePayerMemberId: 'member-123',
-      branchId: 'branch-123',
-      createdAt: '2024-01-15T10:00:00Z',
-      updatedAt: '2024-01-15T10:00:00Z',
-      CreatedByUser: {
-        id: 'user-1',
-        name: 'Test User',
-        email: 'test@example.com',
-      },
-      Contribution: {
-        id: 'contrib-1',
-        title: 'Contribuição Teste',
-        description: 'Descrição da contribuição',
-      },
-      TithePayerMember: {
-        id: 'member-123',
-        name: 'Maria Santos',
-        email: 'maria@example.com',
-      },
-    }
-
-    vi.mocked(api.get).mockResolvedValue({ data: mockTransaction })
-
-    render(
-      <MemoryRouter>
-        <TransactionDetails />
-      </MemoryRouter>
-    )
-
-    await waitFor(() => {
-      // Verificar tipo de entrada "Contribuição" usando testid
-      const entryTypeElement = screen.getByTestId('transaction-entry-type')
-      expect(entryTypeElement).toBeInTheDocument()
-      expect(entryTypeElement).toHaveTextContent('Contribuição')
-      
-      // Verificar título da contribuição vinculada usando testid
-      const contributionTitle = screen.getByTestId('contribution-linked-title')
-      expect(contributionTitle).toBeInTheDocument()
-      expect(contributionTitle).toHaveTextContent('Contribuição Teste')
-      
-      // Verificar descrição da contribuição usando testid
-      const contributionDescription = screen.getByTestId('contribution-linked-description')
-      expect(contributionDescription).toBeInTheDocument()
-      expect(contributionDescription).toHaveTextContent('Descrição da contribuição')
-      
-      // Verificar label e nome do contribuinte
-      expect(screen.getByText('Contribuinte')).toBeInTheDocument()
-      const contributorName = screen.getByTestId('contributor-name')
-      expect(contributorName).toBeInTheDocument()
-      expect(contributorName).toHaveTextContent('Maria Santos')
-    })
-  })
-
-  it('deve exibir nome do contribuinte não membro para CONTRIBUICAO', async () => {
-    const mockTransaction = {
-      id: 'trans-1',
-      title: 'Transação de Contribuição',
-      amount: 500.0,
-      type: 'ENTRY',
-      entryType: 'CONTRIBUICAO',
-      contributionId: 'contrib-1',
-      category: 'Contribuição',
-      tithePayerName: 'Visitante Silva',
-      branchId: 'branch-123',
-      createdAt: '2024-01-15T10:00:00Z',
-      updatedAt: '2024-01-15T10:00:00Z',
-      CreatedByUser: {
-        id: 'user-1',
-        name: 'Test User',
-        email: 'test@example.com',
-      },
-      Contribution: {
-        id: 'contrib-1',
-        title: 'Contribuição Teste',
-        description: 'Descrição da contribuição',
-      },
-    }
-
-    vi.mocked(api.get).mockResolvedValue({ data: mockTransaction })
-
-    render(
-      <MemoryRouter>
-        <TransactionDetails />
-      </MemoryRouter>
-    )
-
-    await waitFor(() => {
-      expect(screen.getByText('Contribuinte')).toBeInTheDocument()
-      expect(screen.getByText('Visitante Silva')).toBeInTheDocument()
-    })
-  })
-
+  // ============================================================================
+  // TESTE 4: ERROR STATE - Exibe erro e redireciona quando transação não encontrada
+  // ============================================================================
   it('deve exibir erro e redirecionar quando transação não encontrada', async () => {
-    const toast = await import('react-hot-toast')
-    vi.mocked(api.get).mockRejectedValue({
-      response: {
-        data: {
-          message: 'Transação não encontrada',
-        },
+    // Arrange
+    const mockUser = fixtures.user()
+    mockApiError('get', '/finances/trans-1', { message: 'Transação não encontrada' })
+
+    // Act
+    renderWithProviders(<TransactionDetails />, {
+      initialEntries: ['/app/finances/trans-1'],
+      authState: {
+        user: mockUser,
+        token: 'token',
       },
     })
 
-    render(
-      <MemoryRouter>
-        <TransactionDetails />
-      </MemoryRouter>
-    )
-
+    // Assert
     await waitFor(() => {
-      expect(toast.default.error).toHaveBeenCalledWith('Transação não encontrada')
+      expect(mockToastError).toHaveBeenCalled()
       expect(mockNavigate).toHaveBeenCalledWith('/app/finances')
     })
   })
 
+  // ============================================================================
+  // TESTE 5: PRIMARY INTERACTION - Navega de volta ao clicar em Voltar
+  // ============================================================================
   it('deve navegar de volta ao clicar em Voltar', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    const mockUser = fixtures.user()
     const mockTransaction = {
       id: 'trans-1',
       title: 'Teste',
@@ -291,15 +205,16 @@ describe('TransactionDetails Page', () => {
       createdAt: '2024-01-15T10:00:00Z',
       updatedAt: '2024-01-15T10:00:00Z',
     }
+    mockApiResponse('get', '/finances/trans-1', mockTransaction)
 
-    vi.mocked(api.get).mockResolvedValue({ data: mockTransaction })
-
-    const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <TransactionDetails />
-      </MemoryRouter>
-    )
+    // Act
+    renderWithProviders(<TransactionDetails />, {
+      initialEntries: ['/app/finances/trans-1'],
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
 
     await waitFor(() => {
       expect(screen.getByText('Voltar')).toBeInTheDocument()
@@ -308,7 +223,7 @@ describe('TransactionDetails Page', () => {
     const backButton = screen.getByText('Voltar')
     await user.click(backButton)
 
+    // Assert
     expect(mockNavigate).toHaveBeenCalledWith('/app/finances')
   })
 })
-

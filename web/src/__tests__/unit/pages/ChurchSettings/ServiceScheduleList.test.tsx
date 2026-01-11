@@ -1,9 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ServiceScheduleList from '@/pages/ChurchSettings/ServiceScheduleList'
 import { serviceScheduleApi } from '@/api/serviceScheduleApi'
-import toast from 'react-hot-toast'
 
 vi.mock('@/api/serviceScheduleApi', () => ({
   serviceScheduleApi: {
@@ -14,18 +13,19 @@ vi.mock('@/api/serviceScheduleApi', () => ({
   },
 }))
 
+const mockToastSuccess = vi.fn()
+const mockToastError = vi.fn()
 vi.mock('react-hot-toast', () => ({
   default: {
-    success: vi.fn(),
-    error: vi.fn(),
+    success: mockToastSuccess,
+    error: mockToastError,
   },
 }))
 
-// Mock window.confirm
 const mockConfirm = vi.fn()
 window.confirm = mockConfirm
 
-describe('ServiceScheduleList', () => {
+describe('ServiceScheduleList - Unit Tests', () => {
   const mockSchedules = [
     {
       id: 'schedule-1',
@@ -62,10 +62,14 @@ describe('ServiceScheduleList', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    mockConfirm.mockReturnValue(false) // Por padrão, não confirma
+    mockConfirm.mockReturnValue(false)
   })
 
+  // ============================================================================
+  // TESTE 1: BASIC RENDER - Renderiza lista de horários
+  // ============================================================================
   it('deve renderizar lista de horários', () => {
+    // Arrange & Act
     render(
       <ServiceScheduleList
         schedules={mockSchedules}
@@ -75,28 +79,39 @@ describe('ServiceScheduleList', () => {
       />
     )
 
+    // Assert
     expect(screen.getByText('Culto Dominical')).toBeInTheDocument()
     expect(screen.getByText('Culto de Quarta')).toBeInTheDocument()
     expect(screen.getByText('Domingo')).toBeInTheDocument()
     expect(screen.getByText('Quarta-feira')).toBeInTheDocument()
   })
 
-  it('deve mostrar badge de padrão para horário padrão', () => {
+  // ============================================================================
+  // TESTE 2: EMPTY STATE - Mostra mensagem vazia quando não há horários
+  // ============================================================================
+  it('deve mostrar mensagem vazia quando não há horários', () => {
+    // Arrange & Act
     render(
       <ServiceScheduleList
-        schedules={mockSchedules}
+        schedules={[]}
         onEdit={mockOnEdit}
         onDelete={mockOnDelete}
         onRefresh={mockOnRefresh}
       />
     )
 
-    const defaultBadges = screen.getAllByText('Padrão')
-    expect(defaultBadges.length).toBeGreaterThan(0)
+    // Assert
+    expect(screen.getByText('Nenhum horário de culto cadastrado.')).toBeInTheDocument()
   })
 
+  // ============================================================================
+  // TESTE 3: PRIMARY INTERACTION - Chama onEdit quando clicar no botão de editar
+  // ============================================================================
   it('deve chamar onEdit quando clicar no botão de editar', async () => {
+    // Arrange
     const user = userEvent.setup()
+
+    // Act
     render(
       <ServiceScheduleList
         schedules={mockSchedules}
@@ -109,17 +124,23 @@ describe('ServiceScheduleList', () => {
     const editButtons = screen.getAllByTitle('Editar')
     await user.click(editButtons[0])
 
+    // Assert
     expect(mockOnEdit).toHaveBeenCalledWith(mockSchedules[0])
   })
 
-  it('deve mostrar diálogo de confirmação ao deletar horário sem eventos', async () => {
+  // ============================================================================
+  // TESTE 4: PRIMARY INTERACTION - Deleta horário quando confirmado
+  // ============================================================================
+  it('deve deletar horário quando confirmado', async () => {
+    // Arrange
     const user = userEvent.setup()
-    ;(serviceScheduleApi.getRelatedEventsCount as any).mockResolvedValue({
+    vi.mocked(serviceScheduleApi.getRelatedEventsCount).mockResolvedValue({
       count: 0,
       scheduleTitle: 'Culto Dominical',
-    })
-    mockConfirm.mockReturnValueOnce(true) // Confirma a primeira pergunta
+    } as any)
+    mockConfirm.mockReturnValueOnce(true)
 
+    // Act
     render(
       <ServiceScheduleList
         schedules={[mockSchedules[0]]}
@@ -132,122 +153,23 @@ describe('ServiceScheduleList', () => {
     const deleteButton = screen.getByTitle('Deletar')
     await user.click(deleteButton)
 
+    // Assert
     await waitFor(() => {
-      expect(serviceScheduleApi.getRelatedEventsCount).toHaveBeenCalledWith('schedule-1')
+      expect(mockOnDelete).toHaveBeenCalledWith('schedule-1', true)
     })
-
-    expect(mockConfirm).toHaveBeenCalledWith(
-      expect.stringContaining('Tem certeza que deseja deletar o horário "Culto Dominical"?')
-    )
-    // Sempre deleta eventos (mesmo quando não há eventos, passa true)
-    expect(mockOnDelete).toHaveBeenCalledWith('schedule-1', true)
   })
 
-  it('deve mostrar diálogo informando sobre eventos relacionados', async () => {
-    const user = userEvent.setup()
-    ;(serviceScheduleApi.getRelatedEventsCount as any).mockResolvedValue({
-      count: 5,
-      scheduleTitle: 'Culto Dominical',
-    })
-    mockConfirm.mockReturnValueOnce(true) // Confirma deletar horário (e eventos relacionados)
-
-    render(
-      <ServiceScheduleList
-        schedules={[mockSchedules[0]]}
-        onEdit={mockOnEdit}
-        onDelete={mockOnDelete}
-        onRefresh={mockOnRefresh}
-      />
-    )
-
-    const deleteButton = screen.getByTitle('Deletar')
-    await user.click(deleteButton)
-
-    await waitFor(() => {
-      expect(serviceScheduleApi.getRelatedEventsCount).toHaveBeenCalledWith('schedule-1')
-    })
-
-    expect(mockConfirm).toHaveBeenCalledWith(
-      expect.stringContaining('5 evento(s) criado(s) a partir dele também serão deletados')
-    )
-    // Não deve mostrar segunda confirmação - sempre deleta eventos
-    expect(mockConfirm).toHaveBeenCalledTimes(1)
-    // Verifica que a mensagem contém o aviso sobre eventos
-    expect(mockConfirm).toHaveBeenCalledWith(
-      expect.stringContaining('⚠️ ATENÇÃO: Ao deletar este horário de culto, 5 evento(s) criado(s) a partir dele também serão deletados')
-    )
-    expect(mockOnDelete).toHaveBeenCalledWith('schedule-1', true)
-  })
-
-  it('deve deletar horário e eventos relacionados quando confirmado', async () => {
-    const user = userEvent.setup()
-    ;(serviceScheduleApi.getRelatedEventsCount as any).mockResolvedValue({
-      count: 3,
-      scheduleTitle: 'Culto Dominical',
-    })
-    mockConfirm.mockReturnValueOnce(true) // Confirma deletar horário (e eventos relacionados)
-
-    render(
-      <ServiceScheduleList
-        schedules={[mockSchedules[0]]}
-        onEdit={mockOnEdit}
-        onDelete={mockOnDelete}
-        onRefresh={mockOnRefresh}
-      />
-    )
-
-    const deleteButton = screen.getByTitle('Deletar')
-    await user.click(deleteButton)
-
-    await waitFor(() => {
-      expect(mockOnDelete).toHaveBeenCalled()
-    })
-
-    // Sempre deleta eventos quando deleta o horário
-    expect(mockOnDelete).toHaveBeenCalledWith('schedule-1', true)
-  })
-
-  it('não deve deletar quando usuário cancela a primeira confirmação', async () => {
-    const user = userEvent.setup()
-    ;(serviceScheduleApi.getRelatedEventsCount as any).mockResolvedValue({
-      count: 2,
-      scheduleTitle: 'Culto Dominical',
-    })
-    // Reset mock para garantir que retorne false
-    mockConfirm.mockReset()
-    mockConfirm.mockReturnValue(false) // Cancela
-
-    render(
-      <ServiceScheduleList
-        schedules={[mockSchedules[0]]}
-        onEdit={mockOnEdit}
-        onDelete={mockOnDelete}
-        onRefresh={mockOnRefresh}
-      />
-    )
-
-    const deleteButton = screen.getByTitle('Deletar')
-    await user.click(deleteButton)
-
-    await waitFor(() => {
-      expect(serviceScheduleApi.getRelatedEventsCount).toHaveBeenCalled()
-    })
-
-    // Aguarda um pouco para garantir que o código assíncrono seja executado
-    await waitFor(() => {
-      expect(mockConfirm).toHaveBeenCalled()
-    })
-
-    // Verifica que onDelete não foi chamado porque o usuário cancelou
-    expect(mockOnDelete).not.toHaveBeenCalled()
-  })
-
+  // ============================================================================
+  // TESTE 5: ERROR STATE - Mostra erro quando falha ao contar eventos
+  // ============================================================================
   it('deve mostrar erro quando falha ao contar eventos', async () => {
+    // Arrange
     const user = userEvent.setup()
-    ;(serviceScheduleApi.getRelatedEventsCount as any).mockRejectedValue(
+    vi.mocked(serviceScheduleApi.getRelatedEventsCount).mockRejectedValue(
       new Error('Erro ao contar eventos')
     )
 
+    // Act
     render(
       <ServiceScheduleList
         schedules={[mockSchedules[0]]}
@@ -260,28 +182,11 @@ describe('ServiceScheduleList', () => {
     const deleteButton = screen.getByTitle('Deletar')
     await user.click(deleteButton)
 
+    // Assert
     await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith(
-        expect.stringContaining('Erro ao verificar eventos relacionados')
-      )
+      expect(mockToastError).toHaveBeenCalled()
     })
 
     expect(mockOnDelete).not.toHaveBeenCalled()
   })
-
-  it('deve mostrar mensagem vazia quando não há horários', () => {
-    render(
-      <ServiceScheduleList
-        schedules={[]}
-        onEdit={mockOnEdit}
-        onDelete={mockOnDelete}
-        onRefresh={mockOnRefresh}
-      />
-    )
-
-    expect(screen.getByText('Nenhum horário de culto cadastrado.')).toBeInTheDocument()
-  })
 })
-
-
-

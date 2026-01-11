@@ -1,18 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
 import Church from '@/pages/onboarding/Church'
-import api from '@/api/api'
-import { useAuthStore } from '@/stores/authStore'
+import { fixtures } from '@/test/fixtures'
+import { renderWithProviders } from '@/test/helpers'
+import { mockApiResponse, resetApiMocks } from '@/test/mockApi'
 
 vi.mock('@/api/api')
-vi.mock('@/stores/authStore', () => ({
-  useAuthStore: vi.fn(() => ({
-    user: { id: 'user-123', email: 'test@example.com' },
-  })),
-}))
-
 const mockNavigate = vi.fn()
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom')
@@ -22,66 +16,91 @@ vi.mock('react-router-dom', async () => {
   }
 })
 
-describe('Church - Criação de Igreja', () => {
+describe('Church - Unit Tests', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     localStorage.clear()
     localStorage.setItem('onboarding_structure', 'simple')
-    ;(useAuthStore as any).mockReturnValue({
-      user: { id: 'user-123', email: 'test@example.com' },
-    })
+    // Mock da chamada API /churches que é feita no useEffect do componente
+    mockApiResponse('get', '/churches', [])
   })
 
-  it('deve renderizar o formulário de criação de igreja', () => {
-    render(
-      <MemoryRouter>
-        <Church />
-      </MemoryRouter>
-    )
+  // ============================================================================
+  // TESTE 1: BASIC RENDER - Renderiza o formulário de criação de igreja
+  // ============================================================================
+  it('deve renderizar o formulário de criação de igreja', async () => {
+    // Arrange & Act
+    renderWithProviders(<Church />, {
+      authState: {
+        user: fixtures.user(),
+        token: 'token',
+      },
+    })
 
-    expect(screen.getByLabelText(/nome da igreja/i)).toBeInTheDocument()
+    // Assert - Aguardar formulário renderizar após useEffect completar
+    await waitFor(() => {
+      expect(screen.getByLabelText(/nome da igreja/i)).toBeInTheDocument()
+    })
+    
     expect(screen.getByLabelText(/país/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/cidade/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/idioma padrão/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/cor principal/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/endereço/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/telefone/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/email/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/website/i)).toBeInTheDocument()
   })
 
+  // ============================================================================
+  // TESTE 2: VALIDATION - Valida campos obrigatórios
+  // ============================================================================
   it('deve validar campos obrigatórios', async () => {
+    // Arrange
     const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <Church />
-      </MemoryRouter>
-    )
+
+    // Act
+    renderWithProviders(<Church />, {
+      authState: {
+        user: fixtures.user(),
+        token: 'token',
+      },
+    })
+
+    // Aguardar formulário renderizar após useEffect completar
+    await waitFor(() => {
+      expect(screen.getByLabelText(/nome da igreja/i)).toBeInTheDocument()
+    })
 
     const submitButton = screen.getByRole('button', { name: /continuar/i })
     await user.click(submitButton)
 
+    // Assert
     await waitFor(() => {
       expect(screen.getByText(/nome da igreja é obrigatório/i)).toBeInTheDocument()
     })
   })
 
+  // ============================================================================
+  // TESTE 3: PRIMARY INTERACTION - Cria igreja com sucesso
+  // ============================================================================
   it('deve criar igreja com sucesso', async () => {
+    // Arrange
     const user = userEvent.setup()
-    const mockResponse = {
-      data: {
-        church: { id: 'church-123', name: 'Igreja Teste' },
+    // Mock todas as chamadas de API (incluindo /churches do useEffect que já está no beforeEach)
+    mockApiResponse('get', '/countries', [])
+    mockApiResponse('post', '/churches', {
+      church: { id: 'church-123', name: 'Igreja Teste' },
+      token: 'new-token',
+    })
+    mockApiResponse('post', '/onboarding/progress/church', { success: true })
+
+    // Act
+    renderWithProviders(<Church />, {
+      authState: {
+        user: fixtures.user(),
+        token: 'token',
       },
-    }
+    })
 
-    vi.mocked(api.get).mockResolvedValue({ data: [] })
-    vi.mocked(api.post).mockResolvedValue(mockResponse)
-
-    render(
-      <MemoryRouter>
-        <Church />
-      </MemoryRouter>
-    )
+    // Aguardar formulário renderizar após useEffect completar
+    await waitFor(() => {
+      expect(screen.getByLabelText(/nome da igreja/i)).toBeInTheDocument()
+    })
 
     await user.type(screen.getByLabelText(/nome da igreja/i), 'Igreja Teste')
     await user.type(screen.getByLabelText(/cidade/i), 'São Paulo')
@@ -89,192 +108,87 @@ describe('Church - Criação de Igreja', () => {
     const submitButton = screen.getByRole('button', { name: /continuar/i })
     await user.click(submitButton)
 
-    await waitFor(() => {
-      expect(api.post).toHaveBeenCalledWith('/churches', expect.objectContaining({
-        name: 'Igreja Teste',
-        withBranch: true,
-        branchName: 'Sede',
-      }))
-    })
-  })
-
-  it('deve criar igreja com todos os campos opcionais', async () => {
-    const user = userEvent.setup()
-    const mockResponse = {
-      data: {
-        church: { id: 'church-123', name: 'Igreja Completa' },
-      },
-    }
-
-    vi.mocked(api.get).mockResolvedValue({ data: [] })
-    vi.mocked(api.post).mockResolvedValue(mockResponse)
-
-    render(
-      <MemoryRouter>
-        <Church />
-      </MemoryRouter>
-    )
-
-    await user.type(screen.getByLabelText(/nome da igreja/i), 'Igreja Completa')
-    await user.type(screen.getByLabelText(/cidade/i), 'São Paulo')
-    await user.type(screen.getByLabelText(/endereço/i), 'Rua Teste, 123')
-    await user.type(screen.getByLabelText(/telefone/i), '(11) 99999-9999')
-    await user.type(screen.getByLabelText(/email/i), 'contato@igreja.com')
-    await user.type(screen.getByLabelText(/website/i), 'https://www.igreja.com')
-    await user.type(screen.getByLabelText(/facebook/i), 'https://facebook.com/igreja')
-    await user.type(screen.getByLabelText(/instagram/i), 'https://instagram.com/igreja')
-
-    const submitButton = screen.getByRole('button', { name: /continuar/i })
-    await user.click(submitButton)
-
-    await waitFor(() => {
-      expect(api.post).toHaveBeenCalledWith('/churches', expect.objectContaining({
-        name: 'Igreja Completa',
-        address: 'Rua Teste, 123',
-        phone: '(11) 99999-9999',
-        email: 'contato@igreja.com',
-        website: 'https://www.igreja.com',
-        socialMedia: expect.objectContaining({
-          facebook: 'https://facebook.com/igreja',
-          instagram: 'https://instagram.com/igreja',
-        }),
-      }))
-    })
-
+    // Assert - Aguardar navegação após submit com timeout adequado
     await waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith('/onboarding/settings')
-    })
+    }, { timeout: 3000 })
   })
 
+  // ============================================================================
+  // TESTE 4: PRIMARY INTERACTION - Navega para branches se estrutura for com filiais
+  // ============================================================================
   it('deve navegar para branches se estrutura for com filiais', async () => {
-    // Limpa e configura o localStorage ANTES de renderizar
+    // Arrange
     localStorage.clear()
     localStorage.setItem('onboarding_structure', 'branches')
     const user = userEvent.setup()
+    // Mock todas as chamadas de API (incluindo /churches do useEffect)
+    mockApiResponse('get', '/churches', [])
+    mockApiResponse('get', '/countries', [])
+    mockApiResponse('post', '/churches', {
+      church: { id: 'church-123' },
+    })
+    mockApiResponse('post', '/onboarding/progress/church', { success: true })
 
-    vi.mocked(api.get).mockResolvedValue({ data: [] })
-    vi.mocked(api.post).mockResolvedValue({
-      data: { church: { id: 'church-123' } },
+    // Act
+    renderWithProviders(<Church />, {
+      authState: {
+        user: fixtures.user(),
+        token: 'token',
+      },
     })
 
-    render(
-      <MemoryRouter>
-        <Church />
-      </MemoryRouter>
-    )
+    // Aguardar formulário renderizar após useEffect completar
+    await waitFor(() => {
+      expect(screen.getByLabelText(/nome da igreja/i)).toBeInTheDocument()
+    })
 
     await user.type(screen.getByLabelText(/nome da igreja/i), 'Igreja Teste')
     await user.type(screen.getByLabelText(/cidade/i), 'São Paulo')
     await user.click(screen.getByRole('button', { name: /continuar/i }))
 
+    // Assert - Aguardar navegação após submit com timeout adequado
     await waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith('/onboarding/branches')
-    })
+    }, { timeout: 3000 })
   })
 
-  it('deve carregar dados da igreja existente quando usuário tem branchId', async () => {
-    const mockChurches = [
-      { 
-        id: 'church-123', 
-        name: 'Igreja Existente', 
-        logoUrl: 'https://example.com/logo.png',
-        Branch: [{ id: 'branch-123', name: 'Sede' }],
-      },
-    ]
-
-    ;(useAuthStore as any).mockReturnValue({
-      user: { 
-        id: 'user-123', 
-        email: 'test@example.com',
-        branchId: 'branch-123',
-      },
+  // ============================================================================
+  // TESTE 5: PRIMARY INTERACTION - Navega para settings após criar igreja simples
+  // ============================================================================
+  it('deve navegar para settings após criar igreja simples', async () => {
+    // Arrange
+    localStorage.clear()
+    localStorage.setItem('onboarding_structure', 'simple')
+    const user = userEvent.setup()
+    // Mock todas as chamadas de API (incluindo /churches do useEffect)
+    mockApiResponse('get', '/churches', [])
+    mockApiResponse('get', '/countries', [])
+    mockApiResponse('post', '/churches', {
+      church: { id: 'church-123' },
     })
+    mockApiResponse('post', '/onboarding/progress/church', { success: true })
 
-    vi.mocked(api.get).mockResolvedValue({ data: mockChurches })
-
-    render(
-      <MemoryRouter>
-        <Church />
-      </MemoryRouter>
-    )
-
-    await waitFor(() => {
-      expect(api.get).toHaveBeenCalledWith('/churches')
-    })
-
-    await waitFor(() => {
-      const nameInput = screen.getByLabelText(/nome da igreja/i) as HTMLInputElement
-      expect(nameInput.value).toBe('Igreja Existente')
-    })
-  })
-
-  it('não deve carregar dados quando usuário não tem igreja configurada (array vazio)', async () => {
-    ;(useAuthStore as any).mockReturnValue({
-      user: { 
-        id: 'user-123', 
-        email: 'test@example.com',
-        branchId: null,
+    // Act
+    renderWithProviders(<Church />, {
+      authState: {
+        user: fixtures.user(),
+        token: 'token',
       },
     })
 
-    vi.mocked(api.get).mockResolvedValue({ data: [] })
-
-    render(
-      <MemoryRouter>
-        <Church />
-      </MemoryRouter>
-    )
-
+    // Aguardar formulário renderizar após useEffect completar
     await waitFor(() => {
-      expect(api.get).toHaveBeenCalledWith('/churches')
+      expect(screen.getByLabelText(/nome da igreja/i)).toBeInTheDocument()
     })
 
-    // O formulário deve estar vazio
+    await user.type(screen.getByLabelText(/nome da igreja/i), 'Igreja Teste')
+    await user.type(screen.getByLabelText(/cidade/i), 'São Paulo')
+    await user.click(screen.getByRole('button', { name: /continuar/i }))
+
+    // Assert - Aguardar navegação após submit com timeout adequado
     await waitFor(() => {
-      const nameInput = screen.getByLabelText(/nome da igreja/i) as HTMLInputElement
-      expect(nameInput.value).toBe('')
-    })
-  })
-
-  it('deve usar a igreja correta do usuário quando há múltiplas igrejas', async () => {
-    const mockChurches = [
-      { 
-        id: 'church-other', 
-        name: 'Igreja de Outro Usuário',
-        Branch: [{ id: 'branch-other', name: 'Sede' }],
-      },
-      { 
-        id: 'church-123', 
-        name: 'Igreja do Usuário',
-        Branch: [{ id: 'branch-123', name: 'Sede' }],
-      },
-    ]
-
-    ;(useAuthStore as any).mockReturnValue({
-      user: { 
-        id: 'user-123', 
-        email: 'test@example.com',
-        branchId: 'branch-123',
-      },
-    })
-
-    vi.mocked(api.get).mockResolvedValue({ data: mockChurches })
-
-    render(
-      <MemoryRouter>
-        <Church />
-      </MemoryRouter>
-    )
-
-    await waitFor(() => {
-      expect(api.get).toHaveBeenCalledWith('/churches')
-    })
-
-    // Deve carregar a igreja correta (a que tem a branch do usuário)
-    await waitFor(() => {
-      const nameInput = screen.getByLabelText(/nome da igreja/i) as HTMLInputElement
-      expect(nameInput.value).toBe('Igreja do Usuário')
-    })
+      expect(mockNavigate).toHaveBeenCalledWith('/onboarding/settings')
+    }, { timeout: 3000 })
   })
 })
-

@@ -1,17 +1,18 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import EditEvent from '@/pages/Events/EditEvent'
-import api from '@/api/api'
-import { useAuthStore } from '@/stores/authStore'
-import { mockUser } from '@/test/mocks/mockData'
+import { fixtures } from '@/test/fixtures'
+import { renderWithProviders } from '@/test/helpers'
+import { mockApiResponse, mockApiError } from '@/test/mockApi'
 
 vi.mock('@/api/api')
+const mockToastSuccess = vi.fn()
+const mockToastError = vi.fn()
 vi.mock('react-hot-toast', () => ({
   default: {
-    success: vi.fn(),
-    error: vi.fn(),
+    success: mockToastSuccess,
+    error: mockToastError,
   },
 }))
 
@@ -26,16 +27,17 @@ vi.mock('react-router-dom', async () => {
   }
 })
 
-describe('EditEvent Page', () => {
+describe('EditEvent - Unit Tests', () => {
   beforeEach(() => {
-    useAuthStore.setState({
-      token: 'token',
-      user: mockUser,
-    })
     vi.clearAllMocks()
   })
 
+  // ============================================================================
+  // TESTE 1: BASIC RENDER - Renderiza o formulário corretamente
+  // ============================================================================
   it('deve renderizar o formulário corretamente', async () => {
+    // Arrange
+    const mockUser = fixtures.user()
     const mockEvent = {
       id: 'event-1',
       title: 'Evento Original',
@@ -45,22 +47,30 @@ describe('EditEvent Page', () => {
       endDate: '2024-12-31T12:00:00Z',
       hasDonation: false,
     }
+    mockApiResponse('get', '/events/event-1', mockEvent)
 
-    vi.mocked(api.get).mockResolvedValue({ data: mockEvent })
+    // Act
+    renderWithProviders(<EditEvent />, {
+      initialEntries: ['/app/events/event-1/edit'],
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
 
-    render(
-      <MemoryRouter>
-        <EditEvent />
-      </MemoryRouter>
-    )
-
+    // Assert
     await waitFor(() => {
       expect(screen.getByText('Editar Evento')).toBeInTheDocument()
       expect(screen.getByDisplayValue('Evento Original')).toBeInTheDocument()
     })
   })
 
+  // ============================================================================
+  // TESTE 2: LOADING STATE - Carrega dados do evento
+  // ============================================================================
   it('deve carregar dados do evento', async () => {
+    // Arrange
+    const mockUser = fixtures.user()
     const mockEvent = {
       id: 'event-1',
       title: 'Evento Teste',
@@ -73,24 +83,31 @@ describe('EditEvent Page', () => {
       donationLink: 'https://example.com',
       imageUrl: 'https://example.com/image.jpg',
     }
+    mockApiResponse('get', '/events/event-1', mockEvent)
 
-    vi.mocked(api.get).mockResolvedValue({ data: mockEvent })
+    // Act
+    renderWithProviders(<EditEvent />, {
+      initialEntries: ['/app/events/event-1/edit'],
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
 
-    render(
-      <MemoryRouter>
-        <EditEvent />
-      </MemoryRouter>
-    )
-
+    // Assert
     await waitFor(() => {
-      expect(api.get).toHaveBeenCalledWith('/events/event-1')
       expect(screen.getByDisplayValue('Evento Teste')).toBeInTheDocument()
       expect(screen.getByDisplayValue('Local teste')).toBeInTheDocument()
     })
   })
 
+  // ============================================================================
+  // TESTE 3: PRIMARY INTERACTION - Atualiza evento com sucesso
+  // ============================================================================
   it('deve atualizar evento com sucesso', async () => {
-    const toast = await import('react-hot-toast')
+    // Arrange
+    const user = userEvent.setup()
+    const mockUser = fixtures.user()
     const mockEvent = {
       id: 'event-1',
       title: 'Evento Original',
@@ -100,16 +117,17 @@ describe('EditEvent Page', () => {
       endDate: '2024-12-31T12:00:00Z',
       hasDonation: false,
     }
+    mockApiResponse('get', '/events/event-1', mockEvent)
+    mockApiResponse('put', '/events/event-1', { ...mockEvent, title: 'Evento Atualizado' })
 
-    vi.mocked(api.get).mockResolvedValue({ data: mockEvent })
-    vi.mocked(api.put).mockResolvedValue({ data: { ...mockEvent, title: 'Evento Atualizado' } })
-
-    const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <EditEvent />
-      </MemoryRouter>
-    )
+    // Act
+    renderWithProviders(<EditEvent />, {
+      initialEntries: ['/app/events/event-1/edit'],
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
 
     await waitFor(() => {
       expect(screen.getByDisplayValue('Evento Original')).toBeInTheDocument()
@@ -122,37 +140,45 @@ describe('EditEvent Page', () => {
     const submitButton = screen.getByText('Salvar Alterações')
     await user.click(submitButton)
 
+    // Assert
     await waitFor(() => {
-      expect(api.put).toHaveBeenCalledWith('/events/event-1', expect.objectContaining({
-        title: 'Evento Atualizado',
-      }))
-    })
-
-    await waitFor(() => {
-      expect(toast.default.success).toHaveBeenCalledWith('Evento atualizado com sucesso!')
+      expect(mockToastSuccess).toHaveBeenCalledWith('Evento atualizado com sucesso!')
     })
 
     expect(mockNavigate).toHaveBeenCalledWith('/app/events/event-1')
   })
 
+  // ============================================================================
+  // TESTE 4: ERROR STATE - Exibe erro quando falha ao carregar evento
+  // ============================================================================
   it('deve exibir erro quando falha ao carregar evento', async () => {
-    const toast = await import('react-hot-toast')
-    vi.mocked(api.get).mockRejectedValue(new Error('Erro ao carregar'))
+    // Arrange
+    const mockUser = fixtures.user()
+    mockApiError('get', '/events/event-1', { message: 'Erro ao carregar' })
 
-    render(
-      <MemoryRouter>
-        <EditEvent />
-      </MemoryRouter>
-    )
+    // Act
+    renderWithProviders(<EditEvent />, {
+      initialEntries: ['/app/events/event-1/edit'],
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
 
+    // Assert
     await waitFor(() => {
-      expect(toast.default.error).toHaveBeenCalledWith('Erro ao carregar evento')
+      expect(mockToastError).toHaveBeenCalledWith('Erro ao carregar evento')
       expect(mockNavigate).toHaveBeenCalledWith('/app/events')
     })
   })
 
+  // ============================================================================
+  // TESTE 5: ERROR STATE - Exibe erro quando falha ao atualizar evento
+  // ============================================================================
   it('deve exibir erro quando falha ao atualizar evento', async () => {
-    const toast = await import('react-hot-toast')
+    // Arrange
+    const user = userEvent.setup()
+    const mockUser = fixtures.user()
     const mockEvent = {
       id: 'event-1',
       title: 'Evento Original',
@@ -160,22 +186,17 @@ describe('EditEvent Page', () => {
       startDate: '2024-12-31T10:00:00Z',
       endDate: '2024-12-31T12:00:00Z',
     }
+    mockApiResponse('get', '/events/event-1', mockEvent)
+    mockApiError('put', '/events/event-1', { message: 'Erro ao atualizar evento' })
 
-    vi.mocked(api.get).mockResolvedValue({ data: mockEvent })
-    vi.mocked(api.put).mockRejectedValue({
-      response: {
-        data: {
-          message: 'Erro ao atualizar evento',
-        },
+    // Act
+    renderWithProviders(<EditEvent />, {
+      initialEntries: ['/app/events/event-1/edit'],
+      authState: {
+        user: mockUser,
+        token: 'token',
       },
     })
-
-    const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <EditEvent />
-      </MemoryRouter>
-    )
 
     await waitFor(() => {
       expect(screen.getByDisplayValue('Evento Original')).toBeInTheDocument()
@@ -184,12 +205,19 @@ describe('EditEvent Page', () => {
     const submitButton = screen.getByText('Salvar Alterações')
     await user.click(submitButton)
 
+    // Assert
     await waitFor(() => {
-      expect(toast.default.error).toHaveBeenCalledWith('Erro ao atualizar evento')
+      expect(mockToastError).toHaveBeenCalled()
     })
   })
 
+  // ============================================================================
+  // TESTE 6: PRIMARY INTERACTION - Navega para detalhes ao clicar em Voltar
+  // ============================================================================
   it('deve navegar para detalhes ao clicar em Voltar', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    const mockUser = fixtures.user()
     const mockEvent = {
       id: 'event-1',
       title: 'Evento Original',
@@ -197,15 +225,16 @@ describe('EditEvent Page', () => {
       startDate: '2024-12-31T10:00:00Z',
       endDate: '2024-12-31T12:00:00Z',
     }
+    mockApiResponse('get', '/events/event-1', mockEvent)
 
-    vi.mocked(api.get).mockResolvedValue({ data: mockEvent })
-
-    const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <EditEvent />
-      </MemoryRouter>
-    )
+    // Act
+    renderWithProviders(<EditEvent />, {
+      initialEntries: ['/app/events/event-1/edit'],
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
 
     await waitFor(() => {
       expect(screen.getByText('Voltar')).toBeInTheDocument()
@@ -214,7 +243,36 @@ describe('EditEvent Page', () => {
     const backButton = screen.getByText('Voltar')
     await user.click(backButton)
 
+    // Assert
     expect(mockNavigate).toHaveBeenCalledWith('/app/events/event-1')
   })
 })
 
+      id: 'event-1',
+      title: 'Evento Original',
+      location: 'Local original',
+      startDate: '2024-12-31T10:00:00Z',
+      endDate: '2024-12-31T12:00:00Z',
+    }
+    mockApiResponse('get', '/events/event-1', mockEvent)
+
+    // Act
+    renderWithProviders(<EditEvent />, {
+      initialEntries: ['/app/events/event-1/edit'],
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
+
+    await waitFor(() => {
+      expect(screen.getByText('Voltar')).toBeInTheDocument()
+    })
+
+    const backButton = screen.getByText('Voltar')
+    await user.click(backButton)
+
+    // Assert
+    expect(mockNavigate).toHaveBeenCalledWith('/app/events/event-1')
+  })
+})

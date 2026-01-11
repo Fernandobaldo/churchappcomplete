@@ -17,8 +17,13 @@ export default function ProtectedRoute({
   }
 
   // Se tem token mas não completou onboarding, redireciona para onboarding
-  if (requireOnboarding && (!user?.branchId || !user?.role)) {
-    return <Navigate to="/onboarding/start" replace />
+  if (requireOnboarding) {
+    const hasCompleteMember = user?.memberId && user?.branchId && user?.role
+    const onboardingCompleted = user?.onboardingCompleted === true
+    
+    if (!hasCompleteMember || !onboardingCompleted) {
+      return <Navigate to="/onboarding/start" replace />
+    }
   }
 
   return <>{children}</>

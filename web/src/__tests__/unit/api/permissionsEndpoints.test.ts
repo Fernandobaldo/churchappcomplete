@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import api from '@/api/api'
 import { useAuthStore } from '@/stores/authStore'
 
-// Mock do módulo api
 vi.mock('@/api/api', () => {
   const mockApi = {
     get: vi.fn(),
@@ -30,7 +29,11 @@ describe('Permissions Endpoints - Unit Tests', () => {
   })
 
   describe('GET /members (para listar membros com permissões)', () => {
+    // ============================================================================
+    // TESTE 1: SUCCESS - Busca membros com permissões com sucesso
+    // ============================================================================
     it('deve buscar membros com permissões com sucesso', async () => {
+      // Arrange
       const mockResponse = {
         data: [
           {
@@ -44,11 +47,12 @@ describe('Permissions Endpoints - Unit Tests', () => {
           },
         ],
       }
-
       vi.mocked(api.get).mockResolvedValue(mockResponse)
 
+      // Act
       const response = await api.get('/members')
 
+      // Assert
       expect(api.get).toHaveBeenCalledWith('/members')
       expect(response.data).toBeInstanceOf(Array)
       expect(response.data[0]).toHaveProperty('permissions')
@@ -57,7 +61,11 @@ describe('Permissions Endpoints - Unit Tests', () => {
   })
 
   describe('POST /permissions/:memberId', () => {
+    // ============================================================================
+    // TESTE 2: SUCCESS - Atualiza permissões de membro com sucesso
+    // ============================================================================
     it('deve atualizar permissões de membro com sucesso', async () => {
+      // Arrange
       const mockResponse = {
         data: {
           success: true,
@@ -68,13 +76,14 @@ describe('Permissions Endpoints - Unit Tests', () => {
           ],
         },
       }
-
       vi.mocked(api.post).mockResolvedValue(mockResponse)
 
+      // Act
       const response = await api.post('/permissions/member-1', {
         permissions: ['devotional_manage', 'members_view'],
       })
 
+      // Assert
       expect(api.post).toHaveBeenCalledWith('/permissions/member-1', {
         permissions: ['devotional_manage', 'members_view'],
       })
@@ -127,7 +136,11 @@ describe('Permissions Endpoints - Unit Tests', () => {
       expect(response.data.permissions.length).toBe(0)
     })
 
+    // ============================================================================
+    // TESTE 3: VALIDATION FAILURE - Retorna erro 400 quando permissions não é um array
+    // ============================================================================
     it('deve retornar erro 400 quando permissions não é um array', async () => {
+      // Arrange
       const mockError = {
         response: {
           status: 400,
@@ -137,9 +150,9 @@ describe('Permissions Endpoints - Unit Tests', () => {
           },
         },
       }
-
       vi.mocked(api.post).mockRejectedValue(mockError)
 
+      // Act & Assert
       await expect(
         api.post('/permissions/member-1', {
           permissions: 'not-an-array',
@@ -151,7 +164,11 @@ describe('Permissions Endpoints - Unit Tests', () => {
       })
     })
 
+    // ============================================================================
+    // TESTE 4: FORBIDDEN - Retorna erro 403 quando usuário não tem permissão
+    // ============================================================================
     it('deve retornar erro 403 quando usuário não tem permissão', async () => {
+      // Arrange
       const mockError = {
         response: {
           status: 403,
@@ -160,9 +177,9 @@ describe('Permissions Endpoints - Unit Tests', () => {
           },
         },
       }
-
       vi.mocked(api.post).mockRejectedValue(mockError)
 
+      // Act & Assert
       await expect(
         api.post('/permissions/member-1', {
           permissions: ['devotional_manage'],
@@ -176,3 +193,18 @@ describe('Permissions Endpoints - Unit Tests', () => {
   })
 })
 
+      vi.mocked(api.post).mockRejectedValue(mockError)
+
+      // Act & Assert
+      await expect(
+        api.post('/permissions/member-1', {
+          permissions: ['devotional_manage'],
+        })
+      ).rejects.toMatchObject({
+        response: {
+          status: 403,
+        },
+      })
+    })
+  })
+})

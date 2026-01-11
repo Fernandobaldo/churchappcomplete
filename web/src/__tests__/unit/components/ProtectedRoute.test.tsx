@@ -1,101 +1,143 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { screen } from '@testing-library/react'
 import ProtectedRoute from '@/components/ProtectedRoute'
-import { useAuthStore } from '@/stores/authStore'
+import { renderWithProviders } from '@/test/renderWithProviders'
+import { fixtures } from '@/test/fixtures'
 
-describe('ProtectedRoute', () => {
+describe('ProtectedRoute - Unit Tests', () => {
   beforeEach(() => {
-    useAuthStore.setState({ token: null, user: null })
+    // Reset store antes de cada teste
   })
 
+  // ============================================================================
+  // TESTE 1: BASIC RENDER - Redirecionamento quando não há token
+  // ============================================================================
   it('deve redirecionar para /login quando não há token', () => {
-    render(
-      <MemoryRouter>
+    // Arrange
+    // Act
+    renderWithProviders(
         <ProtectedRoute>
           <div>Conteúdo Protegido</div>
-        </ProtectedRoute>
-      </MemoryRouter>
+      </ProtectedRoute>,
+      {
+        authState: {
+          token: null,
+          user: null,
+        },
+      }
     )
 
-    // Verifica se redirecionou (não mostra o conteúdo)
+    // Assert
     expect(screen.queryByText('Conteúdo Protegido')).not.toBeInTheDocument()
   })
 
+  // ============================================================================
+  // TESTE 2: REDIRECT - Redirecionamento quando não tem branchId
+  // ============================================================================
   it('deve redirecionar para /onboarding/start quando tem token mas não tem branchId', () => {
-    useAuthStore.setState({
-      token: 'valid-token',
-      user: {
-        id: 'user-123',
-        name: 'Test',
-        email: 'test@example.com',
-        role: '', // Sem role
-        branchId: '', // Sem branchId
-        permissions: [],
-        token: 'valid-token',
-      },
+    // Arrange
+    const mockUser = fixtures.user({
+      role: '',
+      branchId: '',
+      onboardingCompleted: false,
     })
 
-    render(
-      <MemoryRouter>
+    // Act
+    renderWithProviders(
         <ProtectedRoute>
           <div>Conteúdo Protegido</div>
-        </ProtectedRoute>
-      </MemoryRouter>
+      </ProtectedRoute>,
+      {
+        authState: {
+          token: 'valid-token',
+          user: mockUser,
+        },
+      }
     )
 
-    // Verifica se redirecionou (não mostra o conteúdo)
+    // Assert
     expect(screen.queryByText('Conteúdo Protegido')).not.toBeInTheDocument()
   })
 
+  // ============================================================================
+  // TESTE 3: REDIRECT - Redirecionamento quando não tem role
+  // ============================================================================
   it('deve redirecionar para /onboarding/start quando tem token mas não tem role', () => {
-    useAuthStore.setState({
-      token: 'valid-token',
-      user: {
-        id: 'user-123',
-        name: 'Test',
-        email: 'test@example.com',
-        role: '', // Sem role
-        branchId: 'branch-123',
-        permissions: [],
-        token: 'valid-token',
-      },
+    // Arrange
+    const mockUser = fixtures.user({
+      role: '',
+      onboardingCompleted: false,
     })
 
-    render(
-      <MemoryRouter>
+    // Act
+    renderWithProviders(
         <ProtectedRoute>
           <div>Conteúdo Protegido</div>
-        </ProtectedRoute>
-      </MemoryRouter>
+      </ProtectedRoute>,
+      {
+        authState: {
+          token: 'valid-token',
+          user: mockUser,
+        },
+      }
     )
 
-    // Verifica se redirecionou (não mostra o conteúdo)
+    // Assert
     expect(screen.queryByText('Conteúdo Protegido')).not.toBeInTheDocument()
   })
 
+  // ============================================================================
+  // TESTE 4: PRIMARY INTERACTION - Renderiza quando onboarding completo
+  // ============================================================================
   it('deve renderizar children quando há token e usuário com onboarding completo', () => {
-    useAuthStore.setState({
-      token: 'valid-token',
-      user: {
-        id: 'user-123',
-        name: 'Test',
-        email: 'test@example.com',
+    // Arrange
+    const mockUser = fixtures.user({
         role: 'MEMBER',
-        branchId: 'branch-123',
-        permissions: [],
-        token: 'valid-token',
-      },
+      onboardingCompleted: true,
     })
 
-    render(
-      <MemoryRouter>
+    // Act
+    renderWithProviders(
         <ProtectedRoute>
           <div>Conteúdo Protegido</div>
-        </ProtectedRoute>
-      </MemoryRouter>
+      </ProtectedRoute>,
+      {
+        authState: {
+          token: 'valid-token',
+          user: mockUser,
+        },
+      }
     )
 
+    // Assert
+    expect(screen.getByText('Conteúdo Protegido')).toBeInTheDocument()
+  })
+
+  // ============================================================================
+  // TESTE 5: EDGE CASE - Permite acesso quando requireOnboarding=false
+  // ============================================================================
+  it('deve renderizar children quando requireOnboarding=false mesmo sem onboarding completo', () => {
+    // Arrange
+    const mockUser = fixtures.user({
+      role: '',
+      branchId: '',
+      onboardingCompleted: false,
+    })
+
+    // Act
+    renderWithProviders(
+      <ProtectedRoute requireOnboarding={false}>
+        <div>Conteúdo Protegido</div>
+      </ProtectedRoute>,
+      {
+        authState: {
+          token: 'valid-token',
+          user: mockUser,
+        },
+      }
+    )
+
+    // Assert
     expect(screen.getByText('Conteúdo Protegido')).toBeInTheDocument()
   })
 })

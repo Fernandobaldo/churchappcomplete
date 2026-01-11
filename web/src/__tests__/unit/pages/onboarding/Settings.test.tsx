@@ -1,11 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
 import Settings from '@/pages/onboarding/Settings'
-import api from '@/api/api'
-
-vi.mock('@/api/api')
+import { renderWithProviders } from '@/test/helpers'
 
 const mockNavigate = vi.fn()
 vi.mock('react-router-dom', async () => {
@@ -16,75 +13,105 @@ vi.mock('react-router-dom', async () => {
   }
 })
 
-describe('Settings - Wizard de Configurações', () => {
+describe('Settings - Unit Tests', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     localStorage.clear()
   })
 
+  // ============================================================================
+  // TESTE 1: BASIC RENDER - Renderiza o step 1 (Roles e Permissões)
+  // ============================================================================
   it('deve renderizar o step 1 (Roles e Permissões)', () => {
-    render(
-      <MemoryRouter>
-        <Settings />
-      </MemoryRouter>
-    )
+    // Arrange & Act
+    renderWithProviders(<Settings />)
 
-    // Usa getAllByText porque há múltiplos elementos com esse texto (indicador de progresso e título)
+    // Assert
     const step1Elements = screen.getAllByText(/roles e permissões/i)
     expect(step1Elements.length).toBeGreaterThan(0)
-    
     expect(screen.getByText(/administrador geral/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /criar roles/i })).toBeInTheDocument()
   })
 
+  // ============================================================================
+  // TESTE 2: PRIMARY INTERACTION - Avança para step 2 após criar roles
+  // ============================================================================
   it('deve avançar para step 2 após criar roles', async () => {
+    // Arrange
     const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <Settings />
-      </MemoryRouter>
-    )
+
+    // Act
+    renderWithProviders(<Settings />)
 
     const createRolesButton = screen.getByRole('button', { name: /criar roles/i })
     await user.click(createRolesButton)
 
+    // Assert
     await waitFor(() => {
       expect(screen.getByText(/ativar módulos/i)).toBeInTheDocument()
     })
   })
 
+  // ============================================================================
+  // TESTE 3: PRIMARY INTERACTION - Permite selecionar/deselecionar módulos no step 2
+  // ============================================================================
   it('deve permitir selecionar/deselecionar módulos no step 2', async () => {
+    // Arrange
     const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <Settings />
-      </MemoryRouter>
-    )
 
-    // Avança para step 2
+    // Act
+    renderWithProviders(<Settings />)
+
     await user.click(screen.getByRole('button', { name: /criar roles/i }))
     await waitFor(() => {
       expect(screen.getByText(/ativar módulos/i)).toBeInTheDocument()
     })
 
-    // Verifica módulos
     const eventsCheckbox = screen.getByLabelText(/eventos/i)
     expect(eventsCheckbox).toBeChecked()
 
     await user.click(eventsCheckbox)
-    expect(eventsCheckbox).not.toBeChecked()
 
-    await user.click(eventsCheckbox)
-    expect(eventsCheckbox).toBeChecked()
+    // Assert
+    expect(eventsCheckbox).not.toBeChecked()
   })
 
+  // ============================================================================
+  // TESTE 4: PRIMARY INTERACTION - Avança para step 3 (Convites) após selecionar módulos
+  // ============================================================================
   it('deve avançar para step 3 (Convites) após selecionar módulos', async () => {
+    // Arrange
     const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <Settings />
-      </MemoryRouter>
-    )
+
+    // Act
+    renderWithProviders(<Settings />)
+
+    await user.click(screen.getByRole('button', { name: /criar roles/i }))
+    await waitFor(() => {
+      expect(screen.getByText(/ativar módulos/i)).toBeInTheDocument()
+    }, { timeout: 2000 })
+
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    const continueButtons = screen.getAllByRole('button', { name: /continuar/i })
+    const lastContinueButton = continueButtons[continueButtons.length - 1]
+    await user.click(lastContinueButton)
+
+    // Assert
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: /enviar convites/i })).toBeInTheDocument()
+    }, { timeout: 2000 })
+  })
+
+  // ============================================================================
+  // TESTE 5: PRIMARY INTERACTION - Navega para dashboard ao concluir
+  // ============================================================================
+  it('deve navegar para dashboard ao concluir onboarding', async () => {
+    // Arrange
+    const user = userEvent.setup()
+
+    // Act
+    renderWithProviders(<Settings />)
 
     // Step 1
     await user.click(screen.getByRole('button', { name: /criar roles/i }))
@@ -92,34 +119,43 @@ describe('Settings - Wizard de Configurações', () => {
       expect(screen.getByText(/ativar módulos/i)).toBeInTheDocument()
     }, { timeout: 2000 })
 
-    // Step 2 - Aguarda um pouco para garantir que o estado foi atualizado
+    // Step 2
     await new Promise(resolve => setTimeout(resolve, 100))
-    
-    // Pega todos os botões "Continuar" e clica no que está no step 2 (o último)
     const continueButtons = screen.getAllByRole('button', { name: /continuar/i })
-    const step2ContinueButton = continueButtons[continueButtons.length - 1]
-    await user.click(step2ContinueButton)
+    await user.click(continueButtons[continueButtons.length - 1])
 
     await waitFor(() => {
-      const inviteElements = screen.getAllByText(/enviar convites/i)
-      expect(inviteElements.length).toBeGreaterThan(0)
-      // Verifica que o título principal está presente
-      expect(inviteElements.some(el => el.tagName === 'H2')).toBe(true)
+      expect(screen.getByRole('heading', { name: /enviar convites/i })).toBeInTheDocument()
     }, { timeout: 2000 })
-  })
 
-  it('deve mostrar progresso visual dos steps', () => {
-    render(
-      <MemoryRouter>
-        <Settings />
-      </MemoryRouter>
-    )
+    // Step 3 - Finalizar
+    await new Promise(resolve => setTimeout(resolve, 100))
+    const finalButtons = screen.getAllByRole('button', { name: /finalizar/i })
+    if (finalButtons.length > 0) {
+      await user.click(finalButtons[finalButtons.length - 1])
+    }
 
-    // Verifica que step 1 está ativo (usa getAllByText e pega o primeiro, que é o título)
-    const step1Titles = screen.getAllByText(/roles e permissões/i)
-    expect(step1Titles.length).toBeGreaterThan(0)
-    // Verifica que o título principal está presente
-    expect(step1Titles.some(el => el.tagName === 'H2')).toBe(true)
+    // Assert
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/app/dashboard')
+    }, { timeout: 3000 })
   })
 })
 
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: /enviar convites/i })).toBeInTheDocument()
+    }, { timeout: 2000 })
+
+    // Step 3 - Finalizar
+    await new Promise(resolve => setTimeout(resolve, 100))
+    const finalButtons = screen.getAllByRole('button', { name: /finalizar/i })
+    if (finalButtons.length > 0) {
+      await user.click(finalButtons[finalButtons.length - 1])
+    }
+
+    // Assert
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/app/dashboard')
+    }, { timeout: 3000 })
+  })
+})

@@ -51,7 +51,10 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
   
   if (token) {
     // Se tem token mas não completou onboarding, redireciona para onboarding
-    if (!user?.branchId || !user?.role) {
+    const hasCompleteMember = user?.memberId && user?.branchId && user?.role
+    const onboardingCompleted = user?.onboardingCompleted === true
+    
+    if (!hasCompleteMember || !onboardingCompleted) {
       return <Navigate to="/onboarding/start" replace />
     }
     // Se completou onboarding, redireciona para dashboard
@@ -62,7 +65,7 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 }
 
 // Componente para rotas de onboarding - permite acesso mesmo com token
-// mas redireciona para dashboard se o onboarding já foi completado (tem branchId/role)
+// mas redireciona para dashboard se o onboarding já foi completado
 function OnboardingRoute({ children }: { children: React.ReactNode }) {
   const { token, user } = useAuthStore()
   
@@ -71,14 +74,17 @@ function OnboardingRoute({ children }: { children: React.ReactNode }) {
     return <>{children}</>
   }
   
-  // Se tem token mas não tem branchId/role, ainda está no onboarding
-  // Permite continuar o onboarding
-  if (token && (!user?.branchId || !user?.role)) {
+  // Verifica se completou onboarding
+  const hasCompleteMember = user?.memberId && user?.branchId && user?.role
+  const onboardingCompleted = user?.onboardingCompleted === true
+  
+  // Se tem token mas não completou onboarding, permite continuar
+  if (!hasCompleteMember || !onboardingCompleted) {
     return <>{children}</>
   }
   
-  // Se já completou onboarding (tem branchId e role), redireciona para dashboard
-  if (token && user?.branchId && user?.role) {
+  // Se já completou onboarding, redireciona para dashboard
+  if (hasCompleteMember && onboardingCompleted) {
     return <Navigate to="/app/dashboard" replace />
   }
   
