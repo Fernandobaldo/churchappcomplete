@@ -15,7 +15,9 @@ vi.mock('react-router-dom', async () => {
   }
 })
 
-const mockToastSuccess = vi.fn()
+const { mockToastSuccess } = vi.hoisted(() => ({
+  mockToastSuccess: vi.fn(),
+}))
 vi.mock('react-hot-toast', () => ({
   default: {
     success: mockToastSuccess,
@@ -134,61 +136,5 @@ describe('Header - Unit Tests', () => {
   })
 })
 
-
-
-      },
-    })
-
-    // Assert
-    const logoutButton = screen.getByTitle('Sair')
-    expect(logoutButton).toBeInTheDocument()
-  })
-
-  // ============================================================================
-  // TESTE 4: PRIMARY INTERACTION - Faz logout ao clicar no botão
-  // ============================================================================
-  it('deve fazer logout ao clicar no botão', async () => {
-    // Arrange
-    const user = userEvent.setup()
-    const mockUser = fixtures.user()
-    useAuthStore.setState({ user: mockUser, token: 'token' })
-
-    renderWithProviders(<Header />, {
-      authState: {
-        user: mockUser,
-        token: 'token',
-      },
-    })
-
-    // Act
-    const logoutButton = screen.getByTitle('Sair')
-    await user.click(logoutButton)
-
-    // Assert
-    expect(useAuthStore.getState().user).toBeNull()
-    expect(useAuthStore.getState().token).toBeNull()
-    expect(mockNavigate).toHaveBeenCalledWith('/login')
-    expect(mockToastSuccess).toHaveBeenCalledWith('Logout realizado com sucesso!')
-  })
-
-  // ============================================================================
-  // TESTE 5: ERROR STATE - Não exibe nome quando não há usuário
-  // ============================================================================
-  it('não deve exibir nome do usuário quando não há usuário logado', () => {
-    // Arrange & Act
-    renderWithProviders(<Header />, {
-      authState: {
-        user: null,
-        token: null,
-      },
-    })
-
-    // Assert
-    expect(screen.getByText('ChurchPulse')).toBeInTheDocument()
-    // O nome do usuário não deve estar visível
-    const userNameElements = screen.queryAllByText(/João|Silva|Test User/i)
-    expect(userNameElements.length).toBe(0)
-  })
-})
 
 

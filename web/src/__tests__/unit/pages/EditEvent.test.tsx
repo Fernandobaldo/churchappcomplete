@@ -6,9 +6,14 @@ import { fixtures } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/helpers'
 import { mockApiResponse, mockApiError } from '@/test/mockApi'
 
-vi.mock('@/api/api')
-const mockToastSuccess = vi.fn()
-const mockToastError = vi.fn()
+vi.mock('@/api/api', async () => {
+  const { apiMock } = await import('@/test/apiMock')
+  return { default: apiMock }
+})
+const { mockToastSuccess, mockToastError } = vi.hoisted(() => ({
+  mockToastSuccess: vi.fn(),
+  mockToastError: vi.fn(),
+}))
 vi.mock('react-hot-toast', () => ({
   default: {
     success: mockToastSuccess,
@@ -248,31 +253,3 @@ describe('EditEvent - Unit Tests', () => {
   })
 })
 
-      id: 'event-1',
-      title: 'Evento Original',
-      location: 'Local original',
-      startDate: '2024-12-31T10:00:00Z',
-      endDate: '2024-12-31T12:00:00Z',
-    }
-    mockApiResponse('get', '/events/event-1', mockEvent)
-
-    // Act
-    renderWithProviders(<EditEvent />, {
-      initialEntries: ['/app/events/event-1/edit'],
-      authState: {
-        user: mockUser,
-        token: 'token',
-      },
-    })
-
-    await waitFor(() => {
-      expect(screen.getByText('Voltar')).toBeInTheDocument()
-    })
-
-    const backButton = screen.getByText('Voltar')
-    await user.click(backButton)
-
-    // Assert
-    expect(mockNavigate).toHaveBeenCalledWith('/app/events/event-1')
-  })
-})

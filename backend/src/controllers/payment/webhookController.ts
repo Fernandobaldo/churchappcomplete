@@ -9,7 +9,7 @@ import { prisma } from '../../lib/prisma'
  */
 export async function webhookHandler(request: FastifyRequest, reply: FastifyReply) {
   try {
-    const gatewayProvider = (request.params as any).provider || 'mercadopago'
+    const gatewayProvider = (request.params as any).provider || 'stripe'
     const headers = request.headers as Record<string, string>
     const payload = request.body as any
 

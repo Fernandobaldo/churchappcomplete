@@ -2,12 +2,22 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { screen, waitFor } from '@testing-library/react'
 import ChurchSettings from '@/pages/ChurchSettings'
 import { fixtures } from '@/test/fixtures'
-import { renderWithProviders } from '@/test/helpers'
-import { mockApiResponse } from '@/test/mockApi'
+import { renderWithProviders } from '@/test/renderWithProviders'
+import { mockApiResponse, resetApiMocks } from '@/test/mockApi'
 import { serviceScheduleApi } from '@/api/serviceScheduleApi'
 import * as authUtils from '@/utils/authUtils'
 
-vi.mock('@/api/api')
+vi.mock('@/api/api', () => ({
+  default: {
+    get: vi.fn(),
+    post: vi.fn(),
+    put: vi.fn(),
+    delete: vi.fn(),
+    defaults: {
+      baseURL: 'http://localhost',
+    },
+  },
+}))
 vi.mock('@/api/serviceScheduleApi', () => ({
   serviceScheduleApi: {
     getByBranch: vi.fn(),
@@ -36,12 +46,16 @@ vi.mock('react-hot-toast', () => ({
   default: {
     success: vi.fn(),
     error: vi.fn(),
+    loading: vi.fn(),
+    info: vi.fn(),
   },
+  Toaster: () => null,
 }))
 
 describe('ChurchSettings - Unit Tests', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    resetApiMocks()
     vi.mocked(authUtils.hasAccess).mockReturnValue(true)
     mockApiResponse('get', '/churches', [{
       id: 'church-123',

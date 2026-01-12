@@ -6,7 +6,10 @@ import { fixtures } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/helpers'
 import { mockApiResponse } from '@/test/mockApi'
 
-vi.mock('@/api/api')
+vi.mock('@/api/api', async () => {
+  const { apiMock } = await import('@/test/apiMock')
+  return { default: apiMock }
+})
 const mockNavigate = vi.fn()
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom')
@@ -147,33 +150,6 @@ describe('Branches - Unit Tests', () => {
     // Arrange
     const user = userEvent.setup()
     mockApiResponse('get', '/churches', [{ id: 'church-123' }])
-    mockApiResponse('get', '/branches', [])
-    mockApiResponse('post', '/branches', { id: 'branch-123' })
-
-    // Act
-    renderWithProviders(<Branches />, {
-      authState: {
-        user: fixtures.user(),
-        token: 'token',
-      },
-    })
-
-    await waitFor(() => {
-      expect(screen.getByLabelText(/nome da filial/i)).toBeInTheDocument()
-    })
-
-    const nameInput = screen.getByLabelText(/nome da filial/i)
-    await user.type(nameInput, 'Filial Teste')
-
-    await user.click(screen.getByRole('button', { name: /continuar/i }))
-
-    // Assert
-    await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/onboarding/settings')
-    })
-  })
-})
-
     mockApiResponse('get', '/branches', [])
     mockApiResponse('post', '/branches', { id: 'branch-123' })
 

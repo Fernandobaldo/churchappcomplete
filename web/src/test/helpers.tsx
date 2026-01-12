@@ -3,18 +3,14 @@ import React from 'react'
 import { render, RenderOptions } from '@testing-library/react'
 import { BrowserRouter, MemoryRouter } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
-import api from '../api/api'
 import { vi } from 'vitest'
+import { apiMock } from '@/test/apiMock'
 
 // Mock do API client
-vi.mock('../api/api', () => ({
-  default: {
-    get: vi.fn(),
-    post: vi.fn(),
-    put: vi.fn(),
-    delete: vi.fn(),
-  },
-}))
+vi.mock('@/api/api', async () => {
+  const { apiMock } = await import('@/test/apiMock')
+  return { default: apiMock }
+})
 
 /**
  * Wrapper para renderizar componentes com providers necessários
@@ -87,14 +83,14 @@ export function mockAuthState(state: {
  * Helper para mockar API responses
  */
 export function mockApiResponse(method: 'get' | 'post' | 'put' | 'delete', response: any) {
-  ;(api[method] as any).mockResolvedValue(response)
+  ;(apiMock[method] as any).mockResolvedValue(response)
 }
 
 /**
  * Helper para mockar API errors
  */
 export function mockApiError(method: 'get' | 'post' | 'put' | 'delete', error: any) {
-  ;(api[method] as any).mockRejectedValue(error)
+  ;(apiMock[method] as any).mockRejectedValue(error)
 }
 
 /**
@@ -134,10 +130,10 @@ export function decodeMockToken(token: string): any {
  */
 export function clearAllMocks() {
   vi.clearAllMocks()
-  ;(api.get as any).mockReset()
-  ;(api.post as any).mockReset()
-  ;(api.put as any).mockReset()
-  ;(api.delete as any).mockReset()
+  ;(apiMock.get as any).mockReset()
+  ;(apiMock.post as any).mockReset()
+  ;(apiMock.put as any).mockReset()
+  ;(apiMock.delete as any).mockReset()
 }
 
 /**

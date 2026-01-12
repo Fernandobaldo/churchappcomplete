@@ -3,10 +3,17 @@ import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Church from '@/pages/onboarding/Church'
 import { fixtures } from '@/test/fixtures'
-import { renderWithProviders } from '@/test/helpers'
+import { renderWithProviders } from '@/test/renderWithProviders'
 import { mockApiResponse, resetApiMocks } from '@/test/mockApi'
+import { jwtDecode } from 'jwt-decode'
 
-vi.mock('@/api/api')
+vi.mock('@/api/api', async () => {
+  const { apiMock } = await import('@/test/apiMock')
+  return { default: apiMock }
+})
+vi.mock('jwt-decode', () => ({
+  jwtDecode: vi.fn(),
+}))
 const mockNavigate = vi.fn()
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom')
@@ -19,6 +26,12 @@ vi.mock('react-router-dom', async () => {
 describe('Church - Unit Tests', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    resetApiMocks()
+    vi.mocked(jwtDecode).mockReturnValue({
+      branchId: 'branch-123',
+      role: 'ADMINGERAL',
+      name: 'Test User',
+    } as any)
     localStorage.clear()
     localStorage.setItem('onboarding_structure', 'simple')
     // Mock da chamada API /churches que é feita no useEffect do componente

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import toast from 'react-hot-toast'
-import api from '../../api/api'
+import api from '@/api/api'
 import { Plus, X } from 'lucide-react'
 import OnboardingHeader from '../../components/OnboardingHeader'
 import { useAuthStore } from '../../stores/authStore'
@@ -280,4 +280,3 @@ export default function Branches() {
     </div>
   )
 }
-

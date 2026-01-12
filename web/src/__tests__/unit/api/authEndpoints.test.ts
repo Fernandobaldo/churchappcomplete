@@ -195,24 +195,3 @@ describe('Auth Endpoints - Unit Tests', () => {
     })
   })
 })
-
-      vi.mocked(api.post).mockResolvedValue(mockResponse)
-
-      // Act
-      const response = await api.post('/public/register', {
-        name: 'Public User',
-        email: 'public@example.com',
-        password: 'password123',
-      })
-
-      // Assert
-      expect(api.post).toHaveBeenCalledWith('/public/register', {
-        name: 'Public User',
-        email: 'public@example.com',
-        password: 'password123',
-      })
-      expect(response.data).toHaveProperty('token')
-      expect(response.data).toHaveProperty('user')
-    })
-  })
-})

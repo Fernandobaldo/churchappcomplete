@@ -238,7 +238,7 @@ export class AdminPlanService {
     if (plan.gatewayProductId) {
       try {
         const gateway = PaymentGatewayService.getGateway()
-        // MercadoPago não tem desativação de produto, mas podemos atualizar
+        // Atualizar produto no gateway
         await gateway.updateProduct(plan.gatewayProductId, {
           name: plan.name,
         })
@@ -279,7 +279,7 @@ export class AdminPlanService {
     if (plan.gatewayProductId) {
       try {
         const gateway = PaymentGatewayService.getGateway()
-        // MercadoPago não tem desativação de produto, mas podemos atualizar
+        // Atualizar produto no gateway
         await gateway.updateProduct(plan.gatewayProductId, {
           name: plan.name,
         })

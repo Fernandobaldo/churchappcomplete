@@ -243,35 +243,3 @@ describe('Devotionals Endpoints - Unit Tests', () => {
     })
   })
 })
-
-
-      // Assert
-      expect(api.post).toHaveBeenCalledWith('/devotionals/devotional-1/like')
-      expect(response.data.success).toBe(true)
-    })
-
-    // ============================================================================
-    // TESTE 8: VALIDATION FAILURE - Retorna erro 400 quando já curtiu
-    // ============================================================================
-    it('deve retornar erro 400 quando já curtiu', async () => {
-      // Arrange
-      const mockError = {
-        response: {
-          status: 400,
-          data: {
-            message: 'Você já curtiu esse devocional.',
-          },
-        },
-      }
-      vi.mocked(api.post).mockRejectedValue(mockError)
-
-      // Act & Assert
-      await expect(api.post('/devotionals/devotional-1/like')).rejects.toMatchObject({
-        response: {
-          status: 400,
-          data: { message: 'Você já curtiu esse devocional.' },
-        },
-      })
-    })
-  })
-})

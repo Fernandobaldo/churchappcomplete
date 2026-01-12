@@ -864,6 +864,523 @@ Factory `createTestUser` não suportava campo `isBlocked`, causando erro quando 
 
 ---
 
-**Última atualização:** 2026-01-10  
+---
+
+## 📝 Notas Adicionais da Sexta Rodada de Correções - Padronização de Testes E2E
+
+### 26. Helpers E2E Devem Ser Atualizados quando Schemas Mudam
+
+**Problema Encontrado:**  
+Helper `registerUser()` em testes E2E não foi atualizado quando o schema do endpoint `/public/register` mudou de `name` para `firstName`/`lastName` e adicionou campos obrigatórios `phone` e `document`. Todos os 20 testes E2E que dependiam de registro falhavam com erro 400 Bad Request.
+
+**Regra Preventiva:**
+> **REGRA-E2E-001**: Quando um endpoint de API usado em testes E2E tem seu schema alterado, TODOS os helpers que chamam esse endpoint DEVEM ser atualizados no mesmo commit ou PR. Adicionar checklist para validar helpers E2E após mudanças em schemas de rotas.
+
+**Sintoma Típico:**
+```
+Error: Falha ao registrar usuário: 400 - {"error":"Bad Request"}
+ ❯ registerUser tests/e2e/helpers/testHelpers.ts:25:11
+```
+
+**Checklist de Validação:**
+- [ ] Buscar helpers que chamam o endpoint modificado (`grep -r "endpoint-name" tests/e2e/helpers/`)
+- [ ] Verificar se interface do helper corresponde ao schema atual do endpoint
+- [ ] Executar testes E2E após mudanças em schemas de rotas
+- [ ] Documentar mudanças breaking em helpers E2E
+
+**Padrão Correto:**
+```typescript
+// ✅ CORRETO: Helper aceita campos obrigatórios do endpoint
+export async function registerUser(
+  app: FastifyInstance,
+  userData: {
+    firstName: string
+    lastName: string
+    email: string
+    password: string
+    phone: string
+    document: string
+  }
+) {
+  const response = await request(app.server)
+    .post('/public/register')
+    .send(userData) // Envia todos os campos obrigatórios
+  
+  if (response.status !== 201) {
+    throw new Error(`Falha ao registrar usuário: ${response.status} - ${JSON.stringify(response.body)}`)
+  }
+  
+  return {
+    user: response.body.user,
+    token: response.body.token,
+  }
+}
+```
+
+**Retrocompatibilidade (Opcional):**
+Se necessário manter suporte a formato antigo durante transição:
+```typescript
+// ✅ CORRETO: Aceita ambos formatos (novo e antigo)
+export async function registerUser(
+  app: FastifyInstance,
+  userData: 
+    | { firstName: string; lastName: string; email: string; password: string; phone?: string; document?: string }
+    | { name: string; email: string; password: string; phone?: string; document?: string }
+) {
+  // Normalizar dados: converter name para firstName/lastName se necessário
+  let firstName: string
+  let lastName: string
+  
+  if ('name' in userData) {
+    const nameParts = userData.name.trim().split(/\s+/)
+    firstName = nameParts[0] || 'Usuário'
+    lastName = nameParts.slice(1).join(' ') || 'Teste'
+  } else {
+    firstName = userData.firstName
+    lastName = userData.lastName
+  }
+  
+  // Gerar valores padrão se não fornecidos
+  const phone = userData.phone || `11999999999`
+  const document = userData.document || `12345678901`
+  
+  // Enviar payload com campos obrigatórios
+  const payload = { firstName, lastName, email: userData.email, password: userData.password, phone, document }
+  // ...
+}
+```
+
+---
+
+### 27. Helpers E2E Devem Validar Schema do Endpoint em Tempo de Execução
+
+**Problema Encontrado:**  
+Helpers E2E não validaram que estavam enviando todos os campos obrigatórios esperados pelo endpoint, causando erros 400 que eram difíceis de debugar.
+
+**Regra Preventiva:**
+> **REGRA-E2E-002**: Helpers E2E devem logar detalhes completos do erro (response.body completo e payload enviado) quando falham, facilitando debugging. Melhorar mensagens de erro para incluir campos esperados vs campos enviados.
+
+**Padrão Correto:**
+```typescript
+// ✅ CORRETO: Log detalhado quando falha
+const response = await request(app.server)
+  .post('/public/register')
+  .send(payload)
+
+if (response.status !== 201) {
+  throw new Error(
+    `Falha ao registrar usuário: ${response.status} - ${JSON.stringify(response.body)}\n` +
+    `Payload enviado: ${JSON.stringify(payload, null, 2)}`
+  )
+}
+```
+
+**Checklist de Validação:**
+- [ ] Helpers logam `response.body` completo quando status não é o esperado
+- [ ] Mensagens de erro incluem payload enviado para comparação
+- [ ] Helpers validam formato de resposta antes de retornar
+
+---
+
+### 28. Mudanças Breaking em Endpoints Devem Atualizar Testes E2E
+
+**Problema Encontrado:**  
+Mudança breaking no endpoint `/public/register` (removendo `name`, adicionando `firstName`/`lastName`/`phone`/`document`) não atualizou testes E2E no mesmo PR, causando falhas em massa após merge.
+
+**Regra Preventiva:**
+> **REGRA-E2E-003**: Mudanças breaking em endpoints públicos ou autenticados que são usados em testes E2E DEVEM incluir atualização dos helpers e testes E2E no mesmo PR. Criar checklist de "mudanças breaking" que inclui testes E2E.
+
+**Checklist de Validação:**
+- [ ] PR que altera schema de endpoint lista quais helpers/testes E2E precisam atualizar
+- [ ] Testes E2E executados e passando antes de merge
+- [ ] Documentação de helpers atualizada se interface mudar
+
+---
+
+### 29. Testes de Integração Podem Servir de Referência para Helpers E2E
+
+**Problema Encontrado:**  
+Testes de integração já usavam formato correto (`firstName`/`lastName`), mas testes E2E não foram atualizados porque não foram verificados como referência.
+
+**Regra Preventiva:**
+> **REGRA-E2E-004**: Quando testes de integração e E2E testam o mesmo endpoint, devem usar o mesmo formato de dados. Buscar testes de integração como referência ao atualizar helpers E2E.
+
+**Padrão de Busca:**
+```bash
+# Verificar formato usado em testes de integração
+grep -r "firstName\|lastName" backend/tests/integration/ | head -20
+
+# Verificar helpers E2E
+grep -A 20 "registerUser" backend/tests/e2e/helpers/testHelpers.ts
+```
+
+**Checklist de Validação:**
+- [ ] Verificar testes de integração que testam o mesmo endpoint
+- [ ] Garantir que helpers E2E usam o mesmo formato de dados
+- [ ] Criar helper compartilhado se formato é comum entre integration e E2E
+
+---
+
+### 30. Formato de Data em Helpers E2E Deve Corresponder ao Esperado pelo Endpoint
+
+**Problema Encontrado:**  
+Helper `createEvent()` documentava formato `dd/MM/yyyy` (com barra), mas endpoint esperava `dd-MM-yyyy` (com hífen), causando erros de validação de data em 4 testes.
+
+**Regra Preventiva:**
+> **REGRA-E2E-005**: Documentação de helpers E2E deve refletir exatamente o formato esperado pelo endpoint. Quando endpoint aceita múltiplos formatos, documentar todos. Verificar formato correto consultando schema/validação do endpoint.
+
+**Sintoma Típico:**
+```
+Error: Falha ao criar evento: 500 - {"error":"Erro interno ao criar evento","details":"Data de início inválida: 11/01/2026. Use formato dd-MM-yyyy"}
+```
+
+**Padrão Correto:**
+```typescript
+// ✅ CORRETO: Documentação corresponde ao formato esperado pelo endpoint
+export async function createEvent(
+  app: FastifyInstance,
+  token: string,
+  eventData: {
+    title: string
+    startDate: string // formato: dd-MM-yyyy (com hífen, não barra)
+    endDate: string // formato: dd-MM-yyyy (com hífen, não barra)
+    // ...
+  }
+) {
+  // ...
+}
+```
+
+**Checklist de Validação:**
+- [ ] Verificar formato de data/documento esperado pelo endpoint no schema/controller
+- [ ] Atualizar documentação do helper para corresponder exatamente
+- [ ] Atualizar todos os usos do helper nos testes para usar formato correto
+- [ ] Verificar se endpoint aceita múltiplos formatos (documentar todos)
+
+---
+
+## 📝 Notas Adicionais da Quinta Rodada de Correções - Problema de Reset de Banco
+
+### 23. Helpers de Teste Não Devem Falhar Silenciosamente
+
+**Problema Encontrado:**  
+A função `resetTestDatabase()` estava capturando erros e apenas logando, dando falsa impressão de sucesso. Quando `prisma.onboardingProgress` estava `undefined` (Prisma Client não regenerado), a função falhava silenciosamente, permitindo que dados residuais permanecessem no banco e causassem violações de constraint única em testes subsequentes.
+
+**Regra Preventiva:**
+> **REGRA-INFRA-001**: Helpers de infraestrutura de testes (reset, setup, teardown) devem lançar erros quando falharem. NUNCA capturar e ignorar erros silenciosamente em helpers críticos como reset de banco.
+
+**Sintoma Típico:**
+```
+Erro ao resetar banco de teste: TypeError: Cannot read properties of undefined (reading 'deleteMany')
+    at resetTestDatabase (backend/tests/utils/db.ts:49:37)
+```
+Teste passa silenciosamente, mas dados não são limpos, causando falhas em testes subsequentes com constraints únicas violadas.
+
+**Padrão Correto:**
+```typescript
+// ✅ CORRETO: Lança erro quando falha (exceto tabela não existir)
+async function deleteModel(
+  modelName: string,
+  deleteFn: () => Promise<any>
+): Promise<void> {
+  try {
+    await deleteFn()
+  } catch (error: any) {
+    // P2021 = Table does not exist (OK para reset)
+    if (error.code === 'P2021') {
+      return
+    }
+    // Outros erros são críticos e devem ser lançados
+    throw new Error(
+      `Erro ao deletar modelo ${modelName} no reset do banco de teste: ${error.message}. Código: ${error.code}`
+    )
+  }
+}
+
+// ❌ INCORRETO: Captura silenciosamente
+await prisma.onboardingProgress.deleteMany().catch(() => {
+  // Ignora todos os erros - PERIGOSO!
+})
+```
+
+**Checklist:**
+- [ ] Helper tem `throw error` ou equivalente em blocos `catch`
+- [ ] Não há `.catch(() => {})` em operações críticas de reset
+- [ ] Erros são lançados com contexto suficiente (modelo, código de erro)
+- [ ] Apenas erros esperados (P2021 = tabela não existe) são ignorados
+
+---
+
+### 24. Validar Prisma Client Após Mudanças no Schema
+
+**Problema Encontrado:**  
+Modelo `onboardingProgress` estava `undefined` no Prisma Client, possivelmente por Prisma Client não regenerado após mudanças no schema. A função `resetTestDatabase` tentava acessar `prisma.onboardingProgress.deleteMany()` e falhava silenciosamente.
+
+**Regra Preventiva:**
+> **REGRA-INFRA-002**: Após qualquer mudança no schema Prisma, SEMPRE executar `npx prisma generate` e validar que todos os modelos esperados existem no Prisma Client gerado.
+
+**Sintoma Típico:**
+```
+TypeError: Cannot read properties of undefined (reading 'deleteMany')
+    at resetTestDatabase (backend/tests/utils/db.ts:49:37)
+```
+Indica que um modelo do Prisma não está disponível no Prisma Client.
+
+**Padrão Correto:**
+```typescript
+// ✅ CORRETO: Verifica se modelo existe antes de usar
+async function safeDeleteOptionalModel(modelName: string): Promise<void> {
+  try {
+    const model = (prisma as any)[modelName]
+    if (!model || typeof model.deleteMany !== 'function') {
+      console.warn(`[RESET] Modelo ${modelName} não está disponível no Prisma Client. Verifique se o Prisma Client foi regenerado (npx prisma generate). Pulando...`)
+      return
+    }
+    await model.deleteMany()
+  } catch (error: any) {
+    // Tratamento apropriado de erros...
+  }
+}
+```
+
+**Checklist de Validação:**
+- [ ] `npx prisma generate` executado após mudanças no schema
+- [ ] Script de CI/CD inclui `prisma generate` antes dos testes
+- [ ] Verificação automatizada de que modelos críticos existem no Prisma Client
+- [ ] Helpers de reset verificam existência de modelo antes de usar (fail-safe)
+
+**Comandos Úteis para Debug:**
+```bash
+# Regenerar Prisma Client
+cd backend
+npx prisma generate
+
+# Verificar modelos disponíveis
+node -e "const { prisma } = require('./src/lib/prisma'); console.log(Object.keys(prisma).filter(k => !k.startsWith('$') && typeof prisma[k] === 'object' && prisma[k].deleteMany).sort().join(', '))"
+
+# Verificar se modelo específico existe
+node -e "const { prisma } = require('./src/lib/prisma'); console.log(prisma.onboardingProgress ? 'EXISTS' : 'UNDEFINED')"
+```
+
+---
+
+### 25. Reset de Banco Deve Validar Ordem de Deleção e Dependências
+
+**Problema Encontrado:**  
+A função `resetTestDatabase` deletava modelos em ordem, mas se uma deleção falhava silenciosamente, as subsequentes ainda eram executadas, possivelmente deixando dados órfãos ou causando falhas em cascata.
+
+**Regra Preventiva:**
+> **REGRA-INFRA-003**: Funções de reset devem deletar em ordem que respeite constraints de foreign key, e devem usar validação para garantir atomicidade. Se uma deleção crítica falhar, toda a operação deve falhar.
+
+**Padrão Correto:**
+```typescript
+// ✅ CORRETO: Ordem correta (filhos antes de pais) e tratamento de erros apropriado
+export async function resetTestDatabase(options?: { validate?: boolean }) {
+  // Helper para deletar com tratamento de erro apropriado
+  async function deleteModel(
+    modelName: string,
+    deleteFn: () => Promise<any>
+  ): Promise<void> {
+    try {
+      await deleteFn()
+    } catch (error: any) {
+      // P2021 = Table does not exist (OK para reset)
+      if (error.code === 'P2021') {
+        return
+      }
+      // Outros erros são críticos
+      throw new Error(
+        `Erro ao deletar modelo ${modelName}: ${error.message}. Código: ${error.code}`
+      )
+    }
+  }
+
+  // Deletar em ordem reversa das dependências (filhos antes de pais)
+  await deleteModel('auditLog', () => prisma.auditLog.deleteMany())
+  await deleteModel('devotionalLike', () => prisma.devotionalLike.deleteMany())
+  // ... continua em ordem correta
+  
+  // Validação opcional pós-reset
+  if (options?.validate) {
+    const counts = await Promise.all([
+      prisma.user.count().catch(() => 0),
+      prisma.church.count().catch(() => 0),
+      prisma.plan.count().catch(() => 0),
+      // ...
+    ])
+    
+    const hasData = counts.some((count) => count > 0)
+    if (hasData) {
+      throw new Error(
+        `Reset falhou: dados ainda presentes no banco. Counts: users=${counts[0]}, churches=${counts[1]}, ...`
+      )
+    }
+  }
+}
+```
+
+**Checklist:**
+- [ ] Reset deleta em ordem correta (filhos antes de pais)
+- [ ] Erros críticos são lançados, não ignorados
+- [ ] Validação opcional pós-reset disponível para garantir limpeza
+- [ ] Ordem de deleção documentada no código
+
+---
+
+### 26. Testes Unitários Não Devem Compartilhar Estado Entre Suítes
+
+**Problema Encontrado:**  
+Dados de uma suíte de testes estavam afetando outra porque o reset falhava silenciosamente. Testes subsequentes encontravam dados residuais e falhavam com constraints únicas violadas.
+
+**Regra Preventiva:**
+> **REGRA-TEST-002**: Cada suíte de testes unitários deve ser completamente isolada. `beforeAll` deve garantir estado limpo, não assumir que outros testes limparam o estado.
+
+**Sintoma Típico:**
+```
+Unique constraint failed on the fields: (`name`)
+    at prisma.plan.create()
+```
+Indica que dados de teste anterior não foram limpos, causando violação de constraint única.
+
+**Padrão Correto:**
+```typescript
+// ✅ CORRETO: Cada suíte reseta no beforeAll
+describe('AdminUserService - Unit Tests', () => {
+  beforeAll(async () => {
+    await resetTestDatabase()  // Garante estado limpo antes de começar
+  })
+
+  afterAll(async () => {
+    await resetTestDatabase()  // Limpa após terminar
+  })
+
+  // Testes individuais...
+})
+```
+
+**Checklist:**
+- [ ] Cada suíte tem `beforeAll` que reseta o banco
+- [ ] Cada suíte não assume dados de outras suítes
+- [ ] Suítes podem executar em qualquer ordem sem falhar
+- [ ] `resetTestDatabase` funciona corretamente (não falha silenciosamente)
+
+---
+
+## ✅ Checklist Preventivo para Padronização de Testes E2E
+
+Esta seção documenta o checklist preventivo baseado nas lições aprendidas do relatório de investigação de falhas em testes E2E (`docs/qa/TEST_FAILURE_INVESTIGATION_REPORT.md`).
+
+### Quando Usar Este Checklist
+
+Use este checklist sempre que:
+- Fazer mudanças em schemas de endpoints usados em testes E2E
+- Atualizar helpers E2E (`backend/tests/e2e/helpers/testHelpers.ts`)
+- Modificar endpoints públicos ou autenticados que são testados em E2E
+- Adicionar novos campos obrigatórios a endpoints existentes
+- Remover ou renomear campos em endpoints existentes
+
+### Checklist de Validação de Helpers E2E
+
+#### Antes de Fazer Mudanças em Endpoints
+
+- [ ] **Identificar escopo**: Quais endpoints serão modificados?
+- [ ] **Buscar helpers afetados**: `grep -r "endpoint-name" backend/tests/e2e/helpers/`
+- [ ] **Verificar testes de integração**: Verificar formato usado em `backend/tests/integration/` como referência
+- [ ] **Documentar mudanças breaking**: Listar campos adicionados/removidos/renomeados
+
+#### Durante a Implementação
+
+- [ ] **Atualizar helper E2E**: Modificar interface e implementação do helper
+- [ ] **Manter retrocompatibilidade (se necessário)**: Suportar formato antigo durante transição
+- [ ] **Gerar valores padrão**: Para campos obrigatórios novos, gerar valores padrão para testes
+- [ ] **Melhorar mensagens de erro**: Incluir `response.body` completo e payload enviado em erros
+- [ ] **Atualizar documentação**: Atualizar comentários JSDoc do helper
+
+#### Após Implementação
+
+- [ ] **Executar testes E2E**: `npm run test:e2e` deve passar (21/21 testes)
+- [ ] **Verificar todos os usos**: Buscar todos os usos do helper nos testes E2E
+- [ ] **Validar formato de dados**: Verificar que formato corresponde ao schema do endpoint
+- [ ] **Testar retrocompatibilidade**: Se mantida, verificar que formato antigo ainda funciona
+
+### Checklist Específico para Mudanças em `/public/register`
+
+Quando modificar o endpoint `/public/register`:
+
+- [ ] **Atualizar `registerUser()` helper**: `backend/tests/e2e/helpers/testHelpers.ts`
+- [ ] **Atualizar `setupCompleteUser()` helper**: Se usa `registerUser()` internamente
+- [ ] **Verificar testes diretos**: Buscar testes que chamam `/public/register` diretamente (ex: `user-member-model.test.ts`)
+- [ ] **Validar campos obrigatórios**: `firstName`, `lastName`, `email`, `password`, `phone`, `document`
+- [ ] **Verificar formato de `document`**: Deve ter mínimo 11 dígitos (CPF/CNPJ)
+- [ ] **Executar todos os testes E2E**: Garantir que nenhum teste regrediu
+
+### Comandos Úteis para Validação
+
+```bash
+# Buscar helpers que usam endpoint específico
+grep -r "register" backend/tests/e2e/helpers/
+
+# Verificar formato usado em testes de integração
+grep -r "firstName\|lastName" backend/tests/integration/ | head -20
+
+# Verificar schema do endpoint
+grep -A 30 "required:" backend/src/routes/public/register.ts
+
+# Executar testes E2E
+cd backend && npm run test:e2e
+
+# Verificar interface do helper
+grep -A 20 "registerUser" backend/tests/e2e/helpers/testHelpers.ts
+```
+
+### Regras Preventivas Aplicadas
+
+As seguintes regras devem ser seguidas:
+
+1. **REGRA-E2E-001**: Quando um endpoint de API usado em testes E2E tem seu schema alterado, TODOS os helpers que chamam esse endpoint DEVEM ser atualizados no mesmo commit ou PR.
+
+2. **REGRA-E2E-002**: Helpers E2E devem logar detalhes completos do erro (response.body completo e payload enviado) quando falham, facilitando debugging.
+
+3. **REGRA-E2E-003**: Mudanças breaking em endpoints públicos ou autenticados que são usados em testes E2E DEVEM incluir atualização dos helpers e testes E2E no mesmo PR.
+
+4. **REGRA-E2E-004**: Quando testes de integração e E2E testam o mesmo endpoint, devem usar o mesmo formato de dados. Buscar testes de integração como referência ao atualizar helpers E2E.
+
+5. **REGRA-E2E-005**: Documentação de helpers E2E deve refletir exatamente o formato esperado pelo endpoint. Quando endpoint aceita múltiplos formatos, documentar todos.
+
+### Exemplo de Correção Aplicada
+
+**Problema Original:**
+- Helper `registerUser()` enviava `name`, `email`, `password`
+- Endpoint esperava `firstName`, `lastName`, `email`, `password`, `phone`, `document`
+- 20 testes E2E falhavam com erro 400 Bad Request
+
+**Solução Aplicada:**
+- Helper atualizado para aceitar ambos formatos (novo e antigo) com retrocompatibilidade
+- Conversão automática de `name` para `firstName`/`lastName`
+- Geração de valores padrão para `phone` e `document` se não fornecidos
+- Mensagens de erro melhoradas com payload completo
+
+**Resultado:**
+- ✅ 21/21 testes E2E passando
+- ✅ Retrocompatibilidade mantida
+- ✅ Documentação atualizada
+
+---
+
+**Última atualização:** 2025-02-01  
 **Próxima revisão:** Após próxima migração significativa de testes
+---
+
+## Preventive checklist (web unit standardization)
+
+- [ ] When using mockApiResponse, mock @/api/api with a factory that exposes get/post/put/delete and call resetApiMocks() in beforeEach.
+- [ ] If a test uses renderWithProviders, mocked useAuthStore must expose setState.
+- [ ] For loading states, assert on the actual loading label (example: /entrando/i) or on disabled.
+- [ ] For onboarding flow assertions, verify the real route used by the component (example: /onboarding/concluido).
+- [ ] When a component fetches data on mount, mock the exact endpoint used in the useEffect.
+- [ ] If a vi.mock factory references a local mock function, declare it with vi.hoisted or inline it in the factory to avoid TDZ errors.
+- [ ] Avoid top-level const mocks referenced by hoisted vi.mock factories (ReferenceError before initialization).
+- [ ] After editing a test file, run the file once to catch syntax/parse errors early.
+- [ ] Use the shared `apiMock` (`web/src/test/apiMock.ts`) in `vi.mock('@/api/api', ...)` so mockApiResponse applies to the same instance.
+- [ ] If a vi.mock factory needs imported values, use an async factory (dynamic import) or vi.hoisted to avoid TDZ.
 

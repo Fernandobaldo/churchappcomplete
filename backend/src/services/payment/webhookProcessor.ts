@@ -175,7 +175,7 @@ export class WebhookProcessor {
           currency: 'BRL',
           status: this.mapPaymentStatus(status),
           gatewayPaymentId: paymentId?.toString(),
-          gatewayProvider: subscription.gatewayProvider || 'mercadopago',
+          gatewayProvider: subscription.gatewayProvider || 'stripe',
           paidAt: payload.data?.date_approved ? new Date(payload.data.date_approved) : new Date(),
         },
       })

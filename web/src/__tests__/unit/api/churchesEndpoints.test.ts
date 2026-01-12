@@ -267,27 +267,3 @@ describe('Churches Endpoints - Unit Tests', () => {
     })
   })
 })
-
-      const mockError = {
-        response: {
-          status: 404,
-          data: {
-            message: 'Igreja não encontrada',
-          },
-        },
-      }
-      vi.mocked(api.put).mockRejectedValue(mockError)
-
-      // Act & Assert
-      await expect(
-        api.put('/churches/invalid-id', {
-          name: 'Igreja Teste',
-        })
-      ).rejects.toMatchObject({
-        response: {
-          status: 404,
-        },
-      })
-    })
-  })
-})

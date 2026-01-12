@@ -7,9 +7,14 @@ import { renderWithProviders } from '@/test/helpers'
 import { mockApiResponse, mockApiError } from '@/test/mockApi'
 import api from '@/api/api'
 
-vi.mock('@/api/api')
-const mockToastSuccess = vi.fn()
-const mockToastError = vi.fn()
+vi.mock('@/api/api', async () => {
+  const { apiMock } = await import('@/test/apiMock')
+  return { default: apiMock }
+})
+const { mockToastSuccess, mockToastError } = vi.hoisted(() => ({
+  mockToastSuccess: vi.fn(),
+  mockToastError: vi.fn(),
+}))
 vi.mock('react-hot-toast', () => ({
   default: {
     success: mockToastSuccess,
@@ -306,21 +311,3 @@ describe('EditTransaction - Unit Tests', () => {
   })
 })
 
-        token: 'token',
-      },
-    })
-
-    // Assert
-    await waitFor(() => {
-      const titleInput = document.getElementById('title') as HTMLInputElement
-      expect(titleInput.value).toBe('Transação de Contribuição')
-      
-      const entryTypeSelect = document.getElementById('entryType') as HTMLSelectElement
-      expect(entryTypeSelect.value).toBe('CONTRIBUICAO')
-      
-      const contributionSelect = document.getElementById('contributionId') as HTMLSelectElement
-      expect(contributionSelect).toBeInTheDocument()
-      expect(contributionSelect.value).toBe('contrib-1')
-    })
-  })
-})

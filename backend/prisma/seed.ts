@@ -48,8 +48,8 @@ async function main() {
           maxMembers: 20,
           billingInterval: 'month',
           isActive: true,
-          gatewayProvider: 'mercadopago',
-          // IDs fictícios para referência interna (não são usados no Mercado Pago)
+          gatewayProvider: 'stripe',
+          // IDs fictícios para referência interna (serão criados no checkout)
           gatewayProductId: 'prod_free',
           gatewayPriceId: 'price_free_0_month',
           syncStatus: 'synced', // Não precisa sincronizar com gateway (será criado no checkout)
@@ -79,7 +79,7 @@ async function main() {
             // Garantir que outros campos estão corretos
             billingInterval: existingPlan.billingInterval || 'month',
             isActive: existingPlan.isActive !== null ? existingPlan.isActive : true,
-            gatewayProvider: existingPlan.gatewayProvider || 'mercadopago',
+            gatewayProvider: existingPlan.gatewayProvider || 'stripe',
             syncStatus: 'synced',
           },
         })

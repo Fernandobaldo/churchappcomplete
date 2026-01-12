@@ -82,11 +82,3 @@ describe('API Client - Unit Tests', () => {
     })
   })
 })
-
-      // Act & Assert
-      // O interceptor é configurado no arquivo api.ts
-      // Aqui apenas verificamos que o logout existe
-      expect(useAuthStore.getState().logout).toBeDefined()
-    })
-  })
-})

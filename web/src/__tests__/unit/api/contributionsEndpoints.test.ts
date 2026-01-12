@@ -210,39 +210,3 @@ describe('Contributions Endpoints - Unit Tests', () => {
     })
   })
 })
-
-      expect(response.data).toHaveProperty('id')
-      expect(response.data.title).toBe('Nova Campanha')
-      expect(response.data.goal).toBe(5000.0)
-    })
-
-    // ============================================================================
-    // TESTE 6: VALIDATION FAILURE - Retorna erro 400 quando branchId não está presente
-    // ============================================================================
-    it('deve retornar erro 400 quando branchId não está presente', async () => {
-      // Arrange
-      useAuthStore.setState({ token: 'mock-token', user: { branchId: null } as any })
-      const mockError = {
-        response: {
-          status: 400,
-          data: {
-            message: 'Usuário não vinculado a uma filial.',
-          },
-        },
-      }
-      vi.mocked(api.post).mockRejectedValue(mockError)
-
-      // Act & Assert
-      await expect(
-        api.post('/contributions', {
-          title: 'Nova Campanha',
-          goal: 5000.0,
-        })
-      ).rejects.toMatchObject({
-        response: {
-          status: 400,
-        },
-      })
-    })
-  })
-})

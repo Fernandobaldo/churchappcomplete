@@ -7,8 +7,13 @@ import { renderWithProviders } from '@/test/helpers'
 import { mockApiResponse, mockApiError } from '@/test/mockApi'
 import api from '@/api/api'
 
-vi.mock('@/api/api')
-const mockToastError = vi.fn()
+vi.mock('@/api/api', async () => {
+  const { apiMock } = await import('@/test/apiMock')
+  return { default: apiMock }
+})
+const { mockToastError } = vi.hoisted(() => ({
+  mockToastError: vi.fn(),
+}))
 vi.mock('react-hot-toast', () => ({
   default: {
     error: mockToastError,
@@ -190,3 +195,4 @@ describe('DevotionalDetails - Unit Tests', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/app/devotionals')
   })
 })
+

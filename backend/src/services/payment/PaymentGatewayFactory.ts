@@ -1,5 +1,4 @@
 import { PaymentGatewayInterface } from './PaymentGatewayInterface'
-import { MercadoPagoGateway } from './MercadoPagoGateway'
 import { GatewayProvider, GatewayConfig } from './types'
 import { env } from '../../env'
 
@@ -12,9 +11,6 @@ export class PaymentGatewayFactory {
    */
   static createGateway(config: GatewayConfig): PaymentGatewayInterface {
     switch (config.provider) {
-      case 'mercadopago':
-        return new MercadoPagoGateway(config)
-      
       case 'asaas':
         // TODO: Implementar quando necessário
         throw new Error('Gateway Asaas ainda não implementado')
@@ -41,13 +37,10 @@ export class PaymentGatewayFactory {
 
     const config: GatewayConfig = {
       provider,
-      accessToken: env.MERCADOPAGO_ACCESS_TOKEN,
-      publicKey: env.MERCADOPAGO_PUBLIC_KEY,
-      webhookSecret: env.MERCADOPAGO_WEBHOOK_SECRET,
-      environment: env.MERCADOPAGO_ENVIRONMENT,
+      // Configurações serão adicionadas conforme a implementação do Stripe
+      // Por enquanto, apenas o provider é necessário
     }
 
     return this.createGateway(config)
   }
 }
-

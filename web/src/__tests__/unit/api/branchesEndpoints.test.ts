@@ -171,24 +171,3 @@ describe('Branches Endpoints - Unit Tests', () => {
     })
   })
 })
-
-          },
-        },
-      }
-      vi.mocked(api.post).mockRejectedValue(mockError)
-
-      // Act & Assert
-      await expect(
-        api.post('/branches', {
-          name: 'Filial Teste',
-          churchId: 'church-1',
-        })
-      ).rejects.toMatchObject({
-        response: {
-          status: 403,
-          data: { error: 'Limite do plano atingido' },
-        },
-      })
-    })
-  })
-})

@@ -170,7 +170,7 @@ export async function createCheckoutHandler(request: FastifyRequest, reply: Fast
     })
 
     // Determinar gateway provider (usar do plano se existir, senão do env)
-    const gatewayProvider = plan.gatewayProvider || process.env.PAYMENT_GATEWAY || 'mercadopago'
+    const gatewayProvider = plan.gatewayProvider || process.env.PAYMENT_GATEWAY || 'stripe'
 
     // Criar assinatura no banco
     const subscription = await prisma.subscription.create({

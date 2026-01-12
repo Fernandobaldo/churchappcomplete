@@ -192,19 +192,3 @@ describe('Permissions Endpoints - Unit Tests', () => {
     })
   })
 })
-
-      vi.mocked(api.post).mockRejectedValue(mockError)
-
-      // Act & Assert
-      await expect(
-        api.post('/permissions/member-1', {
-          permissions: ['devotional_manage'],
-        })
-      ).rejects.toMatchObject({
-        response: {
-          status: 403,
-        },
-      })
-    })
-  })
-})

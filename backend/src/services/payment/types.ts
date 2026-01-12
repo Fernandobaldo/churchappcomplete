@@ -2,7 +2,7 @@
  * Tipos compartilhados para todos os gateways de pagamento
  */
 
-export type GatewayProvider = 'mercadopago' | 'asaas' | 'pagseguro' | 'stripe'
+export type GatewayProvider = 'asaas' | 'pagseguro' | 'stripe'
 
 export type BillingInterval = 'month' | 'year' | 'week' | 'day'
 
