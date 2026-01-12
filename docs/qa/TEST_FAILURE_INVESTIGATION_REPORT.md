@@ -1,205 +1,214 @@
 # Web Unit Test Failure Investigation Report
 
 Date: 2026-01-12
-Command: cd web; .\node_modules\.bin\vitest run src\__tests__\unit
+Command: cd web; .\node_modules\.bin\vitest run src\__tests__\unit --reporter verbose --no-color
 Scope: web unit tests only
-Result: Test Files 21 failed | 23 passed (44). Tests 165 passed (165).
+Result: Test Files 11 failed | 33 passed (44). Tests 26 failed | 244 passed (270). Errors 4.
 
 ---
 
-## Summary table (failed files)
+## Summary table (failed tests)
 
 | Test file | Test name | Symptom | Classification |
 | --- | --- | --- | --- |
-| `src/__tests__/unit/components/Header.test.tsx` | File init (module mock hoist) | ReferenceError: Cannot access mockToastSuccess before initialization | STANDARDIZATION |
-| `src/__tests__/unit/pages/AddContribution.test.tsx` | File init (module mock hoist) | ReferenceError: Cannot access mockToastSuccess/mockToastError before initialization | STANDARDIZATION |
-| `src/__tests__/unit/pages/AddDevotional.test.tsx` | File init (module mock hoist) | ReferenceError: Cannot access mockToastSuccess/mockToastError before initialization | STANDARDIZATION |
-| `src/__tests__/unit/pages/AddEvent.test.tsx` | File init (module mock hoist) | ReferenceError: Cannot access mockToastSuccess/mockToastError before initialization | STANDARDIZATION |
-| `src/__tests__/unit/pages/AddMember.test.tsx` | File init (module mock hoist) | ReferenceError: Cannot access mockToastSuccess/mockToastError before initialization | STANDARDIZATION |
-| `src/__tests__/unit/pages/AddTransaction.test.tsx` | File init (module mock hoist) | ReferenceError: Cannot access mockToastSuccess/mockToastError before initialization | STANDARDIZATION |
-| `src/__tests__/unit/pages/ChurchSettings/ServiceScheduleList.test.tsx` | File init (module mock hoist) | ReferenceError: Cannot access mockToastSuccess before initialization | STANDARDIZATION |
-| `src/__tests__/unit/pages/Contributions.test.tsx` | File init (module mock hoist) | ReferenceError: Cannot access mockToastError before initialization | STANDARDIZATION |
-| `src/__tests__/unit/pages/DevotionalDetails.test.tsx` | File init (module mock hoist) | ReferenceError: Cannot access mockToastError before initialization | STANDARDIZATION |
-| `src/__tests__/unit/pages/Devotionals.test.tsx` | File init (module mock hoist) | ReferenceError: Cannot access mockToastError before initialization | STANDARDIZATION |
-| `src/__tests__/unit/pages/EditEvent.test.tsx` | File init (module mock hoist) | ReferenceError: Cannot access mockToastSuccess before initialization | STANDARDIZATION |
-| `src/__tests__/unit/pages/EditTransaction.test.tsx` | File init (module mock hoist) | ReferenceError: Cannot access mockToastSuccess before initialization | STANDARDIZATION |
-| `src/__tests__/unit/pages/EventDetails.test.tsx` | File init (module mock hoist) | ReferenceError: Cannot access mockToastSuccess before initialization | STANDARDIZATION |
-| `src/__tests__/unit/pages/Events.test.tsx` | File init (module mock hoist) | ReferenceError: Cannot access mockToastSuccess before initialization | STANDARDIZATION |
-| `src/__tests__/unit/pages/Finances.test.tsx` | File init (module mock hoist) | ReferenceError: Cannot access mockToastError before initialization | STANDARDIZATION |
-| `src/__tests__/unit/pages/MemberDetails.test.tsx` | File init (module mock hoist) | ReferenceError: Cannot access mockToastSuccess before initialization | STANDARDIZATION |
-| `src/__tests__/unit/pages/Members.test.tsx` | File init (module mock hoist) | ReferenceError: Cannot access mockToastError before initialization | STANDARDIZATION |
-| `src/__tests__/unit/pages/Positions.test.tsx` | File init (module mock hoist) | ReferenceError: Cannot access mockToastSuccess before initialization | STANDARDIZATION |
-| `src/__tests__/unit/pages/Register.test.tsx` | File init (module mock hoist) | ReferenceError: Cannot access mockToastSuccess before initialization | STANDARDIZATION |
-| `src/__tests__/unit/pages/TransactionDetails.test.tsx` | File init (module mock hoist) | ReferenceError: Cannot access mockToastError before initialization | STANDARDIZATION |
-| `src/__tests__/unit/pages/onboarding/Branches.test.tsx` | File parse error | Unexpected "}" at line 201 | STANDARDIZATION |
+| `src/__tests__/unit/pages/Contributions.test.tsx` | File parse error | Transform failed: Unexpected "}" (line 220) | STANDARDIZATION |
+| `src/__tests__/unit/pages/AddContribution.test.tsx` | deve criar campanha com sucesso | Toast text mismatch | STANDARDIZATION |
+| `src/__tests__/unit/pages/AddDevotional.test.tsx` | deve exibir loading durante criacao | Submit button not disabled | STANDARDIZATION |
+| `src/__tests__/unit/pages/ChurchSettings.test.tsx` | deve renderizar o formulario de edicao da igreja | Page shows "Igreja nao encontrada"; label not found | STANDARDIZATION |
+| `src/__tests__/unit/pages/ChurchSettings.test.tsx` | deve carregar e exibir os dados da igreja | Label not found; church data undefined | STANDARDIZATION |
+| `src/__tests__/unit/pages/ChurchSettings.test.tsx` | deve exibir botao para adicionar horario | Button not found (church data missing) | STANDARDIZATION |
+| `src/__tests__/unit/pages/DevotionalDetails.test.tsx` | deve curtir devocional com sucesso | Unhandled error: devotional.author.name undefined | STANDARDIZATION |
+| `src/__tests__/unit/pages/DevotionalDetails.test.tsx` | deve navegar para lista ao clicar em Voltar | Unhandled error: devotional.author.name undefined | STANDARDIZATION |
+| `src/__tests__/unit/pages/EditTransaction.test.tsx` | deve carregar dados da transacao existente | document.getElementById('title') is null | STANDARDIZATION |
+| `src/__tests__/unit/pages/EditTransaction.test.tsx` | deve preencher campos de transacao de saida com exitType | Reading value of null element | STANDARDIZATION |
+| `src/__tests__/unit/pages/EditTransaction.test.tsx` | deve atualizar transacao com sucesso | document.getElementById('title') is null | STANDARDIZATION |
+| `src/__tests__/unit/pages/EditTransaction.test.tsx` | deve exibir erro quando falha ao atualizar | document.getElementById('title') is null | STANDARDIZATION |
+| `src/__tests__/unit/pages/EditTransaction.test.tsx` | deve preencher campos de transacao com tipo CONTRIBUICAO | Reading value of null element | STANDARDIZATION |
+| `src/__tests__/unit/pages/MemberDetails.test.tsx` | deve renderizar detalhes do membro | Unhandled error: positions.map on null | STANDARDIZATION |
+| `src/__tests__/unit/pages/Profile.test.tsx` | deve carregar cargos disponiveis | positions load fails; text not found | STANDARDIZATION |
+| `src/__tests__/unit/pages/Profile.test.tsx` | deve atualizar perfil com sucesso | mockUpdateUser not called | STANDARDIZATION |
+| `src/__tests__/unit/pages/Profile.test.tsx` | deve permitir fazer upload de avatar | api.post not called | STANDARDIZATION |
+| `src/__tests__/unit/pages/Register.test.tsx` | deve renderizar o formulario de registro | Label /nome completo/i not found | STANDARDIZATION |
+| `src/__tests__/unit/pages/Register.test.tsx` | deve fazer upload de avatar apos criar conta | Label /nome completo/i not found | STANDARDIZATION |
+| `src/__tests__/unit/pages/Register.test.tsx` | deve exibir erro quando falha ao criar conta | Label /nome completo/i not found | STANDARDIZATION |
+| `src/__tests__/unit/pages/TransactionDetails.test.tsx` | deve carregar e exibir detalhes da transacao | data-testid="transaction-title" not found | STANDARDIZATION |
+| `src/__tests__/unit/pages/TransactionDetails.test.tsx` | deve exibir transacao de saida com exitType | data-testid="transaction-title" not found | STANDARDIZATION |
+| `src/__tests__/unit/pages/ChurchSettings/ServiceScheduleList.test.tsx` | deve renderizar lista de horarios | render is not defined | STANDARDIZATION |
+| `src/__tests__/unit/pages/ChurchSettings/ServiceScheduleList.test.tsx` | deve mostrar mensagem vazia quando nao ha horarios | render is not defined | STANDARDIZATION |
+| `src/__tests__/unit/pages/ChurchSettings/ServiceScheduleList.test.tsx` | deve chamar onEdit quando clicar no botao de editar | render is not defined | STANDARDIZATION |
+| `src/__tests__/unit/pages/ChurchSettings/ServiceScheduleList.test.tsx` | deve deletar horario quando confirmado | render is not defined | STANDARDIZATION |
+| `src/__tests__/unit/pages/ChurchSettings/ServiceScheduleList.test.tsx` | deve mostrar erro quando falha ao contar eventos | render is not defined | STANDARDIZATION |
 
 ---
 
 ## Root cause details (per failing test file)
 
-### 1) react-hot-toast mock hoist errors (20 files)
+### 1) `src/__tests__/unit/pages/Contributions.test.tsx`
 
-**Failing files:**
-- `src/__tests__/unit/components/Header.test.tsx`
-- `src/__tests__/unit/pages/AddContribution.test.tsx`
-- `src/__tests__/unit/pages/AddDevotional.test.tsx`
-- `src/__tests__/unit/pages/AddEvent.test.tsx`
-- `src/__tests__/unit/pages/AddMember.test.tsx`
-- `src/__tests__/unit/pages/AddTransaction.test.tsx`
-- `src/__tests__/unit/pages/ChurchSettings/ServiceScheduleList.test.tsx`
-- `src/__tests__/unit/pages/Contributions.test.tsx`
-- `src/__tests__/unit/pages/DevotionalDetails.test.tsx`
-- `src/__tests__/unit/pages/Devotionals.test.tsx`
-- `src/__tests__/unit/pages/EditEvent.test.tsx`
-- `src/__tests__/unit/pages/EditTransaction.test.tsx`
-- `src/__tests__/unit/pages/EventDetails.test.tsx`
-- `src/__tests__/unit/pages/Events.test.tsx`
-- `src/__tests__/unit/pages/Finances.test.tsx`
-- `src/__tests__/unit/pages/MemberDetails.test.tsx`
-- `src/__tests__/unit/pages/Members.test.tsx`
-- `src/__tests__/unit/pages/Positions.test.tsx`
-- `src/__tests__/unit/pages/Register.test.tsx`
-- `src/__tests__/unit/pages/TransactionDetails.test.tsx`
+- Failure symptom: Transform failed with "Unexpected }" at line 220.
+- Probable root cause: duplicated test block after the describe() is closed; extra closing braces remain.
+- Classification: STANDARDIZATION
+- Confidence: High
+- Minimal reproduction: `cd web; .\node_modules\.bin\vitest run src\__tests__\unit\pages\Contributions.test.tsx --reporter verbose --no-color`
 
-**Test name:** File init (module mock hoist) - tests do not execute.
+### 2) `src/__tests__/unit/pages/ChurchSettings/ServiceScheduleList.test.tsx`
 
-**Symptom:**
-- `Error: [vitest] There was an error when mocking a module...`
-- `Caused by: ReferenceError: Cannot access 'mockToastSuccess' before initialization` (or `mockToastError`).
+- Failure symptom: `render is not defined` for all tests.
+- Probable root cause: missing import of `render` from `@testing-library/react`.
+- Classification: STANDARDIZATION
+- Confidence: High
+- Minimal reproduction: `cd web; .\node_modules\.bin\vitest run src\__tests__\unit\pages\ChurchSettings\ServiceScheduleList.test.tsx --reporter verbose --no-color`
+- Helper/mock involved: none (missing import).
+- Incorrect assumption: render is available via other helpers without importing it.
 
-**Evidence:**
-- Example: `src/__tests__/unit/pages/Devotionals.test.tsx` uses
-  `const mockToastError = vi.fn()` and then `vi.mock('react-hot-toast', () => ({ default: { error: mockToastError } }))`.
-  The factory is hoisted above the const declaration, so the variable is in TDZ.
-- Error stack points to the test file line where the mock variable is referenced.
+### 3) `src/__tests__/unit/pages/Register.test.tsx`
 
-**Probable root cause:**
-- Vitest hoists `vi.mock` factories. Any top-level const used inside the factory is referenced before initialization.
-- This is a test standardization issue in the test files, not application code.
+Failing tests:
+- `deve renderizar o formulario de registro`
+- `deve fazer upload de avatar apos criar conta`
+- `deve exibir erro quando falha ao criar conta`
 
-**Classification:** STANDARDIZATION
-**Confidence:** High
-**Minimal reproduction:**
-- `cd web; .\node_modules\.bin\vitest run src\__tests__\unit\pages\Devotionals.test.tsx`
-  (replace with any file listed above).
+- Failure symptom: `Unable to find a label with the text of: /nome completo/i` (and related fields).
+- Probable root cause: the Register UI no longer has a single "nome completo" field (it uses `firstName` and `lastName`), and there is no "nome da igreja" field. Tests still target old labels.
+- Classification: STANDARDIZATION
+- Confidence: High
+- Minimal reproduction: `cd web; .\node_modules\.bin\vitest run src\__tests__\unit\pages\Register.test.tsx --reporter verbose --no-color`
+- Feature code: `web/src/pages/Register.tsx` uses labels "Primeiro nome" and "Sobrenome".
+- Incorrect assumption: tests assumed the legacy form layout and labels.
 
-**Helper/mock involved:**
-- Local `vi.mock('react-hot-toast', () => ...)` factories in each file.
-- The mocks reference `mockToastSuccess`/`mockToastError` that are not hoisted.
+### 4) `src/__tests__/unit/pages/AddContribution.test.tsx`
 
-**Incorrect assumption:**
-- Assuming `const mockToastSuccess = vi.fn()` is available in a hoisted `vi.mock` factory.
+- Failure symptom: toast called with different message.
+- Probable root cause: test expects "Campanha criada com sucesso!" but the component uses "Campanha de contribuicao criada com sucesso!".
+- Classification: STANDARDIZATION
+- Confidence: High
+- Minimal reproduction: `cd web; .\node_modules\.bin\vitest run src\__tests__\unit\pages\AddContribution.test.tsx --reporter verbose --no-color`
+- Feature code: `web/src/pages/Contributions/AddContribution.tsx` (success toast text).
+- Incorrect assumption: toast message unchanged after UI update.
 
----
+### 5) `src/__tests__/unit/pages/AddDevotional.test.tsx`
 
-### 2) Branches test file parse error
+- Failure symptom: expected submit button to be disabled during loading, but it is enabled.
+- Probable root cause: component does not implement a loading state or disable the submit button.
+- Classification: STANDARDIZATION
+- Confidence: High
+- Minimal reproduction: `cd web; .\node_modules\.bin\vitest run src\__tests__\unit\pages\AddDevotional.test.tsx --reporter verbose --no-color`
+- Feature code: `web/src/pages/Devotionals/AddDevotional.tsx` (no loading state).
+- Incorrect assumption: tests expect loading UX that is not implemented.
 
-**Failing file:** `src/__tests__/unit/pages/onboarding/Branches.test.tsx`
+### 6) `src/__tests__/unit/pages/ChurchSettings.test.tsx`
 
-**Test name:** File parse error (syntax)
+Failing tests:
+- `deve renderizar o formulario de edicao da igreja`
+- `deve carregar e exibir os dados da igreja`
+- `deve exibir botao para adicionar horario`
 
-**Symptom:**
-- `Transform failed: Unexpected "}"` at line 201.
+- Failure symptom: component renders "Igreja nao encontrada" and fetch errors (`churchesResponse` undefined).
+- Probable root cause: API mocks are inconsistent. The file defines `vi.mock('@/api/api', ...)` with a local mock object, but also calls `resetApiMocks()` and `mockApiResponse()` from `web/src/test/mockApi.ts`, which operate on `apiMock`. These are different instances, so `mockApiResponse` does not affect the component. Additionally, the component imports `../../api/api` and `../../api/serviceScheduleApi` (relative), while tests mock alias modules.
+- Classification: STANDARDIZATION
+- Confidence: High
+- Minimal reproduction: `cd web; .\node_modules\.bin\vitest run src\__tests__\unit\pages\ChurchSettings.test.tsx --reporter verbose --no-color`
+- Helper/mock involved: `web/src/test/mockApi.ts` + inline `vi.mock('@/api/api')` in `web/src/__tests__/unit/pages/ChurchSettings.test.tsx`.
+- Incorrect assumption: `mockApiResponse` works even when `@/api/api` is mocked with a separate object and when components import the module via a different path.
 
-**Evidence:**
-- The file contains a duplicated block after the closing `})` for the test and `})` for the describe, leaving extra braces and duplicated test logic at the end of the file.
+### 7) `src/__tests__/unit/pages/DevotionalDetails.test.tsx`
 
-**Probable root cause:**
-- Accidental duplicate paste of the last test block after the suite was closed.
+Failing tests:
+- `deve curtir devocional com sucesso`
+- `deve navegar para lista ao clicar em Voltar`
 
-**Classification:** STANDARDIZATION
-**Confidence:** High
-**Minimal reproduction:**
-- `cd web; .\node_modules\.bin\vitest run src\__tests__\unit\pages\onboarding\Branches.test.tsx`
+- Failure symptom: unhandled error `Cannot read properties of undefined (reading 'name')` at `devotional.author.name`.
+- Probable root cause: `fixtures.devotional()` does not include required fields (`author`, `passage`, `likes`, `liked`). Tests 3 and 5 override only `id` and `title`, leaving `author` undefined.
+- Classification: STANDARDIZATION
+- Confidence: High
+- Minimal reproduction: `cd web; .\node_modules\.bin\vitest run src\__tests__\unit\pages\DevotionalDetails.test.tsx --reporter verbose --no-color`
+- Helper/mock involved: `web/src/test/fixtures/index.ts` devotional fixture.
+- Incorrect assumption: fixture provides all fields required by the component.
 
-**Helper/mock involved:**
-- None (syntax error in test file).
+### 8) `src/__tests__/unit/pages/MemberDetails.test.tsx`
 
-**Incorrect assumption:**
-- Test file edits were assumed to be syntactically valid; the duplicated block is not.
+- Failure symptom: unhandled error `positions.map` on null, then UI is empty and test cannot find member text.
+- Probable root cause: test `deve renderizar detalhes do membro` mocks `/members/:id` but does not mock `/positions`. `mockApiResponse` returns `{ data: null }` for unmatched URLs, so `setPositions(null)` occurs and `positions.map` throws.
+- Classification: STANDARDIZATION
+- Confidence: High
+- Minimal reproduction: `cd web; .\node_modules\.bin\vitest run src\__tests__\unit\pages\MemberDetails.test.tsx --reporter verbose --no-color`
+- Helper/mock involved: `web/src/test/mockApi.ts` (registry returns null for unmatched URLs).
+- Incorrect assumption: missing endpoint mocks default to empty arrays.
 
----
+### 9) `src/__tests__/unit/pages/EditTransaction.test.tsx`
 
-## Follow-up run (post-fix: mock hoist + syntax)
+Failing tests:
+- `deve carregar dados da transacao existente`
+- `deve preencher campos de transacao de saida com exitType`
+- `deve atualizar transacao com sucesso`
+- `deve exibir erro quando falha ao atualizar`
+- `deve preencher campos de transacao com tipo CONTRIBUICAO`
 
-Date: 2026-01-12  
-Command: `cd web; .\node_modules\.bin\vitest run src\__tests__\unit\pages\Devotionals.test.tsx src\__tests__\unit\pages\onboarding\Branches.test.tsx`  
-Result: Test Files 2 failed (2). Tests 7 failed | 4 passed (11).
+- Failure symptom: `document.getElementById('title')` returns null, and later `.value` access throws.
+- Probable root cause: tests still target legacy input IDs (`title`, `category`, etc.) while the component now uses `type`, `entryType`, `exitType`, `amount`, and `date` fields.
+- Classification: STANDARDIZATION
+- Confidence: High
+- Minimal reproduction: `cd web; .\node_modules\.bin\vitest run src\__tests__\unit\pages\EditTransaction.test.tsx --reporter verbose --no-color`
+- Feature code: `web/src/pages/Finances/EditTransaction.tsx`.
+- Incorrect assumption: form field IDs unchanged.
 
-### Summary table (remaining failures)
+### 10) `src/__tests__/unit/pages/TransactionDetails.test.tsx`
 
-| Test file | Test name | Symptom | Classification |
-| --- | --- | --- | --- |
-| `src/__tests__/unit/pages/Devotionals.test.tsx` | Multiple tests (list, empty, navigation, error) | UI stuck in "Carregando devocionais..." or toast not called | STANDARDIZATION |
-| `src/__tests__/unit/pages/onboarding/Branches.test.tsx` | Submit flows (2 tests) | navigate called with `/onboarding/church` (churchId null) | STANDARDIZATION |
+Failing tests:
+- `deve carregar e exibir detalhes da transacao`
+- `deve exibir transacao de saida com exitType`
 
-### 3) Devotionals list/empty/navigation/error tests stuck in loading
+- Failure symptom: `data-testid="transaction-title"` not found.
+- Probable root cause: component no longer renders `transaction-title` test id; only `transaction-amount`, `transaction-type`, etc. exist.
+- Classification: STANDARDIZATION
+- Confidence: High
+- Minimal reproduction: `cd web; .\node_modules\.bin\vitest run src\__tests__\unit\pages\TransactionDetails.test.tsx --reporter verbose --no-color`
+- Feature code: `web/src/pages/Finances/TransactionDetails.tsx`.
+- Incorrect assumption: title test id still exists in UI.
 
-**Failing file:** `src/__tests__/unit/pages/Devotionals.test.tsx`  
-**Symptom:** Assertions fail because the page remains in loading state; error toast never fires.  
-**Evidence:**
-- Test output shows DOM contains only `Carregando devocionais...` even after `waitFor`.
-- `mockToastError` not called when `mockApiError` is used.
-**Probable root cause:**
-- Mocking is applied to a different module instance than the one the component uses.  
-  `mockApiResponse`/`mockApiError` import `../api/api`, while test files and components import `@/api/api`.  
-  Combined with `vi.mock('../api/api')` inside `web/src/test/helpers.tsx`, this creates multiple mock instances.  
-  Result: the mock responses registered by `mockApiResponse` are not used by the component, so `api.get('/devotionals')` never resolves with the expected data.
-**Classification:** STANDARDIZATION  
-**Confidence:** Medium  
-**Minimal reproduction:**  
-- `cd web; .\node_modules\.bin\vitest run src\__tests__\unit\pages\Devotionals.test.tsx`
+### 11) `src/__tests__/unit/pages/Profile.test.tsx`
 
-**Helper/mock involved:**
-- `web/src/test/mockApi.ts` (imports `../api/api`)
-- `web/src/test/helpers.tsx` (mocking `../api/api` at module scope)
+Failing tests:
+- `deve carregar cargos disponiveis`
+- `deve atualizar perfil com sucesso`
+- `deve permitir fazer upload de avatar`
 
-**Incorrect assumption:**
-- Assuming alias `@/api/api` and relative `../api/api` resolve to the same mock instance.
-
-### 4) Branches submit flow navigates to /onboarding/church
-
-**Failing file:** `src/__tests__/unit/pages/onboarding/Branches.test.tsx`  
-**Symptom:** `mockNavigate` called with `/onboarding/church` instead of `/onboarding/settings`.  
-**Evidence:**
-- Test output shows actual navigation `/onboarding/church`.
-- Console error: `TypeError: Cannot read properties of undefined (reading 'data')` in `loadChurch` at `web/src/pages/onboarding/Branches.tsx:32`.
-**Probable root cause:**
-- `api.get('/churches')` returns `undefined` because the mock response is not applied to the module instance used by the component.
-- `churchId` stays `null`, triggering the guard path that navigates to `/onboarding/church`.
-**Classification:** STANDARDIZATION  
-**Confidence:** Medium  
-**Minimal reproduction:**  
-- `cd web; .\node_modules\.bin\vitest run src\__tests__\unit\pages\onboarding\Branches.test.tsx`
-
-**Helper/mock involved:**
-- Same module mismatch as Devotionals (`mockApiResponse` vs alias usage).
-
-**Incorrect assumption:**
-- Assuming `mockApiResponse` is wired to the same mocked `api` instance used by components.
-
-### Recommendations (no code yet)
-
-- Standardize `api` mocking to a single module ID. Prefer using `@/api/api` consistently in tests and helpers, and ensure only one `vi.mock` definition applies.
-- Use `resetApiMocks()` in `beforeEach` for unit tests that rely on `mockApiResponse`, to re-install the registry-backed mock implementation.
+- Failure symptom: `loadPositions` reads `positionsResponse.data` on undefined, and later `api.post` / `mockUpdateUser` not called.
+- Probable root cause: API mocks are inconsistent. The test defines `vi.mock('@/api/api')` inline, but uses `resetApiMocks()` and `mockApiResponse()` which operate on `apiMock` from `web/src/test/mockApi.ts`. The inline mock is not wired to that registry, so `/positions`, `/upload/avatar`, and `/members/me` responses never resolve as expected.
+- Classification: STANDARDIZATION
+- Confidence: High
+- Minimal reproduction: `cd web; .\node_modules\.bin\vitest run src\__tests__\unit\pages\Profile.test.tsx --reporter verbose --no-color`
+- Helper/mock involved: `web/src/test/mockApi.ts` + inline `vi.mock('@/api/api')` in `web/src/__tests__/unit/pages/Profile.test.tsx`.
+- Incorrect assumption: `mockApiResponse` works with any local mock, even when `apiMock` is not used.
 
 ---
 
 ## Recommendations (no code changes yet)
 
-1) For toast mocks, use `vi.hoisted` or define the mocks inside the `vi.mock` factory so they are available when hoisted.
-2) Consider centralizing `react-hot-toast` mocking in `web/src/test/setup.ts` to avoid per-file hoist pitfalls.
-3) Fix `Branches.test.tsx` by removing the duplicated block after the closing braces and re-run the file.
+1) Standardize API mocking to one shared instance. Avoid mixing inline `vi.mock('@/api/api')` objects with `mockApiResponse/resetApiMocks` from `web/src/test/mockApi.ts`.
+2) Align fixtures with component contracts. Extend `fixtures.devotional()` to include `author`, `passage`, `likes`, and `liked` defaults required by `DevotionalDetails`.
+3) Keep tests synced with UI labels and field IDs (Register and EditTransaction). Update test selectors to match current inputs.
+4) For tests expecting loading states, either add explicit loading logic to the component or update tests to match actual behavior.
+5) Add a quick syntax check (single-file vitest run) after large manual edits to avoid duplicate blocks or stray braces.
 
 ---
 
 ## Learning / Preventive rules
 
-- Lesson: "vi.mock factories are hoisted; local const mocks are not."  
-  Prevention: "Use vi.hoisted for mock functions referenced inside vi.mock, or define vi.fn inline in the factory."
+- Lesson: Mocking the same module in different ways creates disconnected mock instances.
+  Prevention: Use a single API mock path and centralize `mockApiResponse/resetApiMocks` usage; do not define inline API mocks in test files.
 
-- Lesson: "Large test file edits can leave duplicate blocks and mismatched braces."  
-  Prevention: "Run lint or a quick single-file vitest run after manual edits to catch syntax errors early."
+- Lesson: Fixtures must satisfy all required component fields.
+  Prevention: Add required defaults to fixtures (e.g., devotional.author, passage, likes, liked) and assert in tests when overriding.
+
+- Lesson: Tests often fail after UI label/field changes.
+  Prevention: Add a checklist step to update test selectors whenever a form changes labels or IDs.
+
+- Lesson: Loading states should be tested only when implemented.
+  Prevention: Require a code comment or component prop indicating loading UX before adding loading assertions.
+
+- Lesson: Manual edits can introduce syntax errors.
+  Prevention: Run a single-file vitest/lint check immediately after manual edits to test files.
 
 ---
 
