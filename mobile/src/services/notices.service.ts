@@ -48,5 +48,14 @@ export const noticesService = {
     const response = await api.post<Notice>('/notices', payload)
     return response.data
   },
+
+  /**
+   * Delete a notice
+   * @param id Notice ID
+   * @returns Promise
+   */
+  delete: async (id: string): Promise<void> => {
+    await api.delete(`/notices/${id}`)
+  },
 }
 

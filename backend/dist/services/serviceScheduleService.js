@@ -159,12 +159,14 @@ export class ServiceScheduleService {
             time: newSchedule.time,
         };
         // Atualiza description apenas se foi fornecido no novo schedule
+        // Permite null explicitamente (null !== undefined)
         if (newSchedule.description !== undefined) {
-            updateData.description = newSchedule.description || undefined;
+            updateData.description = newSchedule.description;
         }
         // Atualiza location se foi fornecido no novo schedule
+        // Permite null explicitamente (null !== undefined)
         if (newSchedule.location !== undefined) {
-            updateData.location = newSchedule.location || undefined;
+            updateData.location = newSchedule.location;
         }
         // Atualiza todos os eventos relacionados
         const result = await prisma.event.updateMany({

@@ -2,9 +2,11 @@ import { FastifyReply, FastifyRequest } from 'fastify'
 import { prisma } from '../lib/prisma'
 import type { AuthenticatedUser } from '../@types/fastify'
 import { OnboardingProgressService } from '../services/onboardingProgressService'
+import { AuthService } from '../services/authService'
 
 export class OnboardingController {
   private progressService = new OnboardingProgressService()
+  private authService = new AuthService()
 
   async getState(request: FastifyRequest, reply: FastifyReply) {
     try {
@@ -193,44 +195,9 @@ export class OnboardingController {
       // Buscar progresso atualizado para retornar
       const progress = await this.progressService.getProgress(userId)
 
-      // Buscar User com Member para gerar token atualizado
-      const userWithMember = await prisma.user.findUnique({
-        where: { id: userId },
-        include: {
-          Member: {
-            include: {
-              Permission: true,
-              Branch: {
-                include: {
-                  Church: true,
-                },
-              },
-            },
-          },
-        },
-      })
-
-      let newToken = null
-      if (userWithMember?.Member) {
-        const member = userWithMember.Member
-        const onboardingCompleted = true // Acabamos de marcar como completo
-        const tokenPayload = {
-          sub: userWithMember.id,
-          email: userWithMember.email,
-          name: userWithMember.firstName && userWithMember.lastName 
-            ? `${userWithMember.firstName} ${userWithMember.lastName}`.trim()
-            : userWithMember.firstName || userWithMember.lastName || 'Usuário',
-          type: 'member' as const,
-          memberId: member.id,
-          role: member.role,
-          branchId: member.branchId,
-          churchId: member.Branch?.Church?.id || null,
-          permissions: member.Permission.map(p => p.type),
-          onboardingCompleted,
-        }
-        
-        newToken = request.server.jwt.sign(tokenPayload, { expiresIn: '7d' })
-      }
+      // Usa método centralizado do AuthService para gerar token
+      // Isso garante que o token sempre inclua onboardingCompleted correto do banco
+      const newToken = await this.authService.generateTokenForUser(userId)
 
       return reply.send({
         message: 'Onboarding marcado como completo',

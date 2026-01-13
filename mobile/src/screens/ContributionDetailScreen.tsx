@@ -76,11 +76,6 @@ export default function ContributionDetailScreen() {
 
     const isEmpty = !loading && !contribution && !error
 
-    const hasPermissionToEdit =
-        user?.role === 'ADMINGERAL' ||
-        user?.role === 'ADMINFILIAL' ||
-        user?.permissions?.some((p: any) => p.type === 'contributions_manage')
-
     const getPaymentMethodLabel = (type: string) => {
         const labels: Record<string, string> = {
             PIX: 'PIX',
@@ -124,12 +119,6 @@ export default function ContributionDetailScreen() {
                 title: "Detalhes da Contribuição",
                 Icon: FontAwesome5,
                 iconName: "heart",
-                rightButtonIcon: hasPermissionToEdit && contribution ? (
-                    <Ionicons name="create-outline" size={24} color="white" />
-                ) : undefined,
-                onRightButtonPress: hasPermissionToEdit && contribution
-                    ? () => (navigation as any).navigate('EditContributionScreen', { id: contribution.id })
-                    : undefined,
             }}
             loading={loading}
             error={error}

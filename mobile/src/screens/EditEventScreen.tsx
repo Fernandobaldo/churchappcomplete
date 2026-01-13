@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react'
-import { useNavigation, useRoute } from '@react-navigation/native'
+import { useNavigation, useRoute, CommonActions } from '@react-navigation/native'
+import { Platform, Alert, View, TouchableOpacity, Text, StyleSheet } from 'react-native'
 import Toast from 'react-native-toast-message'
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5'
 import FormScreenLayout from '../components/layouts/FormScreenLayout'
 import MemberForm from '../components/FormsComponent'
 import { eventsService } from '../services/events.service'
 import { parse, format, isValid } from 'date-fns'
+import { useAuthStore } from '../stores/authStore'
 
 export default function EditEventScreen() {
     const navigation = useNavigation()
@@ -110,6 +112,107 @@ export default function EditEventScreen() {
         await fetchEvent()
     }
 
+    const uploadImage = async (imageUri: string): Promise<string | undefined> => {
+        try {
+            // Verifica se é uma URI local (file://) que precisa ser enviada
+            if (!imageUri || (!imageUri.startsWith('file://') && !imageUri.startsWith('http://') && !imageUri.startsWith('https://'))) {
+                return imageUri // Já é uma URL válida ou está vazia
+            }
+
+            // Se já é uma URL http/https, retorna como está
+            if (imageUri.startsWith('http://') || imageUri.startsWith('https://')) {
+                return imageUri
+            }
+
+            // Para URIs locais (file://), faz upload
+            const token = useAuthStore.getState().token
+            if (!token) {
+                throw new Error('Token de autenticação não encontrado')
+            }
+            
+            const formData = new FormData()
+            
+            // Adiciona o arquivo ao FormData
+            // No React Native, o FormData aceita objetos com uri, type e name
+            // @ts-ignore - React Native FormData aceita este formato
+            formData.append('file', {
+                uri: Platform.OS === 'ios' ? imageUri.replace('file://', '') : imageUri,
+                type: 'image/jpeg',
+                name: 'event-image.jpg',
+            } as any)
+
+            const baseURL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3333'
+            const response = await fetch(`${baseURL}/upload/event-image`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    // Não definir Content-Type - o fetch fará isso automaticamente com boundary
+                },
+                body: formData,
+            })
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ error: 'Erro desconhecido' }))
+                throw new Error(errorData.error || 'Erro ao fazer upload da imagem')
+            }
+
+            const data = await response.json()
+            return data.url // Retorna a URL relativa (/uploads/event-images/...)
+        } catch (error: any) {
+            console.error('Erro ao fazer upload da imagem:', error)
+            throw error
+        }
+    }
+
+    const handleDelete = async () => {
+        Alert.alert(
+            'Excluir Evento',
+            'Tem certeza que deseja excluir este evento? Esta ação não pode ser desfeita.',
+            [
+                {
+                    text: 'Cancelar',
+                    style: 'cancel',
+                },
+                {
+                    text: 'Excluir',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await eventsService.delete(id)
+                            Toast.show({
+                                type: 'success',
+                                text1: 'Evento excluído!',
+                                text2: 'O evento foi excluído com sucesso.',
+                            })
+                            // Reset para Main (TabNavigator) com tab Agenda selecionada
+                            // Isso limpa o histórico e mantém o navbar visível
+                            navigation.dispatch(
+                                CommonActions.reset({
+                                    index: 0,
+                                    routes: [
+                                        {
+                                            name: 'Main',
+                                            state: {
+                                                routes: [{ name: 'Agenda' }],
+                                            },
+                                        },
+                                    ],
+                                })
+                            )
+                        } catch (error: any) {
+                            Toast.show({
+                                type: 'error',
+                                text1: 'Erro ao excluir evento',
+                                text2: error?.response?.data?.message || 'Houve um erro ao excluir o evento.',
+                            })
+                            console.error('Erro ao excluir evento:', error)
+                        }
+                    },
+                },
+            ]
+        )
+    }
+
     const handleUpdate = async () => {
         // Validação de campos obrigatórios
         if (!form.title || !form.startDate) {
@@ -132,13 +235,40 @@ export default function EditEventScreen() {
             }
         }
 
-        const payload = {
-            ...form,
-            startDate: finalStartDate,
-            endDate: finalStartDate, // Usa a mesma data de início como término
-        }
-
         try {
+            // Faz upload da imagem se houver e for URI local
+            let finalImageUrl: string | undefined = form.imageUrl || undefined
+            if (form.imageUrl && form.imageUrl.startsWith('file://')) {
+                try {
+                    finalImageUrl = await uploadImage(form.imageUrl)
+                } catch (uploadError: any) {
+                    Toast.show({
+                        type: 'error',
+                        text1: 'Erro ao fazer upload',
+                        text2: uploadError.message || 'Não foi possível fazer upload da imagem',
+                    })
+                    return
+                }
+            } else if (form.imageUrl && (form.imageUrl.startsWith('http://') || form.imageUrl.startsWith('https://'))) {
+                // Se é URL completa, extrai apenas o caminho relativo se necessário
+                // O backend espera URL relativa ou completa
+                finalImageUrl = form.imageUrl
+            }
+
+            const payload: any = {
+                title: form.title,
+                startDate: finalStartDate,
+                endDate: finalStartDate, // Usa a mesma data de início como término
+                time: form.time,
+                description: form.description,
+                location: form.location,
+            }
+
+            // Adiciona imageUrl apenas se houver valor
+            if (finalImageUrl !== undefined) {
+                payload.imageUrl = finalImageUrl
+            }
+
             await eventsService.update(id, payload)
             Toast.show({
                 type: 'success',
@@ -174,8 +304,42 @@ export default function EditEventScreen() {
                 onSubmit={handleUpdate}
                 submitLabel="Salvar alterações"
             />
+            
+            <View style={styles.deleteContainer}>
+                <TouchableOpacity
+                    style={styles.deleteButton}
+                    onPress={handleDelete}
+                    activeOpacity={0.8}
+                >
+                    <FontAwesome5 name="trash" size={16} color="#fff" />
+                    <Text style={styles.deleteButtonText}>Excluir Evento</Text>
+                </TouchableOpacity>
+            </View>
         </FormScreenLayout>
     )
 }
+
+const styles = StyleSheet.create({
+    deleteContainer: {
+        marginTop: 24,
+        paddingHorizontal: 16,
+        marginBottom: 24,
+    },
+    deleteButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#DC2626',
+        paddingVertical: 14,
+        paddingHorizontal: 20,
+        borderRadius: 12,
+        gap: 8,
+    },
+    deleteButtonText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+})
 
 // Estilos removidos - agora gerenciados pelo FormScreenLayout

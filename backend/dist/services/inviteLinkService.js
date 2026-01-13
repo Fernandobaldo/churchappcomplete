@@ -3,6 +3,7 @@ import { SubscriptionStatus } from '@prisma/client';
 import { checkPlanMembersLimit } from '../utils/planLimits';
 import { validateMemberCreationPermission, getMemberFromUserId } from '../utils/authorization';
 import { sendMemberLimitReachedNotification } from './emailService';
+import { normalizeExpirationDate } from '../utils/dateUtils';
 /**
  * Gera um token único para o link de convite
  */
@@ -81,14 +82,16 @@ export async function generateInviteLink(data) {
         token = generateToken();
         existingLink = await prisma.memberInviteLink.findUnique({ where: { token } });
     }
-    // 6. Criar o link
+    // 6. Normalizar data de expiração (se for date-only, converter para fim do dia)
+    const normalizedExpiresAt = expiresAt ? normalizeExpirationDate(expiresAt) : null;
+    // 7. Criar o link
     const inviteLink = await prisma.memberInviteLink.create({
         data: {
             token,
             branchId,
             createdBy,
             maxUses: maxUses === null ? null : maxUses,
-            expiresAt: expiresAt || null,
+            expiresAt: normalizedExpiresAt,
             isActive: true,
             currentUses: 0,
         },
@@ -135,11 +138,20 @@ export async function validateInviteLink(token) {
             error: 'Este link de convite foi desativado',
         };
     }
-    if (inviteLink.expiresAt && new Date() > inviteLink.expiresAt) {
-        return {
-            valid: false,
-            error: 'Este link de convite expirou',
-        };
+    // Validação de expiração: link expira apenas quando now > expiresAt (estritamente maior)
+    // Se expiresAt for null, o link não expira
+    if (inviteLink.expiresAt) {
+        const now = new Date();
+        // Normalizar expiresAt para garantir que date-only seja tratado como fim do dia
+        const normalizedExpiresAt = normalizeExpirationDate(inviteLink.expiresAt);
+        // Link expira apenas quando now > expiresAt (estritamente maior)
+        // Isso significa que se expiresAt = hoje 23:59:59.999, ainda é válido até esse momento
+        if (now > normalizedExpiresAt) {
+            return {
+                valid: false,
+                error: 'Este link de convite expirou',
+            };
+        }
     }
     if (inviteLink.maxUses !== null && inviteLink.currentUses >= inviteLink.maxUses) {
         return {
@@ -374,11 +386,13 @@ export async function getActiveLinksByBranch(branchId, userId) {
     const linksWithCreator = await Promise.all(links.map(async (link) => {
         const creator = await prisma.user.findUnique({
             where: { id: link.createdBy },
-            select: { name: true, email: true },
+            select: { firstName: true, lastName: true, email: true },
         });
         return {
             ...link,
-            creatorName: creator?.name || 'Usuário desconhecido',
+            creatorName: creator?.firstName && creator?.lastName
+                ? `${creator.firstName} ${creator.lastName}`.trim()
+                : creator?.firstName || creator?.lastName || 'Usuário desconhecido',
             creatorEmail: creator?.email || null,
         };
     }));
@@ -427,11 +441,13 @@ export async function getAllLinksByBranch(branchId, userId) {
     const linksWithCreator = await Promise.all(links.map(async (link) => {
         const creator = await prisma.user.findUnique({
             where: { id: link.createdBy },
-            select: { name: true, email: true },
+            select: { firstName: true, lastName: true, email: true },
         });
         return {
             ...link,
-            creatorName: creator?.name || 'Usuário desconhecido',
+            creatorName: creator?.firstName && creator?.lastName
+                ? `${creator.firstName} ${creator.lastName}`.trim()
+                : creator?.firstName || creator?.lastName || 'Usuário desconhecido',
             creatorEmail: creator?.email || null,
         };
     }));

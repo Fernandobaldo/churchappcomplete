@@ -27,6 +27,32 @@ export async function checkPlanMembersLimit(userId) {
     }
     const churchId = user.Member.Branch.churchId;
     let plan = user?.Subscription[0]?.Plan;
+    // Debug: Se não encontrou plano ativo, verificar todas as subscriptions do usuário
+    if (!plan) {
+        const allUserSubscriptions = await prisma.subscription.findMany({
+            where: { userId },
+            include: { Plan: true },
+            orderBy: { startedAt: 'desc' },
+        });
+        console.log(`🔍 [PLAN LIMITS] Usuário ${userId} não tem subscription ativa. Subscriptions encontradas:`, {
+            count: allUserSubscriptions.length,
+            subscriptions: allUserSubscriptions.map(s => ({
+                id: s.id,
+                status: s.status,
+                planName: s.Plan.name,
+                planId: s.planId,
+                startedAt: s.startedAt,
+            })),
+        });
+        // Tentar usar a subscription mais recente do plano Free se existir
+        // Buscar por code primeiro, depois fallback para name (backward compatibility)
+        const freeSubscription = allUserSubscriptions.find(s => (s.Plan.code === 'FREE' || s.Plan.name.toLowerCase() === 'free') &&
+            (s.status === SubscriptionStatus.active || s.status === SubscriptionStatus.pending));
+        if (freeSubscription) {
+            console.log(`✅ [PLAN LIMITS] Usando subscription Free encontrada (status: ${freeSubscription.status})`);
+            plan = freeSubscription.Plan;
+        }
+    }
     // 2. Se o usuário não tiver plano, buscar o plano do ADMINGERAL da igreja
     if (!plan) {
         const adminMember = await prisma.member.findFirst({
@@ -47,10 +73,43 @@ export async function checkPlanMembersLimit(userId) {
                 },
             },
         });
+        // Debug: Se não encontrou admin com plano ativo, verificar todas as subscriptions do admin
         if (!adminMember?.User?.Subscription[0]?.Plan) {
-            throw new Error('Plano não encontrado para o usuário ou para a igreja');
+            if (adminMember?.User) {
+                const allAdminSubscriptions = await prisma.subscription.findMany({
+                    where: { userId: adminMember.User.id },
+                    include: { Plan: true },
+                    orderBy: { startedAt: 'desc' },
+                });
+                console.log(`🔍 [PLAN LIMITS] ADMINGERAL ${adminMember.User.id} não tem subscription ativa. Subscriptions encontradas:`, {
+                    count: allAdminSubscriptions.length,
+                    subscriptions: allAdminSubscriptions.map(s => ({
+                        id: s.id,
+                        status: s.status,
+                        planName: s.Plan.name,
+                        planId: s.planId,
+                        startedAt: s.startedAt,
+                    })),
+                });
+                // Tentar usar a subscription mais recente do plano Free se existir
+                // Buscar por code primeiro, depois fallback para name (backward compatibility)
+                const freeSubscription = allAdminSubscriptions.find(s => (s.Plan.code === 'FREE' || s.Plan.name.toLowerCase() === 'free') &&
+                    (s.status === SubscriptionStatus.active || s.status === SubscriptionStatus.pending));
+                if (freeSubscription) {
+                    console.log(`✅ [PLAN LIMITS] Usando subscription Free do ADMINGERAL (status: ${freeSubscription.status})`);
+                    plan = freeSubscription.Plan;
+                }
+            }
+            else {
+                console.log(`🔍 [PLAN LIMITS] Nenhum ADMINGERAL encontrado para a igreja ${churchId}`);
+            }
+            if (!plan) {
+                throw new Error(`Plano não encontrado para o usuário ou para a igreja (churchId: ${churchId}). Verifique se há uma assinatura ativa para o usuário ou para o administrador geral da igreja.`);
+            }
         }
-        plan = adminMember.User.Subscription[0].Plan;
+        else {
+            plan = adminMember.User.Subscription[0].Plan;
+        }
     }
     // 2. Se maxMembers for null, significa ilimitado
     if (plan.maxMembers === null) {
@@ -95,6 +154,32 @@ export async function checkPlanBranchesLimit(userId) {
     }
     const churchId = user.Member.Branch.churchId;
     let plan = user?.Subscription[0]?.Plan;
+    // Debug: Se não encontrou plano ativo, verificar todas as subscriptions do usuário
+    if (!plan) {
+        const allUserSubscriptions = await prisma.subscription.findMany({
+            where: { userId },
+            include: { Plan: true },
+            orderBy: { startedAt: 'desc' },
+        });
+        console.log(`🔍 [PLAN LIMITS - BRANCHES] Usuário ${userId} não tem subscription ativa. Subscriptions encontradas:`, {
+            count: allUserSubscriptions.length,
+            subscriptions: allUserSubscriptions.map(s => ({
+                id: s.id,
+                status: s.status,
+                planName: s.Plan.name,
+                planId: s.planId,
+                startedAt: s.startedAt,
+            })),
+        });
+        // Tentar usar a subscription mais recente do plano Free se existir
+        // Buscar por code primeiro, depois fallback para name (backward compatibility)
+        const freeSubscription = allUserSubscriptions.find(s => (s.Plan.code === 'FREE' || s.Plan.name.toLowerCase() === 'free') &&
+            (s.status === SubscriptionStatus.active || s.status === SubscriptionStatus.pending));
+        if (freeSubscription) {
+            console.log(`✅ [PLAN LIMITS - BRANCHES] Usando subscription Free encontrada (status: ${freeSubscription.status})`);
+            plan = freeSubscription.Plan;
+        }
+    }
     // 2. Se o usuário não tiver plano, buscar o plano do ADMINGERAL da igreja
     if (!plan) {
         const adminMember = await prisma.member.findFirst({
@@ -115,10 +200,42 @@ export async function checkPlanBranchesLimit(userId) {
                 },
             },
         });
+        // Debug: Se não encontrou admin com plano ativo, verificar todas as subscriptions do admin
         if (!adminMember?.User?.Subscription[0]?.Plan) {
-            throw new Error('Plano não encontrado para o usuário ou para a igreja');
+            if (adminMember?.User) {
+                const allAdminSubscriptions = await prisma.subscription.findMany({
+                    where: { userId: adminMember.User.id },
+                    include: { Plan: true },
+                    orderBy: { startedAt: 'desc' },
+                });
+                console.log(`🔍 [PLAN LIMITS - BRANCHES] ADMINGERAL ${adminMember.User.id} não tem subscription ativa. Subscriptions encontradas:`, {
+                    count: allAdminSubscriptions.length,
+                    subscriptions: allAdminSubscriptions.map(s => ({
+                        id: s.id,
+                        status: s.status,
+                        planName: s.Plan.name,
+                        planId: s.planId,
+                        startedAt: s.startedAt,
+                    })),
+                });
+                // Tentar usar a subscription mais recente do plano Free se existir
+                const freeSubscription = allAdminSubscriptions.find(s => s.Plan.name.toLowerCase() === 'free' &&
+                    (s.status === SubscriptionStatus.active || s.status === SubscriptionStatus.pending));
+                if (freeSubscription) {
+                    console.log(`✅ [PLAN LIMITS - BRANCHES] Usando subscription Free do ADMINGERAL (status: ${freeSubscription.status})`);
+                    plan = freeSubscription.Plan;
+                }
+            }
+            else {
+                console.log(`🔍 [PLAN LIMITS - BRANCHES] Nenhum ADMINGERAL encontrado para a igreja ${churchId}`);
+            }
+            if (!plan) {
+                throw new Error(`Plano não encontrado para o usuário ou para a igreja (churchId: ${churchId}). Verifique se há uma assinatura ativa para o usuário ou para o administrador geral da igreja.`);
+            }
         }
-        plan = adminMember.User.Subscription[0].Plan;
+        else {
+            plan = adminMember.User.Subscription[0].Plan;
+        }
     }
     // 2. Se maxBranches for null, significa ilimitado
     if (plan.maxBranches === null) {

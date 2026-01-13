@@ -2,7 +2,13 @@ import { getMySubscriptionHandler, listAllSubscriptionsHandler, changePlanHandle
 import { authenticate } from '../middlewares/authenticate';
 import { authorize } from '../middlewares/authorize';
 export async function subscriptionRoutes(app) {
-    app.get('/subscriptions/me', { preHandler: [authenticate] }, getMySubscriptionHandler);
-    app.post('/subscriptions/change', { preHandler: [authenticate] }, changePlanHandler);
-    app.get('/subscriptions', { preHandler: [authenticate, authorize(['SAAS_ADMIN'])] }, listAllSubscriptionsHandler);
+    // Rota para obter assinatura do usuário autenticado
+    // Será /subscriptions/me quando registrado com prefixo /subscriptions
+    app.get('/me', { preHandler: [authenticate] }, getMySubscriptionHandler);
+    // Alias para /subscriptions/current (compatibilidade com frontend)
+    app.get('/current', { preHandler: [authenticate] }, getMySubscriptionHandler);
+    // Rota para trocar de plano
+    app.post('/change', { preHandler: [authenticate] }, changePlanHandler);
+    // Rota para listar todas as assinaturas (admin)
+    app.get('/', { preHandler: [authenticate, authorize(['SAAS_ADMIN'])] }, listAllSubscriptionsHandler);
 }

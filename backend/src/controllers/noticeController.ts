@@ -97,5 +97,35 @@ export class NoticeController {
       return reply.status(500).send({ error: 'Erro interno', details: error.message })
     }
   }
+
+  async delete(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const { id } = request.params as { id: string }
+      const user = request.user
+
+      if (!user?.branchId) {
+        return reply.status(400).send({ 
+          message: 'Usuário não está associado a uma filial. Não é possível excluir avisos.' 
+        })
+      }
+
+      const notice = await this.service.getById(id)
+
+      if (!notice) {
+        return reply.status(404).send({ message: 'Aviso não encontrado' })
+      }
+
+      // Verificar se o aviso pertence à mesma filial do usuário
+      if (notice.branchId !== user.branchId) {
+        return reply.status(403).send({ message: 'Você não tem permissão para excluir este aviso' })
+      }
+
+      await this.service.delete(id)
+      return reply.send({ message: 'Aviso excluído com sucesso' })
+    } catch (error: any) {
+      console.error('❌ Erro ao excluir aviso:', error)
+      return reply.status(500).send({ error: 'Erro interno ao excluir aviso', details: error.message })
+    }
+  }
 }
 

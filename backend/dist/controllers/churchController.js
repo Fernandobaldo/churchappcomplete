@@ -3,9 +3,11 @@ import { ChurchService } from '../services/churchService';
 import { AuditLogger } from '../utils/auditHelper';
 import { prisma } from '../lib/prisma';
 import { getMemberFromUserId } from '../utils/authorization';
+import { OnboardingProgressService } from '../services/onboardingProgressService';
 export class ChurchController {
     constructor() {
         this.service = new ChurchService();
+        this.progressService = new OnboardingProgressService();
     }
     async create(request, reply) {
         try {
@@ -35,6 +37,140 @@ export class ChurchController {
             }
             // Busca os dados do usuário no banco para ter nome, senha, etc
             const userId = user.userId || user.id;
+            // Verificar se o usuário já tem uma igreja criada (via createdByUserId)
+            const existingChurch = await prisma.church.findFirst({
+                where: {
+                    createdByUserId: userId,
+                },
+                include: {
+                    Branch: true,
+                },
+            });
+            // Se já existe uma igreja criada por esse usuário, retornar ela em vez de criar nova
+            if (existingChurch) {
+                // Verificar se existe Branch principal
+                let mainBranch = existingChurch.Branch?.find(b => b.isMainBranch)
+                    || existingChurch.Branch?.[0];
+                // Se não tem Branch, criar
+                if (!mainBranch) {
+                    mainBranch = await prisma.branch.create({
+                        data: {
+                            name: data.branchName || 'Sede',
+                            churchId: existingChurch.id,
+                            isMainBranch: true,
+                        },
+                    });
+                }
+                // Buscar member associado se existir
+                let existingMember = await prisma.member.findFirst({
+                    where: {
+                        userId: userId,
+                    },
+                    include: {
+                        Branch: {
+                            include: {
+                                Church: true,
+                            },
+                        },
+                    },
+                });
+                // Se não tem Member, criar
+                if (!existingMember) {
+                    const dbUser = await this.service.getUserData(userId);
+                    if (dbUser) {
+                        const { getUserFullName } = await import('../utils/userUtils');
+                        const { Role } = await import('@prisma/client');
+                        const { ALL_PERMISSION_TYPES } = await import('../constants/permissions');
+                        existingMember = await prisma.member.create({
+                            data: {
+                                name: getUserFullName(dbUser),
+                                email: dbUser.email,
+                                role: Role.ADMINGERAL,
+                                branchId: mainBranch.id,
+                                userId: dbUser.id,
+                            },
+                        });
+                        // Criar permissões
+                        await prisma.permission.createMany({
+                            data: ALL_PERMISSION_TYPES.map((type) => ({
+                                memberId: existingMember.id,
+                                type,
+                            })),
+                            skipDuplicates: true,
+                        });
+                    }
+                }
+                // Gerar token atualizado se Member existe
+                let newToken = null;
+                if (existingMember) {
+                    const userWithMember = await prisma.user.findUnique({
+                        where: { id: userId },
+                        include: {
+                            Member: {
+                                include: {
+                                    Permission: true,
+                                    Branch: {
+                                        include: {
+                                            Church: true,
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    });
+                    if (userWithMember?.Member) {
+                        const member = userWithMember.Member;
+                        const onboardingCompleted = await this.progressService.isCompleted(userId);
+                        const tokenPayload = {
+                            sub: userWithMember.id,
+                            email: userWithMember.email,
+                            name: userWithMember.firstName && userWithMember.lastName
+                                ? `${userWithMember.firstName} ${userWithMember.lastName}`.trim()
+                                : userWithMember.firstName || userWithMember.lastName || 'Usuário',
+                            type: 'member',
+                            memberId: member.id,
+                            role: member.role,
+                            branchId: member.branchId,
+                            churchId: member.Branch?.Church?.id || null,
+                            permissions: member.Permission.map(p => p.type),
+                            onboardingCompleted,
+                        };
+                        newToken = request.server.jwt.sign(tokenPayload, { expiresIn: '7d' });
+                    }
+                }
+                return reply.code(200).send({
+                    church: {
+                        id: existingChurch.id,
+                        name: existingChurch.name,
+                        logoUrl: existingChurch.logoUrl,
+                        avatarUrl: existingChurch.avatarUrl,
+                        isActive: existingChurch.isActive,
+                    },
+                    branch: mainBranch,
+                    member: existingMember,
+                    token: newToken,
+                    existing: true, // Flag para indicar que é igreja existente
+                });
+            }
+            // Verificar se o usuário já tem uma igreja através do Member
+            const existingMember = await prisma.member.findFirst({
+                where: {
+                    userId: userId,
+                },
+                include: {
+                    Branch: {
+                        include: {
+                            Church: true,
+                        },
+                    },
+                },
+            });
+            if (existingMember?.Branch?.Church) {
+                return reply.code(400).send({
+                    message: 'Você já possui uma igreja. Use a rota de atualização para modificar os dados.',
+                    churchId: existingMember.Branch.Church.id,
+                });
+            }
             const dbUser = await this.service.getUserData(userId);
             if (!dbUser) {
                 return reply.code(401).send({ message: 'Usuário não encontrado.' });
@@ -66,16 +202,20 @@ export class ChurchController {
                 });
                 if (userWithMember?.Member) {
                     const member = userWithMember.Member;
+                    const onboardingCompleted = await this.progressService.isCompleted(dbUser.id);
                     const tokenPayload = {
                         sub: userWithMember.id,
                         email: userWithMember.email,
-                        name: userWithMember.name,
+                        name: userWithMember.firstName && userWithMember.lastName
+                            ? `${userWithMember.firstName} ${userWithMember.lastName}`.trim()
+                            : userWithMember.firstName || userWithMember.lastName || 'Usuário',
                         type: 'member',
                         memberId: member.id,
                         role: member.role,
                         branchId: member.branchId,
                         churchId: member.Branch?.Church?.id || null,
                         permissions: member.Permission.map(p => p.type),
+                        onboardingCompleted,
                     };
                     newToken = request.server.jwt.sign(tokenPayload, { expiresIn: '7d' });
                 }
@@ -112,10 +252,11 @@ export class ChurchController {
     }
     async getAll(request, reply) {
         try {
-            // Obtém o branchId do usuário do token (se disponível)
+            // Obtém o branchId e userId do usuário do token (se disponível)
             const user = request.user;
             const userBranchId = user?.branchId || null;
-            const churches = await this.service.getAllChurches(userBranchId);
+            const userId = user?.userId || user?.id || null;
+            const churches = await this.service.getAllChurches(userBranchId, userId);
             return reply.send(churches);
         }
         catch (error) {
@@ -172,17 +313,26 @@ export class ChurchController {
             if (!user) {
                 return reply.code(401).send({ message: 'Usuário não autenticado.' });
             }
+            // Verifica se a igreja existe e se o usuário é o criador (para permitir edição durante onboarding)
+            const church = await prisma.church.findUnique({
+                where: { id },
+                select: { createdByUserId: true },
+            });
+            if (!church) {
+                return reply.code(404).send({ message: 'Igreja não encontrada.' });
+            }
+            // Permite edição se o usuário é o criador da igreja (durante onboarding)
+            const isCreator = church.createdByUserId === user.userId || church.createdByUserId === user.id;
             // Verifica se o usuário tem permissão church_manage ou é ADMINGERAL/ADMINFILIAL
             const hasPermission = user.permissions?.includes('church_manage');
             const hasRole = user.role === 'ADMINGERAL' || user.role === 'ADMINFILIAL';
-            if (!hasPermission && !hasRole) {
+            if (!isCreator && !hasPermission && !hasRole) {
                 return reply.code(403).send({
                     message: 'Você não tem permissão para editar a igreja.',
                 });
             }
-            // Verifica se o usuário pertence à igreja
-            if (user.branchId) {
-                const { prisma } = await import('../lib/prisma');
+            // Verifica se o usuário pertence à igreja (apenas se não for o criador)
+            if (!isCreator && user.branchId) {
                 const branch = await prisma.branch.findUnique({
                     where: { id: user.branchId },
                 });
@@ -205,8 +355,110 @@ export class ChurchController {
             if (data.avatarUrl !== undefined) {
                 updateData.avatarUrl = data.avatarUrl ?? undefined;
             }
-            const church = await this.service.updateChurch(id, updateData);
-            return reply.send(church);
+            const updatedChurch = await this.service.updateChurch(id, updateData);
+            // Verificar e criar Branch/Member se necessário
+            const userId = user.userId || user.id;
+            if (userId) {
+                // Buscar igreja com branches
+                const churchWithBranches = await prisma.church.findUnique({
+                    where: { id },
+                    include: {
+                        Branch: true,
+                    },
+                });
+                // Verificar se existe Branch principal
+                let mainBranch = churchWithBranches?.Branch?.find(b => b.isMainBranch)
+                    || churchWithBranches?.Branch?.[0];
+                // Se não tem Branch, criar
+                if (!mainBranch && churchWithBranches) {
+                    mainBranch = await prisma.branch.create({
+                        data: {
+                            name: data.branchName || 'Sede',
+                            churchId: id,
+                            isMainBranch: true,
+                        },
+                    });
+                }
+                // Verificar se existe Member
+                let existingMember = await prisma.member.findFirst({
+                    where: {
+                        userId: userId,
+                    },
+                    include: {
+                        Branch: {
+                            include: {
+                                Church: true,
+                            },
+                        },
+                    },
+                });
+                // Se não tem Member e tem Branch, criar
+                if (!existingMember && mainBranch) {
+                    const dbUser = await this.service.getUserData(userId);
+                    if (dbUser) {
+                        const { getUserFullName } = await import('../utils/userUtils');
+                        const { Role } = await import('@prisma/client');
+                        const { ALL_PERMISSION_TYPES } = await import('../constants/permissions');
+                        existingMember = await prisma.member.create({
+                            data: {
+                                name: getUserFullName(dbUser),
+                                email: dbUser.email,
+                                role: Role.ADMINGERAL,
+                                branchId: mainBranch.id,
+                                userId: dbUser.id,
+                            },
+                        });
+                        // Criar permissões
+                        await prisma.permission.createMany({
+                            data: ALL_PERMISSION_TYPES.map((type) => ({
+                                memberId: existingMember.id,
+                                type,
+                            })),
+                            skipDuplicates: true,
+                        });
+                    }
+                }
+                // Buscar User com Member atualizado para gerar token
+                const userWithMember = await prisma.user.findUnique({
+                    where: { id: userId },
+                    include: {
+                        Member: {
+                            include: {
+                                Permission: true,
+                                Branch: {
+                                    include: {
+                                        Church: true,
+                                    },
+                                },
+                            },
+                        },
+                    },
+                });
+                if (userWithMember?.Member) {
+                    const member = userWithMember.Member;
+                    const onboardingCompleted = await this.progressService.isCompleted(userId);
+                    const tokenPayload = {
+                        sub: userWithMember.id,
+                        email: userWithMember.email,
+                        name: userWithMember.firstName && userWithMember.lastName
+                            ? `${userWithMember.firstName} ${userWithMember.lastName}`.trim()
+                            : userWithMember.firstName || userWithMember.lastName || 'Usuário',
+                        type: 'member',
+                        memberId: member.id,
+                        role: member.role,
+                        branchId: member.branchId,
+                        churchId: member.Branch?.Church?.id || null,
+                        permissions: member.Permission.map(p => p.type),
+                        onboardingCompleted,
+                    };
+                    const newToken = request.server.jwt.sign(tokenPayload, { expiresIn: '7d' });
+                    return reply.send({
+                        ...updatedChurch,
+                        token: newToken,
+                    });
+                }
+            }
+            return reply.send(updatedChurch);
         }
         catch (error) {
             // Trata erro do Prisma quando a igreja não existe

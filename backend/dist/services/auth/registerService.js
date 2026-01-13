@@ -32,9 +32,14 @@ export async function registerUserService(data) {
         }
         const inviteLink = validation.inviteLink;
         // 3. Criar User
+        // Separar name em firstName e lastName
+        const nameParts = name.trim().split(/\s+/);
+        const firstName = nameParts[0] || name;
+        const lastName = nameParts.slice(1).join(' ') || firstName;
         const newUser = await prisma.user.create({
             data: {
-                name,
+                firstName,
+                lastName,
                 email,
                 password: hashedPassword,
             },
@@ -113,9 +118,14 @@ export async function registerUserService(data) {
         const existing = await prisma.user.findUnique({ where: { email } });
         if (existing)
             throw new Error('Email já cadastrado como usuário.');
+        // Separar name em firstName e lastName
+        const nameParts = name.trim().split(/\s+/);
+        const firstName = nameParts[0] || name;
+        const lastName = nameParts.slice(1).join(' ') || firstName;
         const user = await prisma.user.create({
             data: {
-                name,
+                firstName,
+                lastName,
                 email,
                 password: hashedPassword,
             },
@@ -171,9 +181,14 @@ export async function registerUserService(data) {
         throw new Error('Email já cadastrado como membro.');
     }
     // 6. Criar User primeiro (para ter senha)
+    // Separar name em firstName e lastName
+    const nameParts = name.trim().split(/\s+/);
+    const firstName = nameParts[0] || name;
+    const lastName = nameParts.slice(1).join(' ') || firstName;
     const newUser = await prisma.user.create({
         data: {
-            name,
+            firstName,
+            lastName,
             email,
             password: hashedPassword,
         },

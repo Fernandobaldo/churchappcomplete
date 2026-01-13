@@ -51,5 +51,11 @@ export class NoticeService {
       }
     })
   }
+
+  async delete(id: string) {
+    return prisma.notice.delete({
+      where: { id },
+    })
+  }
 }
 

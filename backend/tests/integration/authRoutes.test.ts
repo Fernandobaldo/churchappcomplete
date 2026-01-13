@@ -227,6 +227,51 @@ describe('POST /auth/login - Integration Tests', () => {
     expect(decoded.memberId).toBe(userWithMember.member.id)
     expect(decoded.type).toBe('member')
   })
+
+  // Teste adicional: Verificar que token inclui onboardingCompleted do banco
+  it('deve incluir onboardingCompleted no token baseado no estado do banco', async () => {
+    // Given: User com Member e onboarding marcado como completo no banco
+    const { OnboardingProgressService } = await import('../../src/services/onboardingProgressService')
+    const progressService = new OnboardingProgressService()
+    // Criar progresso primeiro se não existir
+    await progressService.getOrCreateProgress(userWithMember.user.id)
+    await progressService.markComplete(userWithMember.user.id)
+
+    // When: POST /auth/login
+    const response = await request(app.server)
+      .post('/auth/login')
+      .send({ 
+        email: userWithMember.user.email, 
+        password: 'password123' 
+      })
+
+    expect(response.status).toBe(200)
+    const token = response.body.token
+
+    // Then: Token inclui onboardingCompleted = true
+    const decoded = app.jwt.decode(token) as any
+    expect(decoded.onboardingCompleted).toBe(true)
+  })
+
+  it('deve incluir onboardingCompleted = false quando onboarding não está completo', async () => {
+    // Given: User com Member mas onboarding NÃO completo no banco
+    // (já está no estado inicial do beforeEach)
+
+    // When: POST /auth/login
+    const response = await request(app.server)
+      .post('/auth/login')
+      .send({ 
+        email: userWithMember.user.email, 
+        password: 'password123' 
+      })
+
+    expect(response.status).toBe(200)
+    const token = response.body.token
+
+    // Then: Token inclui onboardingCompleted = false
+    const decoded = app.jwt.decode(token) as any
+    expect(decoded.onboardingCompleted).toBe(false)
+  })
 })
 
 describe('GET /auth/me - Integration Tests', () => {

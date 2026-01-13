@@ -1,6 +1,7 @@
+require('dotenv').config()
 module.exports = {
   expo: {
-    name: "mobile",
+    name: "Conecta Church",
     slug: "mobile",
     version: "1.0.0",
     orientation: "portrait",
@@ -30,10 +31,9 @@ module.exports = {
     },
     // Variáveis de ambiente
     extra: {
-      // URL da API - pode ser sobrescrita por variável de ambiente do sistema
-      // Para desenvolvimento local, use: http://SEU_IP_LOCAL:3333
-      // Para produção/staging, use a URL do Render
-      apiUrl: process.env.EXPO_PUBLIC_API_URL || "https://churchapp-backend-dev.onrender.com",
+      // URL da API - prioridade: EXPO_PUBLIC_API_URL > fallback
+      // O Expo SDK 54+ expõe automaticamente variáveis EXPO_PUBLIC_* para o código
+      apiUrl: process.env.EXPO_PUBLIC_API_URL || "http://localhost:3333",
     }
   }
 };

@@ -13,8 +13,82 @@ else {
 }
 // Importa prisma DEPOIS de carregar o .env
 import { prisma } from '../lib/prisma';
+import { OnboardingProgressService } from './onboardingProgressService';
 const JWT_SECRET = process.env.JWT_SECRET || 'secret_dev_key';
 export class AuthService {
+    constructor() {
+        this.onboardingProgressService = new OnboardingProgressService();
+    }
+    /**
+     * Constrói o payload do token JWT com todas as informações do usuário,
+     * incluindo onboardingCompleted buscado do banco de dados.
+     *
+     * Este método centraliza a lógica de construção de token para garantir
+     * consistência em todos os lugares que geram tokens.
+     */
+    async buildTokenPayload(user, member, type) {
+        const { getUserFullName } = await import('../utils/userUtils');
+        const fullName = getUserFullName(user);
+        // Buscar onboardingCompleted do banco de dados (fonte de verdade)
+        const onboardingCompleted = await this.onboardingProgressService.isCompleted(user.id);
+        const tokenPayload = {
+            sub: user.id,
+            email: user.email,
+            name: fullName,
+            type: type,
+            onboardingCompleted, // Sempre inclui onboardingCompleted do banco
+        };
+        // Se tem Member, adiciona contexto da igreja
+        if (member) {
+            tokenPayload.memberId = member.id;
+            tokenPayload.role = member.role;
+            tokenPayload.branchId = member.branchId;
+            tokenPayload.churchId = member.Branch?.Church?.id || null;
+            tokenPayload.permissions = member.Permission?.map((p) => p.type) || [];
+        }
+        else {
+            // Quando não há Member, omite campos de Member do payload
+            tokenPayload.permissions = []; // Sempre array vazio, nunca undefined
+        }
+        return tokenPayload;
+    }
+    /**
+     * Gera um token JWT para um usuário, buscando todas as informações necessárias
+     * do banco de dados, incluindo onboardingCompleted.
+     *
+     * Este método pode ser usado por outros serviços que precisam gerar tokens.
+     */
+    async generateTokenForUser(userId) {
+        try {
+            // Buscar User com Member e todas as relações necessárias
+            const user = await prisma.user.findUnique({
+                where: { id: userId },
+                include: {
+                    Member: {
+                        include: {
+                            Permission: true,
+                            Branch: {
+                                include: {
+                                    Church: true,
+                                },
+                            },
+                        },
+                    },
+                },
+            });
+            if (!user) {
+                return null;
+            }
+            const member = user.Member;
+            const type = member ? 'member' : 'user';
+            const tokenPayload = await this.buildTokenPayload(user, member, type);
+            return jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: '7d' });
+        }
+        catch (error) {
+            console.error('[AUTH] Erro ao gerar token para usuário:', error);
+            return null;
+        }
+    }
     async validateCredentials(email, password) {
         // Verifica se o Prisma está conectado
         try {
@@ -117,32 +191,16 @@ export class AuthService {
         if (!user) {
             throw new Error('Usuário não encontrado');
         }
-        // Monta payload do token
-        const tokenPayload = {
-            sub: user.id,
-            email: user.email,
-            name: user.name,
-            type: type,
-        };
-        // Se tem Member, adiciona contexto da igreja
-        if (member) {
-            // member vem de user.Member que já tem as relações carregadas
-            tokenPayload.memberId = member.id;
-            tokenPayload.role = member.role;
-            tokenPayload.branchId = member.branchId;
-            tokenPayload.churchId = member.Branch?.Church?.id || null;
-            tokenPayload.permissions = member.Permission?.map(p => p.type) || [];
-        }
-        else {
-            // Quando não há Member, omite campos de Member do payload (não inclui)
-            // Isso indica que o onboarding não foi completado
-            tokenPayload.permissions = []; // Sempre array vazio, nunca undefined
-        }
+        // Usa método centralizado para construir token payload
+        // Isso garante que onboardingCompleted seja sempre buscado do banco
+        const tokenPayload = await this.buildTokenPayload(user, member, type);
         const token = jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: '7d' });
         // Monta resposta
+        const { getUserFullName } = await import('../utils/userUtils');
+        const fullName = getUserFullName(user);
         const responseUser = {
             id: user.id,
-            name: user.name,
+            name: fullName,
             email: user.email,
         };
         if (member) {

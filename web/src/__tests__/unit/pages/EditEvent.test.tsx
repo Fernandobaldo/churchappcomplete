@@ -251,5 +251,86 @@ describe('EditEvent - Unit Tests', () => {
     // Assert
     expect(mockNavigate).toHaveBeenCalledWith('/app/events/event-1')
   })
+
+  // ============================================================================
+  // TESTE 7: PRIMARY INTERACTION - Exclui evento com sucesso
+  // ============================================================================
+  it('deve excluir evento com sucesso', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    const mockUser = fixtures.user()
+    const mockEvent = {
+      id: 'event-1',
+      title: 'Evento para Deletar',
+      location: 'Local original',
+      startDate: '2024-12-31T10:00:00Z',
+      endDate: '2024-12-31T12:00:00Z',
+    }
+    mockApiResponse('get', '/events/event-1', mockEvent)
+    mockApiResponse('delete', '/events/event-1', {})
+    window.confirm = vi.fn(() => true)
+
+    // Act
+    renderWithProviders(<EditEvent />, {
+      initialEntries: ['/app/events/event-1/edit'],
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
+
+    await waitFor(() => {
+      expect(screen.getByText('Excluir Evento')).toBeInTheDocument()
+    })
+
+    const deleteButton = screen.getByText('Excluir Evento')
+    await user.click(deleteButton)
+
+    // Assert
+    await waitFor(() => {
+      expect(mockToastSuccess).toHaveBeenCalledWith('Evento excluído com sucesso!')
+    })
+    expect(mockNavigate).toHaveBeenCalledWith('/app/events')
+  })
+
+  // ============================================================================
+  // TESTE 8: ERROR STATE - Exibe erro quando falha ao excluir evento
+  // ============================================================================
+  it('deve exibir erro quando falha ao excluir evento', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    const mockUser = fixtures.user()
+    const mockEvent = {
+      id: 'event-1',
+      title: 'Evento Original',
+      location: 'Local original',
+      startDate: '2024-12-31T10:00:00Z',
+      endDate: '2024-12-31T12:00:00Z',
+    }
+    mockApiResponse('get', '/events/event-1', mockEvent)
+    mockApiError('delete', '/events/event-1', { message: 'Erro ao excluir evento' })
+    window.confirm = vi.fn(() => true)
+
+    // Act
+    renderWithProviders(<EditEvent />, {
+      initialEntries: ['/app/events/event-1/edit'],
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
+
+    await waitFor(() => {
+      expect(screen.getByText('Excluir Evento')).toBeInTheDocument()
+    })
+
+    const deleteButton = screen.getByText('Excluir Evento')
+    await user.click(deleteButton)
+
+    // Assert
+    await waitFor(() => {
+      expect(mockToastError).toHaveBeenCalled()
+    })
+  })
 })
 

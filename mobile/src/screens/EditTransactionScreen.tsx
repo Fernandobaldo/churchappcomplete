@@ -11,12 +11,14 @@ import {
   Modal,
 } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
-import { useNavigation, useRoute } from '@react-navigation/native'
+import { useNavigation, useRoute, CommonActions } from '@react-navigation/native'
 import ModalSelector from 'react-native-modal-selector'
 import DateTimePicker from '@react-native-community/datetimepicker'
 import { Ionicons } from '@expo/vector-icons'
+import FontAwesome5 from '@expo/vector-icons/FontAwesome5'
 import api from '../api/api'
 import Toast from 'react-native-toast-message'
+import { financesService } from '../services/finances.service'
 import MemberSearch from '../components/MemberSearch'
 import FormScreenLayout from '../components/layouts/FormScreenLayout'
 import GlassCard from '../components/GlassCard'
@@ -154,7 +156,51 @@ export default function EditTransactionScreen() {
     return true
   }, [amount, type, entryType, exitType, exitTypeOther, isTithePayerMember, tithePayerMemberId, tithePayerName, contributionId])
 
-  const handleSubmit = async () => {
+  const handleDelete = async () => {
+    if (!id) return
+    
+    Alert.alert(
+      'Excluir Transação',
+      'Tem certeza que deseja excluir esta transação? Esta ação não pode ser desfeita.',
+      [
+        {
+          text: 'Cancelar',
+          style: 'cancel',
+        },
+        {
+          text: 'Excluir',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await financesService.delete(id)
+              Toast.show({
+                type: 'success',
+                text1: 'Transação excluída!',
+                text2: 'A transação foi excluída com sucesso.',
+              })
+              // Reset para Finances (rota do Stack, não está no TabNavigator)
+              // Limpa o histórico para evitar voltar para a tela deletada
+              navigation.dispatch(
+                CommonActions.reset({
+                  index: 0,
+                  routes: [{ name: 'Finances' }],
+                })
+              )
+            } catch (error: any) {
+              Toast.show({
+                type: 'error',
+                text1: 'Erro ao excluir transação',
+                text2: error?.response?.data?.message || 'Houve um erro ao excluir a transação.',
+              })
+              console.error('Erro ao excluir transação:', error)
+            }
+          },
+        },
+      ]
+    )
+  }
+
+    const handleSubmit = async () => {
     if (!amount) {
       Alert.alert('Erro', 'Preencha o valor')
       return
@@ -601,8 +647,19 @@ export default function EditTransactionScreen() {
           )}
         </LinearGradient>
       </TouchableOpacity>
-    </FormScreenLayout>
-  )
+      <View style={styles.deleteContainer}>
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={handleDelete}
+          activeOpacity={0.8}
+          disabled={!id}
+        >
+          <FontAwesome5 name="trash" size={16} color="#fff" />
+          <Text style={styles.deleteButtonText}>Excluir Transação</Text>
+        </TouchableOpacity>
+      </View>
+        </FormScreenLayout>
+    )
 }
 
 const styles = StyleSheet.create({
@@ -731,6 +788,26 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     lineHeight: 24,
+  },
+  deleteContainer: {
+    marginTop: 24,
+    paddingHorizontal: 16,
+    marginBottom: 24,
+  },
+  deleteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#DC2626',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    gap: 8,
+  },
+  deleteButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 })
 

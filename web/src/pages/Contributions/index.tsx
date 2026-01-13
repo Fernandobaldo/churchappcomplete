@@ -152,12 +152,25 @@ export default function Contributions() {
                       </span>
                     </td>
                     <td className="py-3 px-4">
-                      <button
-                        onClick={() => navigate(`/app/contributions/${contribution.id}`)}
-                        className="text-primary hover:underline text-sm"
-                      >
-                        Ver Detalhes
-                      </button>
+                      <div className="flex gap-2">
+                        <PermissionGuard permission="contributions_manage">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              navigate(`/app/contributions/${contribution.id}/edit`)
+                            }}
+                            className="text-primary hover:underline text-sm"
+                          >
+                            Editar
+                          </button>
+                        </PermissionGuard>
+                        <button
+                          onClick={() => navigate(`/app/contributions/${contribution.id}`)}
+                          className="text-primary hover:underline text-sm"
+                        >
+                          Ver Detalhes
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

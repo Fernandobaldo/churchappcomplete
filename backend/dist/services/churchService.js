@@ -16,61 +16,60 @@ export class ChurchService {
                     website: data.website,
                     socialMedia: data.socialMedia,
                     isActive: true,
+                    createdByUserId: user.id, // Salvar quem criou a igreja
                 },
             });
-            let branch = null;
-            let member = null;
-            // Só cria branch e member se withBranch não for false
-            if (data.withBranch !== false) {
-                branch = await tx.branch.create({
+            // Sempre cria branch principal (obrigatório para Member)
+            const branch = await tx.branch.create({
+                data: {
+                    name: data.branchName || 'Sede',
+                    churchId: church.id,
+                    isMainBranch: true,
+                },
+            });
+            // Verifica se já existe um Member com esse userId ou email
+            let existingMember = await tx.member.findFirst({
+                where: {
+                    OR: [
+                        { userId: user.id },
+                        { email: user.email },
+                    ],
+                },
+            });
+            let member;
+            if (existingMember) {
+                // Se já existe, atualiza para associar à nova branch e role
+                member = await tx.member.update({
+                    where: { id: existingMember.id },
                     data: {
-                        name: data.branchName || 'Sede',
-                        churchId: church.id,
-                        isMainBranch: true,
+                        role: Role.ADMINGERAL,
+                        branchId: branch.id,
+                        userId: user.id,
                     },
-                });
-                // Verifica se já existe um Member com esse userId ou email
-                let existingMember = await tx.member.findFirst({
-                    where: {
-                        OR: [
-                            { userId: user.id },
-                            { email: user.email },
-                        ],
-                    },
-                });
-                if (existingMember) {
-                    // Se já existe, atualiza para associar à nova branch e role
-                    member = await tx.member.update({
-                        where: { id: existingMember.id },
-                        data: {
-                            role: Role.ADMINGERAL,
-                            branchId: branch.id,
-                            userId: user.id,
-                        },
-                    });
-                }
-                else {
-                    // Se não existe, cria novo Member (sem senha - usa senha do User)
-                    member = await tx.member.create({
-                        data: {
-                            name: user.name,
-                            email: user.email,
-                            role: Role.ADMINGERAL,
-                            branchId: branch.id,
-                            userId: user.id,
-                        },
-                    });
-                }
-                // Cria as permissões diretamente para o member (apenas se não existirem)
-                // Permission tem memberId obrigatório, então não pode existir sem um member
-                await tx.permission.createMany({
-                    data: ALL_PERMISSION_TYPES.map((type) => ({
-                        memberId: member.id,
-                        type,
-                    })),
-                    skipDuplicates: true,
                 });
             }
+            else {
+                // Se não existe, cria novo Member (sem senha - usa senha do User)
+                const { getUserFullName } = await import('../utils/userUtils');
+                member = await tx.member.create({
+                    data: {
+                        name: getUserFullName(user),
+                        email: user.email,
+                        role: Role.ADMINGERAL,
+                        branchId: branch.id,
+                        userId: user.id,
+                    },
+                });
+            }
+            // Cria as permissões diretamente para o member (apenas se não existirem)
+            // Permission tem memberId obrigatório, então não pode existir sem um member
+            await tx.permission.createMany({
+                data: ALL_PERMISSION_TYPES.map((type) => ({
+                    memberId: member.id,
+                    type,
+                })),
+                skipDuplicates: true,
+            });
             return {
                 church,
                 branch,
@@ -78,7 +77,11 @@ export class ChurchService {
             };
         });
     }
-    async getAllChurches(userBranchId) {
+    async getAllChurches(userBranchId, userId) {
+        // Se não tem userId nem userBranchId, retornar array vazio (não retornar dados de outros)
+        if (!userId && !userBranchId) {
+            return [];
+        }
         // Se o usuário tem branchId, retorna apenas a igreja da branch do usuário
         if (userBranchId) {
             const branch = await prisma.branch.findUnique({
@@ -97,8 +100,41 @@ export class ChurchService {
             // Se não encontrou a branch, retorna array vazio
             return [];
         }
-        // Se não tem branchId, significa que o usuário não tem igreja configurada
-        // Retorna array vazio em vez de todas as igrejas
+        // Se não tem branchId mas tem userId, tenta buscar através do createdByUserId
+        if (userId) {
+            const church = await prisma.church.findFirst({
+                where: {
+                    createdByUserId: userId,
+                },
+                include: {
+                    Branch: true,
+                },
+            });
+            if (church) {
+                return [church];
+            }
+            // Também tenta buscar através do Member
+            const member = await prisma.member.findFirst({
+                where: {
+                    userId: userId,
+                },
+                include: {
+                    Branch: {
+                        include: {
+                            Church: {
+                                include: {
+                                    Branch: true,
+                                },
+                            },
+                        },
+                    },
+                },
+            });
+            if (member?.Branch?.Church) {
+                return [member.Branch.Church];
+            }
+        }
+        // Se não encontrou nada, retorna array vazio
         return [];
     }
     async getChurchById(id) {

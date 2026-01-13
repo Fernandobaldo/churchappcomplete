@@ -155,4 +155,52 @@ export async function contributionsRoutes(app: FastifyInstance) {
       },
     },
   }, controller.toggleActive.bind(controller))
+
+  app.delete('/:id', {
+    preHandler: [
+      authenticate,
+      checkBranchId(),
+      checkRole(['ADMINGERAL', 'ADMINFILIAL', 'COORDINATOR']),
+      checkPermission(['contributions_manage'])
+    ],
+    schema: {
+      description: 'Exclui uma contribuição',
+      tags: ['Contribuições'],
+      summary: 'Excluir contribuição',
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['id'],
+        properties: {
+          id: {
+            type: 'string',
+            description: 'ID da contribuição',
+          },
+        },
+      },
+      response: {
+        200: {
+          description: 'Contribuição excluída com sucesso',
+          type: 'object',
+          properties: {
+            message: { type: 'string' },
+          },
+        },
+        404: {
+          description: 'Contribuição não encontrada',
+          type: 'object',
+          properties: {
+            message: { type: 'string' },
+          },
+        },
+        403: {
+          description: 'Sem permissão para excluir esta contribuição',
+          type: 'object',
+          properties: {
+            message: { type: 'string' },
+          },
+        },
+      },
+    },
+  }, controller.delete.bind(controller))
 }

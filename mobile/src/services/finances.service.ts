@@ -122,5 +122,14 @@ export const financesService = {
     const response = await api.put<Transaction>(`/finances/${id}`, payload)
     return response.data
   },
+
+  /**
+   * Delete a transaction
+   * @param id Transaction ID
+   * @returns Promise
+   */
+  delete: async (id: string): Promise<void> => {
+    await api.delete(`/finances/${id}`)
+  },
 }
 

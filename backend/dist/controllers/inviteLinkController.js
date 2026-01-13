@@ -4,6 +4,7 @@ import { generateQRCode } from '../services/qrCodeService';
 import { generateInviteLinkPDF } from '../services/pdfService';
 import { logAudit } from '../utils/auditHelper';
 import { AuditAction } from '@prisma/client';
+import { normalizeExpirationDate } from '../utils/dateUtils';
 /**
  * Cria um novo link de convite
  */
@@ -21,20 +22,32 @@ export async function createInviteLinkController(request, reply) {
         const userId = request.user.userId;
         let inviteLink;
         try {
+            // Normalizar data de expiração: se for date-only, converter para fim do dia
+            const expiresAtDate = bodyData.expiresAt
+                ? normalizeExpirationDate(bodyData.expiresAt)
+                : null;
             inviteLink = await generateInviteLink({
                 branchId: bodyData.branchId,
                 createdBy: userId,
                 maxUses: bodyData.maxUses ?? null,
-                expiresAt: bodyData.expiresAt ? new Date(bodyData.expiresAt) : null,
+                expiresAt: expiresAtDate,
             });
         }
         catch (error) {
             console.error('❌ [INVITE LINK CONTROLLER] Erro ao criar link:', error.message, error.code);
+            // Erro de limite de plano atingido
             if (error.code === 'PLAN_LIMIT_REACHED' || error.message === 'PLAN_LIMIT_REACHED') {
                 return reply.status(403).send({
                     error: 'PLAN_LIMIT_REACHED',
                     message: 'Limite de membros do plano atingido. Faça upgrade do seu plano para criar mais links de convite.',
                     code: 'PLAN_LIMIT_REACHED',
+                });
+            }
+            // Erro de plano não encontrado
+            if (error.message?.includes('Plano não encontrado')) {
+                return reply.status(400).send({
+                    error: 'PLAN_NOT_FOUND',
+                    message: error.message || 'Nenhum plano ativo encontrado. Verifique se há uma assinatura ativa para o usuário ou para o administrador geral da igreja.',
                 });
             }
             throw error;
@@ -83,6 +96,13 @@ export async function createInviteLinkController(request, reply) {
         }
         if (error.name === 'ZodError') {
             return reply.status(400).send({ error: 'Dados inválidos', details: error.errors });
+        }
+        // Erro de plano não encontrado (tratado antes do genérico "não encontrado")
+        if (error.message?.includes('Plano não encontrado')) {
+            return reply.status(400).send({
+                error: 'PLAN_NOT_FOUND',
+                message: error.message || 'Nenhum plano ativo encontrado. Verifique se há uma assinatura ativa para o usuário ou para o administrador geral da igreja.',
+            });
         }
         if (error.message?.includes('permissão') ||
             error.message?.includes('não pode criar') ||
