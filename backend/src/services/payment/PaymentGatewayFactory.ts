@@ -1,7 +1,7 @@
 import { PaymentGatewayInterface } from './PaymentGatewayInterface'
-import { MercadoPagoGateway } from './MercadoPagoGateway'
 import { GatewayProvider, GatewayConfig } from './types'
 import { env } from '../../env'
+import { StripeGateway } from './StripeGateway'
 
 /**
  * Factory para instanciar gateways de pagamento dinamicamente
@@ -12,9 +12,6 @@ export class PaymentGatewayFactory {
    */
   static createGateway(config: GatewayConfig): PaymentGatewayInterface {
     switch (config.provider) {
-      case 'mercadopago':
-        return new MercadoPagoGateway(config)
-      
       case 'asaas':
         // TODO: Implementar quando necessário
         throw new Error('Gateway Asaas ainda não implementado')
@@ -24,8 +21,12 @@ export class PaymentGatewayFactory {
         throw new Error('Gateway PagSeguro ainda não implementado')
       
       case 'stripe':
-        // TODO: Implementar quando necessário
-        throw new Error('Gateway Stripe ainda não implementado')
+        return new StripeGateway({
+          provider: 'stripe',
+          secretKey: config.secretKey || env.STRIPE_SECRET_KEY,
+          publicKey: config.publicKey || env.STRIPE_PUBLIC_KEY,
+          webhookSecret: config.webhookSecret || env.STRIPE_WEBHOOK_SECRET,
+        })
       
       default:
         throw new Error(`Gateway não suportado: ${config.provider}`)
@@ -41,13 +42,11 @@ export class PaymentGatewayFactory {
 
     const config: GatewayConfig = {
       provider,
-      accessToken: env.MERCADOPAGO_ACCESS_TOKEN,
-      publicKey: env.MERCADOPAGO_PUBLIC_KEY,
-      webhookSecret: env.MERCADOPAGO_WEBHOOK_SECRET,
-      environment: env.MERCADOPAGO_ENVIRONMENT,
+      secretKey: env.STRIPE_SECRET_KEY,
+      publicKey: env.STRIPE_PUBLIC_KEY,
+      webhookSecret: env.STRIPE_WEBHOOK_SECRET,
     }
 
     return this.createGateway(config)
   }
 }
-

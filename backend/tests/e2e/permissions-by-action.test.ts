@@ -1,4 +1,6 @@
 // tests/e2e/permissions-by-action.test.ts
+// E2E test para Permissões por Ação
+// Padrão: Validar fluxo completo de permissões e ações
 // IMPORTANTE: Carregar .env.test ANTES de qualquer importação
 import dotenv from 'dotenv'
 dotenv.config({ path: '.env.test' })
@@ -10,14 +12,11 @@ process.env.VITEST = 'true'
 // Importa o setup do ambiente de teste
 import '../setupTestEnv'
 
-import Fastify from 'fastify'
-import fastifyJwt from '@fastify/jwt'
 import { beforeAll, afterAll, describe, it, expect } from 'vitest'
-import { execSync } from 'child_process'
-import { registerRoutes } from '../../src/routes/registerRoutes'
 import { prisma } from '../../src/lib/prisma'
 import { resetTestDatabase } from '../utils/resetTestDatabase'
-import { authenticate } from '../../src/middlewares/authenticate'
+import { createTestApp } from '../utils/createTestApp'
+import { createTestPlan } from '../utils/testFactories'
 import {
   registerUser,
   loginUser,
@@ -37,52 +36,11 @@ import { format } from 'date-fns'
 import request from 'supertest'
 
 describe('E2E: Permissões por Ação', () => {
-  const app = Fastify()
+  let app: Awaited<ReturnType<typeof createTestApp>>
 
   beforeAll(async () => {
-    // Garante que o banco está sincronizado
-    const databaseUrl = process.env.DATABASE_URL
-    if (!databaseUrl) {
-      throw new Error('DATABASE_URL não configurada no .env.test')
-    }
-
-    // Verifica se as tabelas existem, se não, cria
-    try {
-      await prisma.$queryRaw`SELECT 1 FROM "User" LIMIT 1`
-      console.log('[E2E Permissions] ✅ Tabelas já existem no banco de teste')
-    } catch (error: any) {
-      console.log('[E2E Permissions] ⚠️ Tabelas não existem, criando schema...')
-      const cleanDatabaseUrl = databaseUrl.replace(/^["']|["']$/g, '')
-      try {
-        execSync(
-          'npx prisma db push --force-reset --skip-generate --schema=prisma/schema.prisma --accept-data-loss',
-          {
-            stdio: 'inherit',
-            env: { ...process.env, DATABASE_URL: cleanDatabaseUrl },
-          }
-        )
-        console.log('[E2E Permissions] ✅ Schema criado com sucesso')
-      } catch (err: any) {
-        console.error('[E2E Permissions] ❌ Erro ao criar schema:', err.message)
-        throw new Error(
-          `Falha ao inicializar banco de teste. Verifique se o PostgreSQL está rodando e se a DATABASE_URL está correta. Erro: ${err.message}`
-        )
-      }
-    }
-
-    // Configura JWT
-    app.register(fastifyJwt, {
-      secret: process.env.JWT_SECRET || 'churchapp-secret-key',
-    })
-
-    // Usa o middleware authenticate do projeto
-    app.decorate('authenticate', authenticate)
-
-    // Registra todas as rotas da aplicação
-    await registerRoutes(app)
-    await app.ready()
-
-    // Limpa e prepara o banco de dados
+    // Given - Setup do ambiente de teste
+    app = await createTestApp()
     await resetTestDatabase()
 
     // Cria o plano gratuito (necessário para registro de usuários)
@@ -97,19 +55,17 @@ describe('E2E: Permissões por Ação', () => {
     })
 
     if (!existingPlan) {
-      await prisma.plan.create({
-        data: {
-          name: 'free',
-          price: 0,
-          features: [
-            'Até 1 igreja',
-            'Até 1 filial',
-            'Até 20 membros',
-            'Painel de controle limitado',
-          ],
-          maxBranches: 1,
-          maxMembers: 20,
-        },
+      await createTestPlan({
+        name: 'free',
+        price: 0,
+        features: [
+          'Até 1 igreja',
+          'Até 1 filial',
+          'Até 20 membros',
+          'Painel de controle limitado',
+        ],
+        maxBranches: 1,
+        maxMembers: 20,
       })
       console.log('[E2E Permissions] ✅ Plano Free criado')
     } else {
@@ -124,9 +80,8 @@ describe('E2E: Permissões por Ação', () => {
 
   describe('Cenário: Membro realiza ação após receber permissão', () => {
     it('deve permitir criar devocional após receber devotional_manage', async () => {
+      // Given - Estado inicial: admin geral e membro criados
       const timestamp = Date.now()
-      
-      // 1. Criar admin geral
       const adminResult = await setupCompleteUser(app, {
         name: `Admin E2E ${timestamp}`,
         email: `admin-${timestamp}@test.com`,
@@ -137,7 +92,6 @@ describe('E2E: Permissões por Ação', () => {
         pastorName: 'Pastor Teste',
       })
 
-      // 2. Criar membro
       const memberResult = await createMember(app, adminResult.token, {
         name: `Membro E2E ${timestamp}`,
         email: `membro-${timestamp}@test.com`,
@@ -149,26 +103,24 @@ describe('E2E: Permissões por Ação', () => {
       expect(memberResult.id).toBeDefined()
       const memberId = memberResult.id
 
-      // 3. Admin concede permissão devotional_manage
+      // When - Admin concede permissão e membro cria devocional
       await assignPermission(app, adminResult.token, memberId, 'devotional_manage')
-
-      // 4. Membro faz login
       const memberLogin = await loginUser(app, {
         email: `membro-${timestamp}@test.com`,
         password: 'senha123456',
       })
 
-      // 5. Membro cria devocional
       const devotional = await createDevotional(app, memberLogin.token, {
         title: 'Devocional de Teste',
         passage: 'João 3:16',
         content: 'Conteúdo do devocional de teste',
       })
 
+      // Then - Validação de criação de devocional
       expect(devotional.id).toBeDefined()
       expect(devotional.title).toBe('Devocional de Teste')
 
-      // 6. Validar que o devocional foi criado
+      // Then - Verificação de estado final no banco
       const devotionalDetails = await getResourceById(app, memberLogin.token, 'devotionals', devotional.id)
       expect(devotionalDetails.id).toBe(devotional.id)
       expect(devotionalDetails.title).toBe('Devocional de Teste')
@@ -216,8 +168,8 @@ describe('E2E: Permissões por Ação', () => {
       tomorrow.setDate(tomorrow.getDate() + 1)
       const event = await createEvent(app, memberLogin.token, {
         title: 'Evento de Teste',
-        startDate: format(tomorrow, 'dd/MM/yyyy'),
-        endDate: format(tomorrow, 'dd/MM/yyyy'),
+        startDate: format(tomorrow, 'dd-MM-yyyy'),
+        endDate: format(tomorrow, 'dd-MM-yyyy'),
         time: '19:00',
         location: 'Igreja',
         description: 'Descrição do evento de teste',

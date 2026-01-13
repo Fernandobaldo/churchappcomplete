@@ -81,5 +81,14 @@ export const contributionsService = {
     const response = await api.put<Contribution>(`/contributions/${id}`, payload)
     return response.data
   },
+
+  /**
+   * Delete a contribution
+   * @param id Contribution ID
+   * @returns Promise
+   */
+  delete: async (id: string): Promise<void> => {
+    await api.delete(`/contributions/${id}`)
+  },
 }
 

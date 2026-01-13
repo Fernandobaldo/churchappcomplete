@@ -151,10 +151,9 @@ export async function createCheckoutHandler(request: FastifyRequest, reply: Fast
     }
 
     // Criar assinatura no gateway
-    // Passar dados do plano diretamente (PreApproval Plan será criado aqui)
     const gatewaySubscription = await gateway.createSubscription({
       customerId: customer.id,
-      customerEmail: user.email, // Email do cliente (obrigatório para Mercado Pago)
+      customerEmail: user.email,
       planId: plan.id,
       planData: {
         amount: plan.price, // Valor em reais
@@ -170,7 +169,7 @@ export async function createCheckoutHandler(request: FastifyRequest, reply: Fast
     })
 
     // Determinar gateway provider (usar do plano se existir, senão do env)
-    const gatewayProvider = plan.gatewayProvider || process.env.PAYMENT_GATEWAY || 'mercadopago'
+    const gatewayProvider = plan.gatewayProvider || process.env.PAYMENT_GATEWAY || 'stripe'
 
     // Criar assinatura no banco
     const subscription = await prisma.subscription.create({

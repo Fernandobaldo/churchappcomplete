@@ -1,6 +1,7 @@
 import { prisma } from '../../lib/prisma';
 import { SubscriptionStatus } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { OnboardingProgressService } from '../onboardingProgressService';
 export async function loginUserService(app, email, password) {
     const user = await prisma.user.findUnique({
         where: { email },
@@ -17,6 +18,8 @@ export async function loginUserService(app, email, password) {
     if (!user || !(await bcrypt.compare(password, user.password))) {
         throw new Error('Credenciais inválidas');
     }
+    const progressService = new OnboardingProgressService();
+    const onboardingCompleted = await progressService.isCompleted(user.id);
     const tokenPayload = {
         userId: user.id,
         email: user.email,
@@ -24,6 +27,7 @@ export async function loginUserService(app, email, password) {
         role: user.Member?.role ?? null,
         branchId: user.Member?.branchId ?? null,
         permissions: user.Member?.Permission.map((p) => p.type) ?? [],
+        onboardingCompleted,
     };
     const token = app.jwt.sign(tokenPayload, { sub: user.id, expiresIn: '7d' });
     return {

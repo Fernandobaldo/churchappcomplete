@@ -1,11 +1,11 @@
 import { z } from 'zod';
 export const createTransactionBodySchema = z.object({
-    title: z.string().min(1, 'Título obrigatório'),
     amount: z.number().positive('Valor deve ser positivo'),
     type: z.enum(['ENTRY', 'EXIT'], {
         errorMap: () => ({ message: 'Tipo deve ser ENTRY ou EXIT' }),
     }),
-    category: z.string().optional(),
+    title: z.string().nullable().optional(),
+    category: z.string().nullable().optional(),
     entryType: z.enum(['OFERTA', 'DIZIMO', 'CONTRIBUICAO']).optional(),
     exitType: z.enum(['ALUGUEL', 'ENERGIA', 'AGUA', 'INTERNET', 'OUTROS']).optional(),
     exitTypeOther: z.string().optional(),
@@ -13,6 +13,7 @@ export const createTransactionBodySchema = z.object({
     tithePayerMemberId: z.string().optional(),
     tithePayerName: z.string().optional(),
     isTithePayerMember: z.boolean().optional(),
+    date: z.coerce.date().optional(),
 }).refine((data) => {
     // Se type é ENTRY, entryType é obrigatório
     if (data.type === 'ENTRY' && !data.entryType) {
@@ -67,10 +68,10 @@ export const createTransactionBodySchema = z.object({
     path: ['contributionId'],
 });
 export const updateTransactionBodySchema = z.object({
-    title: z.string().min(1, 'Título obrigatório').optional(),
     amount: z.number().positive('Valor deve ser positivo').optional(),
     type: z.enum(['ENTRY', 'EXIT']).optional(),
-    category: z.string().optional(),
+    title: z.string().nullable().optional(),
+    category: z.string().nullable().optional(),
     entryType: z.enum(['OFERTA', 'DIZIMO', 'CONTRIBUICAO']).optional(),
     exitType: z.enum(['ALUGUEL', 'ENERGIA', 'AGUA', 'INTERNET', 'OUTROS']).optional(),
     exitTypeOther: z.string().optional(),
@@ -78,6 +79,7 @@ export const updateTransactionBodySchema = z.object({
     tithePayerMemberId: z.string().optional(),
     tithePayerName: z.string().optional(),
     isTithePayerMember: z.boolean().optional(),
+    date: z.coerce.date().optional(),
 }).refine((data) => {
     // Se type é ENTRY e entryType foi fornecido, entryType deve ser válido
     if (data.type === 'ENTRY' && data.entryType === undefined && data.entryType !== null) {
@@ -138,10 +140,8 @@ export const createTransactionSchema = {
     body: {
         type: 'object',
         properties: {
-            title: { type: 'string' },
             amount: { type: 'number' },
             type: { type: 'string', enum: ['ENTRY', 'EXIT'] },
-            category: { type: 'string' },
             entryType: { type: 'string', enum: ['OFERTA', 'DIZIMO', 'CONTRIBUICAO'] },
             exitType: { type: 'string', enum: ['ALUGUEL', 'ENERGIA', 'AGUA', 'INTERNET', 'OUTROS'] },
             exitTypeOther: { type: 'string' },
@@ -149,8 +149,9 @@ export const createTransactionSchema = {
             tithePayerMemberId: { type: 'string' },
             tithePayerName: { type: 'string' },
             isTithePayerMember: { type: 'boolean' },
+            date: { type: 'string', format: 'date-time' },
         },
-        required: ['title', 'amount', 'type'],
+        required: ['amount', 'type'],
     },
     response: {
         201: {
@@ -158,7 +159,7 @@ export const createTransactionSchema = {
             type: 'object',
             properties: {
                 id: { type: 'string' },
-                title: { type: 'string' },
+                title: { type: 'string', nullable: true },
                 amount: { type: 'number' },
                 type: { type: 'string', enum: ['ENTRY', 'EXIT'] },
                 category: { type: 'string', nullable: true },
@@ -171,6 +172,7 @@ export const createTransactionSchema = {
                 isTithePayerMember: { type: 'boolean', nullable: true },
                 createdBy: { type: 'string', nullable: true },
                 branchId: { type: 'string' },
+                date: { type: 'string', format: 'date-time', nullable: true },
                 createdAt: { type: 'string', format: 'date-time' },
                 updatedAt: { type: 'string', format: 'date-time' },
             },

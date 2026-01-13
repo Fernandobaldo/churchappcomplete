@@ -12,14 +12,10 @@ vi.mock('jwt-decode', () => ({
 }))
 
 // Mock api
-vi.mock('@/api/api', () => ({
-  default: {
-    get: vi.fn(),
-    post: vi.fn(),
-    put: vi.fn(),
-    delete: vi.fn(),
-  },
-}))
+vi.mock('@/api/api', async () => {
+  const { apiMock } = await import('@/test/apiMock')
+  return { default: apiMock }
+})
 
 const mockNavigate = vi.fn()
 
@@ -193,7 +189,7 @@ describe('Login - Unit Tests', () => {
 
     // Assert
     // Verifica se botão está desabilitado ou mostra loading
-    const submitButton = screen.getByRole('button', { name: /entrar/i })
+    const submitButton = screen.getByRole('button', { name: /entrando/i })
     expect(submitButton).toBeDisabled()
 
     // Aguarda conclusão

@@ -7,8 +7,13 @@ import { fixtures } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/helpers'
 import { mockApiResponse, mockApiError } from '@/test/mockApi'
 
-vi.mock('@/api/api')
-const mockToastError = vi.fn()
+vi.mock('@/api/api', async () => {
+  const { apiMock } = await import('@/test/apiMock')
+  return { default: apiMock }
+})
+const { mockToastError } = vi.hoisted(() => ({
+  mockToastError: vi.fn(),
+}))
 vi.mock('react-hot-toast', () => ({
   default: {
     error: mockToastError,
@@ -208,47 +213,5 @@ describe('Devotionals - Unit Tests', () => {
   })
 })
 
-
-
-    renderWithProviders(<Devotionals />, {
-      authState: {
-        user: mockUser,
-        token: 'token',
-      },
-    })
-
-    await waitFor(() => {
-      expect(screen.getByText('Devocional Teste')).toBeInTheDocument()
-    })
-
-    const card = screen.getByText('Devocional Teste').closest('div')
-    await user.click(card!)
-
-    // Assert
-    expect(mockNavigate).toHaveBeenCalledWith('/app/devotionals/devotional-1')
-  })
-
-  // ============================================================================
-  // TESTE 6: ERROR STATE - Exibe erro quando falha ao carregar devocionais
-  // ============================================================================
-  it('deve exibir erro quando falha ao carregar devocionais', async () => {
-    // Arrange
-    const mockUser = fixtures.user()
-    mockApiError('get', '/devotionals', new Error('Erro na API'))
-
-    // Act
-    renderWithProviders(<Devotionals />, {
-      authState: {
-        user: mockUser,
-        token: 'token',
-      },
-    })
-
-    // Assert
-    await waitFor(() => {
-      expect(mockToastError).toHaveBeenCalledWith('Erro ao carregar devocionais')
-    })
-  })
-})
 
 

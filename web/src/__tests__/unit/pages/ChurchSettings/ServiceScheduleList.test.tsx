@@ -13,8 +13,10 @@ vi.mock('@/api/serviceScheduleApi', () => ({
   },
 }))
 
-const mockToastSuccess = vi.fn()
-const mockToastError = vi.fn()
+const { mockToastSuccess, mockToastError } = vi.hoisted(() => ({
+  mockToastSuccess: vi.fn(),
+  mockToastError: vi.fn(),
+}))
 vi.mock('react-hot-toast', () => ({
   default: {
     success: mockToastSuccess,
@@ -190,3 +192,4 @@ describe('ServiceScheduleList - Unit Tests', () => {
     expect(mockOnDelete).not.toHaveBeenCalled()
   })
 })
+

@@ -48,6 +48,7 @@ export type FormsComponentProps = {
     onSubmit: () => void
     submitLabel?: string
     hideButtons?: boolean
+    loading?: boolean // Prop para desabilitar botão durante processamento
 }
 
 export default function FormsComponent({
@@ -57,6 +58,7 @@ export default function FormsComponent({
                                            onSubmit,
                                            submitLabel = 'Salvar',
                                            hideButtons = false,
+                                           loading = false,
                                        }: FormsComponentProps) {
     const navigation = useNavigation()
 
@@ -308,19 +310,21 @@ export default function FormsComponent({
                         style={styles.saveButton} 
                         onPress={onSubmit} 
                         activeOpacity={0.8}
-                        disabled={!isFormValid}
+                        disabled={!isFormValid || loading}
                     >
                         <LinearGradient
                             colors={
-                                isFormValid 
+                                (isFormValid && !loading)
                                     ? colors.gradients.primary as [string, string]
-                                    : ['#94A3B8', '#94A3B8'] // Cinza quando desativado
+                                    : ['#94A3B8', '#94A3B8'] // Cinza quando desativado ou loading
                             }
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 0 }}
                             style={styles.gradientButton}
                         >
-                            <Text style={styles.buttonText}>{submitLabel}</Text>
+                            <Text style={styles.buttonText}>
+                                {loading ? 'Salvando...' : submitLabel}
+                            </Text>
                         </LinearGradient>
                     </TouchableOpacity>
                 </View>

@@ -1,179 +1,276 @@
-// IMPORTANTE: Carregar .env.test ANTES de qualquer importação
-import dotenv from 'dotenv'
-dotenv.config({ path: '.env.test' })
-
-process.env.NODE_ENV = 'test'
-process.env.VITEST = 'true'
-
-import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+// Unit tests para AdminDashboardService
+// Padrão obrigatório: 6 testes por módulo crítico
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { AdminDashboardService } from '../../../src/services/adminDashboardService'
 import { prisma } from '../../../src/lib/prisma'
-import { resetTestDatabase } from '../../utils/resetTestDatabase'
-import bcrypt from 'bcryptjs'
+import { SubscriptionStatus } from '@prisma/client'
 import { subDays } from 'date-fns'
 
+// Mock do Prisma - OBRIGATÓRIO em unit tests
+vi.mock('../../../src/lib/prisma', () => ({
+  prisma: {
+    user: {
+      count: vi.fn(),
+    },
+    church: {
+      count: vi.fn(),
+    },
+    branch: {
+      count: vi.fn(),
+    },
+    member: {
+      count: vi.fn(),
+    },
+    subscription: {
+      findMany: vi.fn(),
+    },
+  },
+}))
+
 describe('AdminDashboardService - Unit Tests', () => {
-  const dashboardService = new AdminDashboardService()
+  let service: AdminDashboardService
+  const mockNow = new Date('2024-06-15T12:00:00Z')
 
-  beforeAll(async () => {
-    await resetTestDatabase()
+  beforeEach(() => {
+    service = new AdminDashboardService()
+    vi.clearAllMocks()
+    // Mock subDays para retornar datas fixas
+    vi.useFakeTimers()
+    vi.setSystemTime(mockNow)
   })
 
-  afterAll(async () => {
-    await resetTestDatabase()
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
-  describe('ADM_UNIT_DASHBOARD_TS001_TC001: Cálculo de novas igrejas últimos 30 dias', () => {
-    it('deve calcular corretamente novas igrejas nos últimos 30 dias', async () => {
-      // Cria igrejas em diferentes períodos
-      const now = new Date()
-      const thirtyDaysAgo = subDays(now, 30)
-      const fortyDaysAgo = subDays(now, 40)
+  describe('getDashboardStats', () => {
+    // Teste 1: Success - Estatísticas básicas
+    it('deve retornar estatísticas gerais do dashboard', async () => {
+      // Arrange
+      const sevenDaysAgo = subDays(mockNow, 7)
+      const thirtyDaysAgo = subDays(mockNow, 30)
 
-      // Igreja criada há 20 dias (deve contar)
-      await prisma.church.create({
-        data: {
-          name: 'Igreja Recente',
-          createdAt: subDays(now, 20),
+      vi.mocked(prisma.user.count).mockResolvedValueOnce(100) // totalUsers
+      vi.mocked(prisma.church.count).mockResolvedValueOnce(50) // totalChurches
+      vi.mocked(prisma.branch.count).mockResolvedValueOnce(75) // totalBranches
+      vi.mocked(prisma.member.count).mockResolvedValueOnce(200) // totalMembers
+      vi.mocked(prisma.user.count).mockResolvedValueOnce(10) // newUsersLast7Days
+      vi.mocked(prisma.user.count).mockResolvedValueOnce(30) // newUsersLast30Days
+      vi.mocked(prisma.church.count).mockResolvedValueOnce(5) // newChurchesLast7Days
+      vi.mocked(prisma.church.count).mockResolvedValueOnce(15) // newChurchesLast30Days
+
+      const mockSubscriptions = [
+        {
+          id: 'sub-1',
+          status: SubscriptionStatus.active,
+          Plan: { id: 'plan-1', name: 'Free' },
         },
-      })
-
-      // Igreja criada há 40 dias (não deve contar)
-      await prisma.church.create({
-        data: {
-          name: 'Igreja Antiga',
-          createdAt: fortyDaysAgo,
+        {
+          id: 'sub-2',
+          status: SubscriptionStatus.active,
+          Plan: { id: 'plan-2', name: 'Premium' },
         },
-      })
+      ]
+      vi.mocked(prisma.subscription.findMany).mockResolvedValue(mockSubscriptions as any)
+      vi.mocked(prisma.church.count).mockResolvedValueOnce(40) // activeChurches
 
-      const stats = await dashboardService.getDashboardStats()
+      // Act
+      const stats = await service.getDashboardStats()
 
-      expect(stats.newChurchesLast30Days).toBeGreaterThanOrEqual(1)
-    })
-  })
-
-  describe('ADM_UNIT_DASHBOARD_TS001_TC002: Agrupamento de igrejas por plano', () => {
-    it('deve agrupar igrejas corretamente por plano', async () => {
-      // Cria planos
-      const freePlan = await prisma.plan.create({
-        data: {
-          name: 'Free Plan',
-          price: 0,
-          features: ['basic'],
-          maxMembers: 10,
-          maxBranches: 1,
-        },
-      })
-
-      const premiumPlan = await prisma.plan.create({
-        data: {
-          name: 'Premium Plan',
-          price: 99.99,
-          features: ['advanced'],
-          maxMembers: 100,
-          maxBranches: 5,
-        },
-      })
-
-      // Usar factory em vez de prisma direto
-      const { createTestUser, createTestSubscription } = await import('../../utils/testFactories')
-      const { SubscriptionStatus } = await import('@prisma/client')
-      
-      const user1 = await createTestUser({
-        firstName: 'User',
-        lastName: '1',
-        email: 'user1@test.com',
-        password: await bcrypt.hash('password123', 10),
-      })
-      await createTestSubscription(user1.id, freePlan.id, SubscriptionStatus.active)
-
-      const user2 = await createTestUser({
-        firstName: 'User',
-        lastName: '2',
-        email: 'user2@test.com',
-        password: await bcrypt.hash('password123', 10),
-      })
-      await createTestSubscription(user2.id, premiumPlan.id, SubscriptionStatus.active)
-
-      const stats = await dashboardService.getDashboardStats()
-
+      // Assert
+      expect(stats.totalUsers).toBe(100)
+      expect(stats.totalChurches).toBe(50)
+      expect(stats.totalBranches).toBe(75)
+      expect(stats.totalMembers).toBe(200)
+      expect(stats.newUsersLast7Days).toBe(10)
+      expect(stats.newUsersLast30Days).toBe(30)
+      expect(stats.newChurchesLast7Days).toBe(5)
+      expect(stats.newChurchesLast30Days).toBe(15)
       expect(stats.churchesByPlan).toBeDefined()
-      expect(Array.isArray(stats.churchesByPlan)).toBe(true)
-
-      const freePlanCount = stats.churchesByPlan.find(
-        (p) => p.planName === 'Free Plan'
-      )?.count
-      const premiumPlanCount = stats.churchesByPlan.find(
-        (p) => p.planName === 'Premium Plan'
-      )?.count
-
-      expect(freePlanCount).toBeGreaterThanOrEqual(1)
-      expect(premiumPlanCount).toBeGreaterThanOrEqual(1)
+      expect(stats.activeChurches).toBe(40)
     })
-  })
 
-  describe('ADM_UNIT_DASHBOARD_TS001_TC003: Cálculo com nenhum dado', () => {
-    it('deve retornar zeros quando não há dados', async () => {
-      await resetTestDatabase()
+    // Teste 2: Success - Agrupamento de igrejas por plano
+    it('deve agrupar corretamente igrejas por plano', async () => {
+      // Arrange
+      vi.mocked(prisma.user.count).mockResolvedValue(0)
+      vi.mocked(prisma.church.count).mockResolvedValue(0)
+      vi.mocked(prisma.branch.count).mockResolvedValue(0)
+      vi.mocked(prisma.member.count).mockResolvedValue(0)
 
-      const stats = await dashboardService.getDashboardStats()
+      const mockSubscriptions = [
+        {
+          id: 'sub-1',
+          status: SubscriptionStatus.active,
+          Plan: { id: 'plan-1', name: 'Free' },
+        },
+        {
+          id: 'sub-2',
+          status: SubscriptionStatus.active,
+          Plan: { id: 'plan-2', name: 'Premium' },
+        },
+        {
+          id: 'sub-3',
+          status: SubscriptionStatus.active,
+          Plan: { id: 'plan-1', name: 'Free' }, // Mesmo plano
+        },
+      ]
+      vi.mocked(prisma.subscription.findMany).mockResolvedValue(mockSubscriptions as any)
 
+      // Act
+      const stats = await service.getDashboardStats()
+
+      // Assert
+      expect(stats.churchesByPlan).toBeDefined()
+      expect(stats.churchesByPlan.length).toBeGreaterThan(0)
+      // Deve agrupar: Free = 2, Premium = 1
+      const freePlan = stats.churchesByPlan.find((p) => p.planName === 'Free')
+      const premiumPlan = stats.churchesByPlan.find((p) => p.planName === 'Premium')
+      expect(freePlan?.count).toBe(2)
+      expect(premiumPlan?.count).toBe(1)
+    })
+
+    // Teste 3: Success - Filtro de subscriptions ativas
+    it('deve contar apenas subscriptions ativas para igrejas por plano', async () => {
+      // Arrange
+      const sevenDaysAgo = subDays(mockNow, 7)
+      const thirtyDaysAgo = subDays(mockNow, 30)
+
+      vi.mocked(prisma.user.count).mockResolvedValue(0)
+      vi.mocked(prisma.church.count).mockResolvedValue(0)
+      vi.mocked(prisma.branch.count).mockResolvedValue(0)
+      vi.mocked(prisma.member.count).mockResolvedValue(0)
+
+      // O service filtra por status active no findMany, então o mock só retorna ativas
+      const mockSubscriptions = [
+        {
+          id: 'sub-1',
+          status: SubscriptionStatus.active,
+          Plan: { id: 'plan-1', name: 'Free' },
+        },
+      ]
+      vi.mocked(prisma.subscription.findMany).mockResolvedValue(mockSubscriptions as any)
+      vi.mocked(prisma.church.count).mockResolvedValue(0) // activeChurches
+
+      // Act
+      const stats = await service.getDashboardStats()
+
+      // Assert
+      // findMany já filtra por status active no service, então apenas ativas são retornadas
+      expect(stats.churchesByPlan.length).toBe(1)
+      expect(stats.churchesByPlan[0].planName).toBe('Free')
+      expect(stats.churchesByPlan[0].count).toBe(1)
+      // Verifica se o findMany foi chamado com filtro de status active
+      expect(prisma.subscription.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { status: SubscriptionStatus.active },
+        })
+      )
+    })
+
+    // Teste 4: Edge case - Sem dados
+    it('deve retornar zero quando não há dados', async () => {
+      // Arrange
+      vi.mocked(prisma.user.count).mockResolvedValue(0)
+      vi.mocked(prisma.church.count).mockResolvedValue(0)
+      vi.mocked(prisma.branch.count).mockResolvedValue(0)
+      vi.mocked(prisma.member.count).mockResolvedValue(0)
+      vi.mocked(prisma.subscription.findMany).mockResolvedValue([])
+
+      // Act
+      const stats = await service.getDashboardStats()
+
+      // Assert
       expect(stats.totalUsers).toBe(0)
       expect(stats.totalChurches).toBe(0)
       expect(stats.totalBranches).toBe(0)
       expect(stats.totalMembers).toBe(0)
-      expect(stats.newUsersLast7Days).toBe(0)
-      expect(stats.newUsersLast30Days).toBe(0)
-      expect(stats.newChurchesLast7Days).toBe(0)
-      expect(stats.newChurchesLast30Days).toBe(0)
       expect(stats.churchesByPlan).toEqual([])
       expect(stats.activeChurches).toBe(0)
     })
-  })
 
-  describe('ADM_UNIT_DASHBOARD_TS001_TC004: Cálculo com muito dado (performance)', () => {
-    it('deve calcular corretamente mesmo com muitos dados', async () => {
-      await resetTestDatabase()
+    // Teste 5: Edge case - Filtros de data
+    it('deve filtrar corretamente novas igrejas por intervalo de data', async () => {
+      // Arrange
+      const sevenDaysAgo = subDays(mockNow, 7)
+      const thirtyDaysAgo = subDays(mockNow, 30)
 
-      // Cria muitos usuários e igrejas
-      const plan = await prisma.plan.create({
-        data: {
-          name: 'Test Plan',
-          price: 0,
-          features: ['basic'],
-          maxMembers: 10,
-          maxBranches: 1,
-        },
-      })
+      // Reset mocks para garantir ordem correta
+      vi.clearAllMocks()
 
-      // Usar factory em vez de prisma direto
-      const { createTestUser, createTestSubscription } = await import('../../utils/testFactories')
-      const { SubscriptionStatus } = await import('@prisma/client')
+      vi.mocked(prisma.user.count)
+        .mockResolvedValueOnce(100) // totalUsers
+        .mockResolvedValueOnce(5) // newUsersLast7Days
+        .mockResolvedValueOnce(20) // newUsersLast30Days
+      vi.mocked(prisma.church.count)
+        .mockResolvedValueOnce(50) // totalChurches
+        .mockResolvedValueOnce(3) // newChurchesLast7Days
+        .mockResolvedValueOnce(12) // newChurchesLast30Days
+        .mockResolvedValueOnce(45) // activeChurches
+      vi.mocked(prisma.branch.count).mockResolvedValue(0)
+      vi.mocked(prisma.member.count).mockResolvedValue(0)
+      vi.mocked(prisma.subscription.findMany).mockResolvedValue([])
+
+      // Act
+      const stats = await service.getDashboardStats()
+
+      // Assert
+      expect(stats.totalUsers).toBe(100)
+      expect(stats.newUsersLast7Days).toBe(5)
+      expect(stats.newUsersLast30Days).toBe(20)
+      expect(stats.totalChurches).toBe(50)
+      expect(stats.newChurchesLast7Days).toBe(3)
+      expect(stats.newChurchesLast30Days).toBe(12)
+      expect(stats.activeChurches).toBe(45)
       
-      const users = []
-      for (let i = 0; i < 50; i++) {
-        const user = await createTestUser({
-          firstName: 'User',
-          lastName: `${i}`,
-          email: `user${i}@test.com`,
-          password: await bcrypt.hash('password123', 10),
+      // Verifica se os filtros de data foram aplicados
+      expect(prisma.user.count).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            createdAt: expect.objectContaining({
+              gte: sevenDaysAgo,
+            }),
+          }),
         })
-        await createTestSubscription(user.id, plan.id, SubscriptionStatus.active)
-        users.push(user)
-      }
+      )
+      expect(prisma.user.count).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            createdAt: expect.objectContaining({
+              gte: thirtyDaysAgo,
+            }),
+          }),
+        })
+      )
+    })
 
-      const startTime = Date.now()
-      const stats = await dashboardService.getDashboardStats()
-      const endTime = Date.now()
+    // Teste 6: Edge case - Igrejas ativas com filtro complexo
+    it('deve contar corretamente igrejas ativas com filtros OR', async () => {
+      // Arrange
+      const thirtyDaysAgo = subDays(mockNow, 30)
 
-      expect(stats.totalUsers).toBe(50)
-      expect(endTime - startTime).toBeLessThan(5000) // Deve completar em menos de 5 segundos
+      vi.mocked(prisma.user.count).mockResolvedValue(0)
+      vi.mocked(prisma.church.count).mockResolvedValueOnce(50) // totalChurches
+      vi.mocked(prisma.branch.count).mockResolvedValue(0)
+      vi.mocked(prisma.member.count).mockResolvedValue(0)
+      vi.mocked(prisma.church.count).mockResolvedValueOnce(0) // newChurchesLast7Days
+      vi.mocked(prisma.church.count).mockResolvedValueOnce(0) // newChurchesLast30Days
+      vi.mocked(prisma.subscription.findMany).mockResolvedValue([])
+      vi.mocked(prisma.church.count).mockResolvedValueOnce(25) // activeChurches (com filtro OR complexo)
+
+      // Act
+      const stats = await service.getDashboardStats()
+
+      // Assert
+      expect(stats.activeChurches).toBe(25)
+      expect(prisma.church.count).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            OR: expect.any(Array),
+            isActive: true,
+          }),
+        })
+      )
     })
   })
 })
-
-
-
-
-
-

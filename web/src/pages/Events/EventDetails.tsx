@@ -41,7 +41,7 @@ export default function EventDetails() {
       setEvent(response.data)
     } catch (error) {
       toast.error('Erro ao carregar evento')
-      navigate('/app/events')
+      navigate('/app/events', { replace: true })
     } finally {
       setLoading(false)
     }
@@ -53,7 +53,7 @@ export default function EventDetails() {
     try {
       await api.delete(`/events/${id}`)
       toast.success('Evento excluído com sucesso!')
-      navigate('/app/events')
+      navigate('/app/events', { replace: true })
     } catch (error) {
       toast.error('Erro ao excluir evento')
     }

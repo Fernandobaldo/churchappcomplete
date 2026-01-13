@@ -7,9 +7,14 @@ import { renderWithProviders } from '@/test/helpers'
 import { mockApiResponse, mockApiError } from '@/test/mockApi'
 import api from '@/api/api'
 
-vi.mock('@/api/api')
-const mockToastSuccess = vi.fn()
-const mockToastError = vi.fn()
+vi.mock('@/api/api', async () => {
+  const { apiMock } = await import('@/test/apiMock')
+  return { default: apiMock }
+})
+const { mockToastSuccess, mockToastError } = vi.hoisted(() => ({
+  mockToastSuccess: vi.fn(),
+  mockToastError: vi.fn(),
+}))
 vi.mock('react-hot-toast', () => ({
   default: {
     success: mockToastSuccess,
@@ -304,23 +309,90 @@ describe('EditTransaction - Unit Tests', () => {
       expect(contributionSelect.value).toBe('contrib-1')
     })
   })
-})
 
+  // ============================================================================
+  // TESTE 7: PRIMARY INTERACTION - Exclui transação com sucesso
+  // ============================================================================
+  it('deve excluir transação com sucesso', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    const mockUser = fixtures.user()
+    const mockTransaction = {
+      id: 'trans-1',
+      amount: 500.0,
+      type: 'ENTRY',
+      entryType: 'OFERTA',
+      branchId: 'branch-123',
+      createdAt: '2024-01-15T10:00:00Z',
+      updatedAt: '2024-01-15T10:00:00Z',
+    }
+    mockApiResponse('get', '/finances/trans-1', mockTransaction)
+    mockApiResponse('delete', '/finances/trans-1', {})
+    window.confirm = vi.fn(() => true)
+
+    // Act
+    renderWithProviders(<EditTransaction />, {
+      initialEntries: ['/app/finances/trans-1/edit'],
+      authState: {
+        user: mockUser,
         token: 'token',
       },
     })
 
+    await waitFor(() => {
+      expect(screen.getByText('Excluir Transação')).toBeInTheDocument()
+    })
+
+    const deleteButton = screen.getByText('Excluir Transação')
+    await user.click(deleteButton)
+
     // Assert
     await waitFor(() => {
-      const titleInput = document.getElementById('title') as HTMLInputElement
-      expect(titleInput.value).toBe('Transação de Contribuição')
-      
-      const entryTypeSelect = document.getElementById('entryType') as HTMLSelectElement
-      expect(entryTypeSelect.value).toBe('CONTRIBUICAO')
-      
-      const contributionSelect = document.getElementById('contributionId') as HTMLSelectElement
-      expect(contributionSelect).toBeInTheDocument()
-      expect(contributionSelect.value).toBe('contrib-1')
+      expect(mockToastSuccess).toHaveBeenCalledWith('Transação excluída com sucesso!')
+    })
+    expect(mockNavigate).toHaveBeenCalled()
+  })
+
+  // ============================================================================
+  // TESTE 8: ERROR STATE - Exibe erro quando falha ao excluir transação
+  // ============================================================================
+  it('deve exibir erro quando falha ao excluir transação', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    const mockUser = fixtures.user()
+    const mockTransaction = {
+      id: 'trans-1',
+      amount: 500.0,
+      type: 'ENTRY',
+      entryType: 'OFERTA',
+      branchId: 'branch-123',
+      createdAt: '2024-01-15T10:00:00Z',
+      updatedAt: '2024-01-15T10:00:00Z',
+    }
+    mockApiResponse('get', '/finances/trans-1', mockTransaction)
+    mockApiError('delete', '/finances/trans-1', { message: 'Erro ao excluir transação' })
+    window.confirm = vi.fn(() => true)
+
+    // Act
+    renderWithProviders(<EditTransaction />, {
+      initialEntries: ['/app/finances/trans-1/edit'],
+      authState: {
+        user: mockUser,
+        token: 'token',
+      },
+    })
+
+    await waitFor(() => {
+      expect(screen.getByText('Excluir Transação')).toBeInTheDocument()
+    })
+
+    const deleteButton = screen.getByText('Excluir Transação')
+    await user.click(deleteButton)
+
+    // Assert
+    await waitFor(() => {
+      expect(mockToastError).toHaveBeenCalled()
     })
   })
 })
+

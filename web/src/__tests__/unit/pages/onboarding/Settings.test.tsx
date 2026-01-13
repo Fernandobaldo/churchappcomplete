@@ -3,6 +3,12 @@ import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Settings from '@/pages/onboarding/Settings'
 import { renderWithProviders } from '@/test/helpers'
+import { mockApiResponse, resetApiMocks } from '@/test/mockApi'
+
+vi.mock('@/api/api', async () => {
+  const { apiMock } = await import('@/test/apiMock')
+  return { default: apiMock }
+})
 
 const mockNavigate = vi.fn()
 vi.mock('react-router-dom', async () => {
@@ -16,6 +22,7 @@ vi.mock('react-router-dom', async () => {
 describe('Settings - Unit Tests', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    resetApiMocks()
     localStorage.clear()
   })
 
@@ -109,6 +116,7 @@ describe('Settings - Unit Tests', () => {
   it('deve navegar para dashboard ao concluir onboarding', async () => {
     // Arrange
     const user = userEvent.setup()
+    mockApiResponse('post', '/onboarding/progress/settings', { success: true })
 
     // Act
     renderWithProviders(<Settings />)
@@ -128,34 +136,13 @@ describe('Settings - Unit Tests', () => {
       expect(screen.getByRole('heading', { name: /enviar convites/i })).toBeInTheDocument()
     }, { timeout: 2000 })
 
-    // Step 3 - Finalizar
-    await new Promise(resolve => setTimeout(resolve, 100))
-    const finalButtons = screen.getAllByRole('button', { name: /finalizar/i })
-    if (finalButtons.length > 0) {
-      await user.click(finalButtons[finalButtons.length - 1])
-    }
+    // Step 3 - Pular convites
+    const skipButton = screen.getByRole('button', { name: /pular/i })
+    await user.click(skipButton)
 
     // Assert
     await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/app/dashboard')
-    }, { timeout: 3000 })
-  })
-})
-
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: /enviar convites/i })).toBeInTheDocument()
-    }, { timeout: 2000 })
-
-    // Step 3 - Finalizar
-    await new Promise(resolve => setTimeout(resolve, 100))
-    const finalButtons = screen.getAllByRole('button', { name: /finalizar/i })
-    if (finalButtons.length > 0) {
-      await user.click(finalButtons[finalButtons.length - 1])
-    }
-
-    // Assert
-    await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/app/dashboard')
+      expect(mockNavigate).toHaveBeenCalledWith('/onboarding/concluido')
     }, { timeout: 3000 })
   })
 })

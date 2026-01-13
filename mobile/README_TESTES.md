@@ -98,3 +98,5 @@ jest.mock('../api/api', () => ({
 - [ ] Adicionar testes E2E
 - [ ] Configurar MSW (Mock Service Worker) para mockar APIs
 - [ ] Adicionar testes de navegação
+
+

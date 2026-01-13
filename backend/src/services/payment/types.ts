@@ -2,7 +2,7 @@
  * Tipos compartilhados para todos os gateways de pagamento
  */
 
-export type GatewayProvider = 'mercadopago' | 'asaas' | 'pagseguro' | 'stripe'
+export type GatewayProvider = 'asaas' | 'pagseguro' | 'stripe'
 
 export type BillingInterval = 'month' | 'year' | 'week' | 'day'
 
@@ -72,8 +72,8 @@ export interface CreateCustomerInput {
  */
 export interface CreateSubscriptionInput {
   customerId: string
-  customerEmail?: string // Email do cliente (necessário para Mercado Pago)
-  priceId?: string // ID do preço (compatibilidade com Stripe)
+  customerEmail?: string // Email do cliente
+  priceId?: string // ID do preço (Stripe)
   planId?: string // ID do plano (para referência)
   planData?: { // Dados do plano (usado quando não há priceId pré-criado)
     amount: number // Valor em reais (não centavos)

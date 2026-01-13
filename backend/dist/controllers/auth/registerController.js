@@ -3,6 +3,7 @@ import { registerUserService } from '../../services/auth/registerService';
 import { logAudit, AuditLogger } from '../../utils/auditHelper';
 import { prisma } from '../../lib/prisma';
 import { AuditAction } from '@prisma/client';
+import { OnboardingProgressService } from '../../services/onboardingProgressService';
 export async function registerController(request, reply) {
     const bodySchema = z.object({
         name: z.string().min(1),
@@ -61,15 +62,19 @@ export async function registerController(request, reply) {
                         details: `userId: ${result.userId}`
                     });
                 }
+                const { getUserFullName } = await import('../../utils/userUtils');
+                const progressService = new OnboardingProgressService();
+                const onboardingCompleted = await progressService.isCompleted(user.id);
                 const tokenPayload = {
                     sub: user.id,
                     email: user.email,
-                    name: user.name,
+                    name: getUserFullName(user),
                     type: 'member',
                     memberId: result.id,
                     role: 'role' in result ? result.role : null,
                     branchId: 'branchId' in result ? result.branchId : null,
                     permissions: [],
+                    onboardingCompleted,
                 };
                 if (!request.server?.jwt) {
                     return reply.status(500).send({ error: 'Erro ao gerar token: JWT não configurado' });
@@ -184,12 +189,17 @@ export async function registerController(request, reply) {
                 }
                 // Não inclui campos de Member no token quando não há Member associado
                 // Isso mantém o token limpo e permite que o frontend verifique com toBeUndefined()
+                const { getUserFullName } = await import('../../utils/userUtils');
+                const fullName = getUserFullName(user);
+                const progressService = new OnboardingProgressService();
+                const onboardingCompleted = await progressService.isCompleted(user.id);
                 const tokenPayload = {
                     sub: user.id,
                     email: user.email,
-                    name: user.name,
+                    name: fullName,
                     type: 'user',
                     permissions: [], // Usuário não tem permissões (apenas membros têm)
+                    onboardingCompleted,
                 };
                 if (!request.server?.jwt) {
                     return reply.status(500).send({
@@ -200,7 +210,8 @@ export async function registerController(request, reply) {
                 const response = {
                     user: {
                         id: user.id,
-                        name: user.name,
+                        firstName: user.firstName,
+                        lastName: user.lastName,
                         email: user.email,
                     },
                     token,

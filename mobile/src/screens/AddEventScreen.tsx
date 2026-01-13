@@ -20,6 +20,7 @@ export default function AddEventScreen() {
         location: '',
         imageUrl: '',
     })
+    const [saving, setSaving] = useState(false)
 
     const fields = useMemo(() => [
         { key: 'title', label: 'Título do evento', type: 'string' as const, required: true, placeholder: 'Ex: Culto Dominical' },
@@ -111,6 +112,11 @@ export default function AddEventScreen() {
     }
 
     const handleSave = async () => {
+        // Proteção contra double-click
+        if (saving) {
+            return
+        }
+
         // Validação de campos obrigatórios
         if (!form.title || !form.startDate) {
             Toast.show({
@@ -120,6 +126,8 @@ export default function AddEventScreen() {
             })
             return
         }
+
+        setSaving(true)
 
         // Combina startDate com time se ambos estiverem presentes
         let finalStartDate = convertToFormattedDate(form.startDate)
@@ -169,7 +177,10 @@ export default function AddEventScreen() {
                 text2: 'Seu evento foi adicionado com sucesso. 🎉',
             })
 
-            navigation.goBack()
+            // Verifica se é possível voltar antes de navegar
+            if (navigation.canGoBack()) {
+                navigation.goBack()
+            }
         } catch (error: any) {
             Toast.show({
                 type: 'error',
@@ -177,6 +188,8 @@ export default function AddEventScreen() {
                 text2: error?.response?.data?.message || 'Houve um erro ao salvar o evento',
             })
             console.error('Erro ao salvar evento:', error?.response?.data || error)
+        } finally {
+            setSaving(false)
         }
     }
 
@@ -194,6 +207,7 @@ export default function AddEventScreen() {
                 fields={fields}
                 onSubmit={handleSave}
                 submitLabel="Salvar alterações"
+                loading={saving}
             />
         </FormScreenLayout>
     )

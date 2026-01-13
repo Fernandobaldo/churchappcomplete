@@ -78,23 +78,50 @@ export async function eventsRoutes(app) {
                     message: 'Usuário não está associado a uma filial. Não é possível criar eventos.'
                 });
             }
-            // Aceita formato ISO (YYYY-MM-DDTHH:mm:ss) ou dd/MM/yyyy
+            // Aceita formato ISO (YYYY-MM-DDTHH:mm:ss) ou dd-MM-yyyy
             let parsedStartDate;
             let parsedEndDate;
-            // Tenta parse ISO primeiro, depois dd/MM/yyyy
-            const isoStartDate = new Date(data.startDate);
-            const isoEndDate = new Date(data.endDate);
-            if (!isNaN(isoStartDate.getTime())) {
-                parsedStartDate = isoStartDate;
+            // Verifica se é formato ISO válido (YYYY-MM-DD)
+            const isoRegex = /^\d{4}-\d{2}-\d{2}/;
+            const isISOStart = isoRegex.test(data.startDate);
+            const isISOEnd = isoRegex.test(data.endDate);
+            if (isISOStart) {
+                // Formato ISO: YYYY-MM-DD
+                parsedStartDate = new Date(data.startDate);
+                if (isNaN(parsedStartDate.getTime())) {
+                    throw new Error('Data de início inválida (formato ISO)');
+                }
             }
             else {
-                parsedStartDate = parse(data.startDate.trim(), 'dd/MM/yyyy', new Date());
+                // Formato brasileiro: dd-MM-yyyy
+                try {
+                    parsedStartDate = parse(data.startDate.trim(), 'dd-MM-yyyy', new Date());
+                    if (isNaN(parsedStartDate.getTime())) {
+                        throw new Error('Data de início inválida (formato dd-MM-yyyy)');
+                    }
+                }
+                catch (error) {
+                    throw new Error(`Data de início inválida: ${data.startDate}. Use formato dd-MM-yyyy`);
+                }
             }
-            if (!isNaN(isoEndDate.getTime())) {
-                parsedEndDate = isoEndDate;
+            if (isISOEnd) {
+                // Formato ISO: YYYY-MM-DD
+                parsedEndDate = new Date(data.endDate);
+                if (isNaN(parsedEndDate.getTime())) {
+                    throw new Error('Data de fim inválida (formato ISO)');
+                }
             }
             else {
-                parsedEndDate = parse(data.endDate.trim(), 'dd/MM/yyyy', new Date());
+                // Formato brasileiro: dd-MM-yyyy
+                try {
+                    parsedEndDate = parse(data.endDate.trim(), 'dd-MM-yyyy', new Date());
+                    if (isNaN(parsedEndDate.getTime())) {
+                        throw new Error('Data de fim inválida (formato dd-MM-yyyy)');
+                    }
+                }
+                catch (error) {
+                    throw new Error(`Data de fim inválida: ${data.endDate}. Use formato dd-MM-yyyy`);
+                }
             }
             const newEvent = await prisma.event.create({
                 data: {
@@ -137,7 +164,10 @@ export async function eventsRoutes(app) {
     }, async (request, reply) => {
         try {
             const { id } = eventIdParamSchema.params.parse(request.params);
+            const rawBody = request.body;
             const data = updateEventSchema.body.parse(request.body);
+            // Verificar se imageUrl foi explicitamente enviado como null (para remover)
+            const imageUrlWasExplicitlyNull = rawBody && 'imageUrl' in rawBody && rawBody.imageUrl === null;
             const existing = await prisma.event.findUnique({
                 where: { id },
                 include: {
@@ -149,40 +179,80 @@ export async function eventsRoutes(app) {
             if (!existing || !existing.Branch?.churchId) {
                 return reply.status(404).send({ message: 'Evento ou filial não encontrada.' });
             }
-            // Aceita formato ISO (YYYY-MM-DDTHH:mm:ss) ou dd/MM/yyyy
+            // Aceita formato ISO (YYYY-MM-DD) ou dd-MM-yyyy
             let parsedStartDate;
             let parsedEndDate;
             if (data.startDate) {
-                const isoStartDate = new Date(data.startDate);
-                if (!isNaN(isoStartDate.getTime())) {
-                    parsedStartDate = isoStartDate;
+                // Verifica se é formato ISO válido (YYYY-MM-DD)
+                const isoRegex = /^\d{4}-\d{2}-\d{2}/;
+                const isISOStart = isoRegex.test(data.startDate);
+                if (isISOStart) {
+                    // Formato ISO: YYYY-MM-DD
+                    parsedStartDate = new Date(data.startDate);
+                    if (isNaN(parsedStartDate.getTime())) {
+                        throw new Error('Data de início inválida (formato ISO)');
+                    }
                 }
                 else {
-                    parsedStartDate = parse(data.startDate.trim(), 'dd/MM/yyyy', new Date());
+                    // Formato brasileiro: dd-MM-yyyy
+                    try {
+                        parsedStartDate = parse(data.startDate.trim(), 'dd-MM-yyyy', new Date());
+                        if (isNaN(parsedStartDate.getTime())) {
+                            throw new Error('Data de início inválida (formato dd-MM-yyyy)');
+                        }
+                    }
+                    catch (error) {
+                        throw new Error(`Data de início inválida: ${data.startDate}. Use formato dd-MM-yyyy`);
+                    }
                 }
             }
             if (data.endDate) {
-                const isoEndDate = new Date(data.endDate);
-                if (!isNaN(isoEndDate.getTime())) {
-                    parsedEndDate = isoEndDate;
+                // Verifica se é formato ISO válido (YYYY-MM-DD)
+                const isoRegex = /^\d{4}-\d{2}-\d{2}/;
+                const isISOEnd = isoRegex.test(data.endDate);
+                if (isISOEnd) {
+                    // Formato ISO: YYYY-MM-DD
+                    parsedEndDate = new Date(data.endDate);
+                    if (isNaN(parsedEndDate.getTime())) {
+                        throw new Error('Data de fim inválida (formato ISO)');
+                    }
                 }
                 else {
-                    parsedEndDate = parse(data.endDate.trim(), 'dd/MM/yyyy', new Date());
+                    // Formato brasileiro: dd-MM-yyyy
+                    try {
+                        parsedEndDate = parse(data.endDate.trim(), 'dd-MM-yyyy', new Date());
+                        if (isNaN(parsedEndDate.getTime())) {
+                            throw new Error('Data de fim inválida (formato dd-MM-yyyy)');
+                        }
+                    }
+                    catch (error) {
+                        throw new Error(`Data de fim inválida: ${data.endDate}. Use formato dd-MM-yyyy`);
+                    }
                 }
             }
+            // Preparar objeto de atualização
+            const updateData = {
+                title: data.title,
+                startDate: parsedStartDate && isValid(parsedStartDate) ? parsedStartDate : undefined,
+                endDate: parsedEndDate && isValid(parsedEndDate) ? parsedEndDate : undefined,
+                time: data.time,
+                location: data.location,
+                description: data.description,
+                hasDonation: data.hasDonation ?? false,
+                donationReason: data.hasDonation ? data.donationReason : null,
+                donationLink: data.hasDonation ? data.donationLink : null,
+            };
+            // Tratar imageUrl: se foi explicitamente null, definir como null; se foi enviado, usar o valor; caso contrário, não incluir
+            if (imageUrlWasExplicitlyNull) {
+                updateData.imageUrl = null;
+            }
+            else if (data.imageUrl !== undefined) {
+                updateData.imageUrl = data.imageUrl;
+            }
+            // Se imageUrl não foi enviado (undefined), não incluir no update (mantém o valor atual)
             const updated = await prisma.event.update({
                 where: { id },
-                data: {
-                    title: data.title,
-                    startDate: parsedStartDate && isValid(parsedStartDate) ? parsedStartDate : undefined,
-                    endDate: parsedEndDate && isValid(parsedEndDate) ? parsedEndDate : undefined,
-                    time: data.time,
-                    location: data.location,
-                    description: data.description,
-                    hasDonation: data.hasDonation ?? false,
-                    donationReason: data.hasDonation ? data.donationReason : null,
-                    donationLink: data.hasDonation ? data.donationLink : null,
-                },
+                data: updateData,
             });
             return reply.send(updated);
         }

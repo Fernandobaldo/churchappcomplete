@@ -80,5 +80,14 @@ export const devotionalsService = {
   unlike: async (id: string): Promise<void> => {
     await api.delete(`/devotionals/${id}/unlike`)
   },
+
+  /**
+   * Delete a devotional
+   * @param id Devotional ID
+   * @returns Promise
+   */
+  delete: async (id: string): Promise<void> => {
+    await api.delete(`/devotionals/${id}`)
+  },
 }
 

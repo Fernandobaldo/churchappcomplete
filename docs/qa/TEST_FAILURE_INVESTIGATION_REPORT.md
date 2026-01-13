@@ -1,558 +1,215 @@
-# Relatório de Investigação de Falhas de Teste
+# Web Unit Test Failure Investigation Report
 
-**Data:** 2026-01-10  
-**Versão:** 2.0  
-**Status:** Investigação Completa - Fase de Padronização de Unit Tests
-
----
-
-## 📋 Sumário Executivo
-
-Após a padronização dos testes unitários do backend, foram identificadas **14 testes falhando** distribuídos em múltiplos arquivos. A análise detalhada revela que as falhas são causadas principalmente por:
-
-1. **Mudança no schema do Prisma** - Campo `name` do User foi substituído por `firstName`/`lastName` (padronização anterior)
-2. **Mocks incompletos em testes unitários** - Testes esperando estrutura antiga do schema
-3. **Lógica do serviço diferente do esperado** - `createChurchWithMainBranch` sempre cria branch mesmo com `withBranch: false`
-4. **Mock não configurado para fluxos alternativos** - Quando usuário não tem plano, código tenta buscar branches mas mock não está preparado
+Date: 2026-01-12
+Command: cd web; .\node_modules\.bin\vitest run src\__tests__\unit --reporter verbose --no-color
+Scope: web unit tests only
+Result: Test Files 11 failed | 33 passed (44). Tests 26 failed | 244 passed (270). Errors 4.
 
 ---
 
-## 📊 Tabela Resumo de Falhas
+## Summary table (failed tests)
 
-| # | Arquivo | Teste | Sintoma | Classificação | Confiança |
-|---|---------|-------|---------|---------------|-----------|
-| 1 | `financeService.test.ts` | getByBranch (1 teste) | Espera `name` mas código usa `firstName`/`lastName` | **STANDARDIZATION** | Alta |
-| 2 | `financeService.test.ts` | create (3 testes) | Espera campos `undefined` mas Prisma remove + espera `name` mas código usa `firstName`/`lastName` | **STANDARDIZATION** | Alta |
-| 3 | `financeService.test.ts` | getById (1 teste) | Espera `name` mas código usa `firstName`/`lastName` | **STANDARDIZATION** | Alta |
-| 4 | `financeService.test.ts` | update (1 teste) | Espera `name` mas código usa `firstName`/`lastName` | **STANDARDIZATION** | Alta |
-| 5 | `financeService.test.ts` | getByBranchWithSummary com filtros (3 testes) | Espera `name` mas código usa `firstName`/`lastName` | **STANDARDIZATION** | Alta |
-| 6 | `planLimits.test.ts` | checkPlanMembersLimit - usuário sem plano | Erro: "Cannot read properties of undefined (reading 'findMany')" | **STANDARDIZATION** | Alta |
-| 7 | `planLimits.test.ts` | checkPlanBranchesLimit - usuário sem plano | Erro: "Cannot read properties of undefined (reading 'findMany')" | **STANDARDIZATION** | Alta |
-| 8 | `onboardingService.test.ts` | createChurchWithMainBranch - withBranch false | Espera que `prisma.branch.create` não seja chamado, mas foi chamado | **PROJECT_CODE** | Alta |
-| 9 | `admin/adminChurchService.test.ts` | Setup beforeAll | `Argument 'firstName' is missing` em `prisma.user.create()` | **STANDARDIZATION** | Alta |
-| 10 | `admin/adminUserService.test.ts` | Setup beforeAll | `Argument 'firstName' is missing` em `prisma.user.create()` | **STANDARDIZATION** | Alta |
-| 11 | `admin/adminDashboardService.test.ts` | Agrupamento por plano | `Argument 'firstName' is missing` em `prisma.user.create()` | **STANDARDIZATION** | Alta |
-| 12 | `admin/adminDashboardService.test.ts` | Cálculo com muitos dados | `Argument 'firstName' is missing` em `prisma.user.create()` | **STANDARDIZATION** | Alta |
-
-**Total de Testes Afetados:** 14  
-**Classificação Geral:**
-- **STANDARDIZATION:** 13 testes (93%)
-- **PROJECT_CODE:** 1 teste (7%)
-- **ENVIRONMENT:** 0 testes (0%)
-- **MIXED:** 0 testes (0%)
-
----
-
-## 🔍 Análise Detalhada por Categoria
-
-### Categoria 1: STANDARDIZATION (13 testes)
-
-#### Grupo 1.1: FinanceService - Schema User mudou (`name` → `firstName`/`lastName`)
-
-**Testes Afetados:** 9 testes
-
-**Arquivo:** `backend/tests/unit/financeService.test.ts`
-
-**Sintomas:**
-```
-expected "spy" to be called with arguments: [ { …(3) } ]
-Received:
-  "CreatedByUser": {
-    "select": {
-      "email": true,
-+     "firstName": true,
-      "id": true,
--     "name": true,
-+     "lastName": true,
-    },
-  },
-```
-
-**Causa Raiz:**
-- O schema do Prisma foi atualizado: `User.name` foi substituído por `User.firstName` e `User.lastName`
-- O código de produção em `financeService.ts` já foi atualizado (linha 84-85):
-  ```typescript
-  firstName: true,
-  lastName: true,
-  ```
-- Os testes unitários ainda esperam a estrutura antiga com `name: true`
-
-**Fluxo do Problema:**
-1. Testes criados/migrados antes da mudança do schema
-2. Schema mudou de `User.name` para `User.firstName`/`User.lastName`
-3. Código de produção foi atualizado
-4. Testes unitários não foram atualizados
-5. Mocks esperam estrutura antiga, mas código real usa nova estrutura
-
-**Testes Específicos:**
-- `getByBranch > deve retornar todas as transações...` (linha 61)
-- `create > deve criar uma transação de entrada...` (linha 266)
-- `create > deve criar uma transação de saída...` (linha 325)
-- `create > deve criar uma transação de dízimo...` (linha 412)
-- `getById > deve retornar transação específica por ID` (linha 471)
-- `update > deve atualizar transação com sucesso` (linha 538)
-- `getByBranchWithSummary com filtros > deve aplicar filtro de categoria` (linha 675)
-- `getByBranchWithSummary com filtros > deve aplicar filtro de tipo` (linha 729)
-- `getByBranchWithSummary com filtros > deve aplicar filtro de pesquisa` (linha 787)
-
-**Correção Necessária:**
-Atualizar todos os mocks em `financeService.test.ts` para usar:
-```typescript
-CreatedByUser: {
-  select: {
-    id: true,
-    firstName: true,  // ← mudança
-    lastName: true,   // ← mudança
-    email: true,
-  },
-}
-```
-
-**Confiança:** Alta - Código de produção já está correto, apenas testes desatualizados
+| Test file | Test name | Symptom | Classification |
+| --- | --- | --- | --- |
+| `src/__tests__/unit/pages/Contributions.test.tsx` | File parse error | Transform failed: Unexpected "}" (line 220) | STANDARDIZATION |
+| `src/__tests__/unit/pages/AddContribution.test.tsx` | deve criar campanha com sucesso | Toast text mismatch | STANDARDIZATION |
+| `src/__tests__/unit/pages/AddDevotional.test.tsx` | deve exibir loading durante criacao | Submit button not disabled | STANDARDIZATION |
+| `src/__tests__/unit/pages/ChurchSettings.test.tsx` | deve renderizar o formulario de edicao da igreja | Page shows "Igreja nao encontrada"; label not found | STANDARDIZATION |
+| `src/__tests__/unit/pages/ChurchSettings.test.tsx` | deve carregar e exibir os dados da igreja | Label not found; church data undefined | STANDARDIZATION |
+| `src/__tests__/unit/pages/ChurchSettings.test.tsx` | deve exibir botao para adicionar horario | Button not found (church data missing) | STANDARDIZATION |
+| `src/__tests__/unit/pages/DevotionalDetails.test.tsx` | deve curtir devocional com sucesso | Unhandled error: devotional.author.name undefined | STANDARDIZATION |
+| `src/__tests__/unit/pages/DevotionalDetails.test.tsx` | deve navegar para lista ao clicar em Voltar | Unhandled error: devotional.author.name undefined | STANDARDIZATION |
+| `src/__tests__/unit/pages/EditTransaction.test.tsx` | deve carregar dados da transacao existente | document.getElementById('title') is null | STANDARDIZATION |
+| `src/__tests__/unit/pages/EditTransaction.test.tsx` | deve preencher campos de transacao de saida com exitType | Reading value of null element | STANDARDIZATION |
+| `src/__tests__/unit/pages/EditTransaction.test.tsx` | deve atualizar transacao com sucesso | document.getElementById('title') is null | STANDARDIZATION |
+| `src/__tests__/unit/pages/EditTransaction.test.tsx` | deve exibir erro quando falha ao atualizar | document.getElementById('title') is null | STANDARDIZATION |
+| `src/__tests__/unit/pages/EditTransaction.test.tsx` | deve preencher campos de transacao com tipo CONTRIBUICAO | Reading value of null element | STANDARDIZATION |
+| `src/__tests__/unit/pages/MemberDetails.test.tsx` | deve renderizar detalhes do membro | Unhandled error: positions.map on null | STANDARDIZATION |
+| `src/__tests__/unit/pages/Profile.test.tsx` | deve carregar cargos disponiveis | positions load fails; text not found | STANDARDIZATION |
+| `src/__tests__/unit/pages/Profile.test.tsx` | deve atualizar perfil com sucesso | mockUpdateUser not called | STANDARDIZATION |
+| `src/__tests__/unit/pages/Profile.test.tsx` | deve permitir fazer upload de avatar | api.post not called | STANDARDIZATION |
+| `src/__tests__/unit/pages/Register.test.tsx` | deve renderizar o formulario de registro | Label /nome completo/i not found | STANDARDIZATION |
+| `src/__tests__/unit/pages/Register.test.tsx` | deve fazer upload de avatar apos criar conta | Label /nome completo/i not found | STANDARDIZATION |
+| `src/__tests__/unit/pages/Register.test.tsx` | deve exibir erro quando falha ao criar conta | Label /nome completo/i not found | STANDARDIZATION |
+| `src/__tests__/unit/pages/TransactionDetails.test.tsx` | deve carregar e exibir detalhes da transacao | data-testid="transaction-title" not found | STANDARDIZATION |
+| `src/__tests__/unit/pages/TransactionDetails.test.tsx` | deve exibir transacao de saida com exitType | data-testid="transaction-title" not found | STANDARDIZATION |
+| `src/__tests__/unit/pages/ChurchSettings/ServiceScheduleList.test.tsx` | deve renderizar lista de horarios | render is not defined | STANDARDIZATION |
+| `src/__tests__/unit/pages/ChurchSettings/ServiceScheduleList.test.tsx` | deve mostrar mensagem vazia quando nao ha horarios | render is not defined | STANDARDIZATION |
+| `src/__tests__/unit/pages/ChurchSettings/ServiceScheduleList.test.tsx` | deve chamar onEdit quando clicar no botao de editar | render is not defined | STANDARDIZATION |
+| `src/__tests__/unit/pages/ChurchSettings/ServiceScheduleList.test.tsx` | deve deletar horario quando confirmado | render is not defined | STANDARDIZATION |
+| `src/__tests__/unit/pages/ChurchSettings/ServiceScheduleList.test.tsx` | deve mostrar erro quando falha ao contar eventos | render is not defined | STANDARDIZATION |
 
 ---
 
-#### Grupo 1.2: FinanceService - Campos `undefined` removidos automaticamente pelo Prisma
+## Root cause details (per failing test file)
 
-**Testes Afetados:** 3 testes em `create`
+### 1) `src/__tests__/unit/pages/Contributions.test.tsx`
 
-**Sintomas:**
-```
-Received:
-  "data": {
-    "amount": 1000,
--   "contributionId": undefined,
--   "createdBy": undefined,
--   "exitType": undefined,
-+   "date": 2026-01-10T19:08:29.834Z,
-```
+- Failure symptom: Transform failed with "Unexpected }" at line 220.
+- Probable root cause: duplicated test block after the describe() is closed; extra closing braces remain.
+- Classification: STANDARDIZATION
+- Confidence: High
+- Minimal reproduction: `cd web; .\node_modules\.bin\vitest run src\__tests__\unit\pages\Contributions.test.tsx --reporter verbose --no-color`
 
-**Causa Raiz:**
-- Prisma remove automaticamente campos `undefined` do objeto `data`
-- Testes esperam campos `undefined` explicitamente, mas Prisma não os envia
-- Código de produção adiciona `date` automaticamente se não fornecido (linha ~220 de financeService.ts)
+### 2) `src/__tests__/unit/pages/ChurchSettings/ServiceScheduleList.test.tsx`
 
-**Correção Necessária:**
-Remover campos `undefined` das expectativas nos testes de `create`:
-```typescript
-// ❌ Antes
-data: {
-  title: transactionData.title,
-  contributionId: undefined,  // ← remover
-  createdBy: undefined,       // ← remover
-  exitType: undefined,        // ← remover
-  // ...
-}
+- Failure symptom: `render is not defined` for all tests.
+- Probable root cause: missing import of `render` from `@testing-library/react`.
+- Classification: STANDARDIZATION
+- Confidence: High
+- Minimal reproduction: `cd web; .\node_modules\.bin\vitest run src\__tests__\unit\pages\ChurchSettings\ServiceScheduleList.test.tsx --reporter verbose --no-color`
+- Helper/mock involved: none (missing import).
+- Incorrect assumption: render is available via other helpers without importing it.
 
-// ✅ Depois
-data: {
-  title: transactionData.title,
-  amount: transactionData.amount,
-  // ... apenas campos definidos
-  date: expect.any(Date),     // ← adicionar se aplicável
-}
-```
+### 3) `src/__tests__/unit/pages/Register.test.tsx`
 
-**Confiança:** Alta - Comportamento padrão do Prisma
+Failing tests:
+- `deve renderizar o formulario de registro`
+- `deve fazer upload de avatar apos criar conta`
+- `deve exibir erro quando falha ao criar conta`
 
----
+- Failure symptom: `Unable to find a label with the text of: /nome completo/i` (and related fields).
+- Probable root cause: the Register UI no longer has a single "nome completo" field (it uses `firstName` and `lastName`), and there is no "nome da igreja" field. Tests still target old labels.
+- Classification: STANDARDIZATION
+- Confidence: High
+- Minimal reproduction: `cd web; .\node_modules\.bin\vitest run src\__tests__\unit\pages\Register.test.tsx --reporter verbose --no-color`
+- Feature code: `web/src/pages/Register.tsx` uses labels "Primeiro nome" and "Sobrenome".
+- Incorrect assumption: tests assumed the legacy form layout and labels.
 
-#### Grupo 1.3: PlanLimits - Mock incompleto para fluxo de fallback
+### 4) `src/__tests__/unit/pages/AddContribution.test.tsx`
 
-**Testes Afetados:** 2 testes
+- Failure symptom: toast called with different message.
+- Probable root cause: test expects "Campanha criada com sucesso!" but the component uses "Campanha de contribuicao criada com sucesso!".
+- Classification: STANDARDIZATION
+- Confidence: High
+- Minimal reproduction: `cd web; .\node_modules\.bin\vitest run src\__tests__\unit\pages\AddContribution.test.tsx --reporter verbose --no-color`
+- Feature code: `web/src/pages/Contributions/AddContribution.tsx` (success toast text).
+- Incorrect assumption: toast message unchanged after UI update.
 
-**Arquivo:** `backend/tests/unit/planLimits.test.ts`
+### 5) `src/__tests__/unit/pages/AddDevotional.test.tsx`
 
-**Testes:**
-- `checkPlanMembersLimit > deve lançar erro quando usuário não tem plano` (linha 138)
-- `checkPlanBranchesLimit > deve lançar erro quando usuário não tem plano` (linha 309)
+- Failure symptom: expected submit button to be disabled during loading, but it is enabled.
+- Probable root cause: component does not implement a loading state or disable the submit button.
+- Classification: STANDARDIZATION
+- Confidence: High
+- Minimal reproduction: `cd web; .\node_modules\.bin\vitest run src\__tests__\unit\pages\AddDevotional.test.tsx --reporter verbose --no-color`
+- Feature code: `web/src/pages/Devotionals/AddDevotional.tsx` (no loading state).
+- Incorrect assumption: tests expect loading UX that is not implemented.
 
-**Sintoma:**
-```
-Expected: "Plano não encontrado para o usuário ou para a igreja"
-Received: "Cannot read properties of undefined (reading 'findMany')"
-```
+### 6) `src/__tests__/unit/pages/ChurchSettings.test.tsx`
 
-**Causa Raiz:**
-1. Teste configura `prisma.user.findUnique` para retornar usuário sem `Subscription`
-2. Teste configura `prisma.member.findFirst` para retornar `null` (sem ADMINGERAL)
-3. Código em `planLimits.ts` (linha 122-123) lança erro "Plano não encontrado..." ANTES de tentar buscar branches
-4. MAS: Erro indica que `prisma.branch.findMany` está sendo chamado
-5. Olhando o código: Na linha 134-138 de `planLimits.ts`, mesmo quando lança erro, o código anterior já tentou acessar `prisma.branch.findMany` para contar membros
+Failing tests:
+- `deve renderizar o formulario de edicao da igreja`
+- `deve carregar e exibir os dados da igreja`
+- `deve exibir botao para adicionar horario`
 
-**Análise do Código:**
-```typescript
-// planLimits.ts linha 122-138
-if (!plan) {
-  throw new Error(`Plano não encontrado...`)
-} else {
-  plan = adminMember.User.Subscription[0].Plan
-}
+- Failure symptom: component renders "Igreja nao encontrada" and fetch errors (`churchesResponse` undefined).
+- Probable root cause: API mocks are inconsistent. The file defines `vi.mock('@/api/api', ...)` with a local mock object, but also calls `resetApiMocks()` and `mockApiResponse()` from `web/src/test/mockApi.ts`, which operate on `apiMock`. These are different instances, so `mockApiResponse` does not affect the component. Additionally, the component imports `../../api/api` and `../../api/serviceScheduleApi` (relative), while tests mock alias modules.
+- Classification: STANDARDIZATION
+- Confidence: High
+- Minimal reproduction: `cd web; .\node_modules\.bin\vitest run src\__tests__\unit\pages\ChurchSettings.test.tsx --reporter verbose --no-color`
+- Helper/mock involved: `web/src/test/mockApi.ts` + inline `vi.mock('@/api/api')` in `web/src/__tests__/unit/pages/ChurchSettings.test.tsx`.
+- Incorrect assumption: `mockApiResponse` works even when `@/api/api` is mocked with a separate object and when components import the module via a different path.
 
-// Mas antes disso, na linha 134-146:
-const branches = await prisma.branch.findMany({  // ← Chamado antes do throw
-  where: { churchId },
-  include: { _count: { select: { Member: true } } },
-})
-```
+### 7) `src/__tests__/unit/pages/DevotionalDetails.test.tsx`
 
-**Problema Identificado:**
-O código em `planLimits.ts` está buscando branches ANTES de verificar se o plano existe. Quando não há plano, o erro deveria ser lançado antes, mas o código tenta buscar branches primeiro.
+Failing tests:
+- `deve curtir devocional com sucesso`
+- `deve navegar para lista ao clicar em Voltar`
 
-**Correção Necessária:**
-Adicionar mock para `prisma.branch.findMany` no teste OU ajustar a ordem de verificação no código (mas isso seria PROJECT_CODE).
+- Failure symptom: unhandled error `Cannot read properties of undefined (reading 'name')` at `devotional.author.name`.
+- Probable root cause: `fixtures.devotional()` does not include required fields (`author`, `passage`, `likes`, `liked`). Tests 3 and 5 override only `id` and `title`, leaving `author` undefined.
+- Classification: STANDARDIZATION
+- Confidence: High
+- Minimal reproduction: `cd web; .\node_modules\.bin\vitest run src\__tests__\unit\pages\DevotionalDetails.test.tsx --reporter verbose --no-color`
+- Helper/mock involved: `web/src/test/fixtures/index.ts` devotional fixture.
+- Incorrect assumption: fixture provides all fields required by the component.
 
-**Ação Correta para STANDARDIZATION:**
-Adicionar mock para `prisma.branch.findMany` mesmo no fluxo de erro:
-```typescript
-// Arrange
-prisma.user.findUnique.mockResolvedValue({...})
-prisma.member.findFirst.mockResolvedValue(null)
-prisma.branch.findMany.mockResolvedValue([]) // ← Adicionar este mock
-```
+### 8) `src/__tests__/unit/pages/MemberDetails.test.tsx`
 
-**Confiança:** Alta - Mock está faltando no teste
+- Failure symptom: unhandled error `positions.map` on null, then UI is empty and test cannot find member text.
+- Probable root cause: test `deve renderizar detalhes do membro` mocks `/members/:id` but does not mock `/positions`. `mockApiResponse` returns `{ data: null }` for unmatched URLs, so `setPositions(null)` occurs and `positions.map` throws.
+- Classification: STANDARDIZATION
+- Confidence: High
+- Minimal reproduction: `cd web; .\node_modules\.bin\vitest run src\__tests__\unit\pages\MemberDetails.test.tsx --reporter verbose --no-color`
+- Helper/mock involved: `web/src/test/mockApi.ts` (registry returns null for unmatched URLs).
+- Incorrect assumption: missing endpoint mocks default to empty arrays.
 
----
+### 9) `src/__tests__/unit/pages/EditTransaction.test.tsx`
 
-#### Grupo 1.4: Admin Unit Tests - Uso direto de `prisma.user.create()` com schema antigo
+Failing tests:
+- `deve carregar dados da transacao existente`
+- `deve preencher campos de transacao de saida com exitType`
+- `deve atualizar transacao com sucesso`
+- `deve exibir erro quando falha ao atualizar`
+- `deve preencher campos de transacao com tipo CONTRIBUICAO`
 
-**Testes Afetados:** 4 testes em 3 arquivos
+- Failure symptom: `document.getElementById('title')` returns null, and later `.value` access throws.
+- Probable root cause: tests still target legacy input IDs (`title`, `category`, etc.) while the component now uses `type`, `entryType`, `exitType`, `amount`, and `date` fields.
+- Classification: STANDARDIZATION
+- Confidence: High
+- Minimal reproduction: `cd web; .\node_modules\.bin\vitest run src\__tests__\unit\pages\EditTransaction.test.tsx --reporter verbose --no-color`
+- Feature code: `web/src/pages/Finances/EditTransaction.tsx`.
+- Incorrect assumption: form field IDs unchanged.
 
-**Arquivos:**
-- `backend/tests/unit/admin/adminChurchService.test.ts` (linha 48)
-- `backend/tests/unit/admin/adminUserService.test.ts` (linha 47)
-- `backend/tests/unit/admin/adminDashboardService.test.ts` (linhas 79, 161)
+### 10) `src/__tests__/unit/pages/TransactionDetails.test.tsx`
 
-**Sintoma:**
-```
-Invalid `prisma.user.create()` invocation
-Argument `firstName` is missing.
-```
+Failing tests:
+- `deve carregar e exibir detalhes da transacao`
+- `deve exibir transacao de saida com exitType`
 
-**Causa Raiz:**
-- Testes usando `prisma.user.create()` diretamente em vez de usar `createTestUser()` factory
-- Schema do Prisma mudou: `User.name` → `User.firstName` + `User.lastName`
-- Testes não foram atualizados após a mudança do schema
+- Failure symptom: `data-testid="transaction-title"` not found.
+- Probable root cause: component no longer renders `transaction-title` test id; only `transaction-amount`, `transaction-type`, etc. exist.
+- Classification: STANDARDIZATION
+- Confidence: High
+- Minimal reproduction: `cd web; .\node_modules\.bin\vitest run src\__tests__\unit\pages\TransactionDetails.test.tsx --reporter verbose --no-color`
+- Feature code: `web/src/pages/Finances/TransactionDetails.tsx`.
+- Incorrect assumption: title test id still exists in UI.
 
-**Código Problemático:**
-```typescript
-// ❌ Atual (errado)
-testUser = await prisma.user.create({
-  data: {
-    name: "Test User",  // ← Campo não existe mais
-    email: "test@test.com",
-    password: "...",
-  }
-})
+### 11) `src/__tests__/unit/pages/Profile.test.tsx`
 
-// ✅ Correto
-testUser = await createTestUser({
-  firstName: "Test",
-  lastName: "User",
-  email: "test@test.com",
-  password: "...",
-})
-```
+Failing tests:
+- `deve carregar cargos disponiveis`
+- `deve atualizar perfil com sucesso`
+- `deve permitir fazer upload de avatar`
 
-**Correção Necessária:**
-Migrar todos os `prisma.user.create()` diretos para usar `createTestUser()` factory, seguindo o padrão estabelecido nos testes de integração.
-
-**Confiança:** Alta - Padrão já estabelecido, apenas não aplicado nestes arquivos
+- Failure symptom: `loadPositions` reads `positionsResponse.data` on undefined, and later `api.post` / `mockUpdateUser` not called.
+- Probable root cause: API mocks are inconsistent. The test defines `vi.mock('@/api/api')` inline, but uses `resetApiMocks()` and `mockApiResponse()` which operate on `apiMock` from `web/src/test/mockApi.ts`. The inline mock is not wired to that registry, so `/positions`, `/upload/avatar`, and `/members/me` responses never resolve as expected.
+- Classification: STANDARDIZATION
+- Confidence: High
+- Minimal reproduction: `cd web; .\node_modules\.bin\vitest run src\__tests__\unit\pages\Profile.test.tsx --reporter verbose --no-color`
+- Helper/mock involved: `web/src/test/mockApi.ts` + inline `vi.mock('@/api/api')` in `web/src/__tests__/unit/pages/Profile.test.tsx`.
+- Incorrect assumption: `mockApiResponse` works with any local mock, even when `apiMock` is not used.
 
 ---
 
-### Categoria 2: PROJECT_CODE (1 teste)
+## Recommendations (no code changes yet)
 
-#### Grupo 2.1: OnboardingService - Comportamento diferente do esperado
-
-**Teste Afetado:** 1 teste
-
-**Arquivo:** `backend/tests/unit/onboardingService.test.ts`
-
-**Teste:**
-- `ChurchService - Onboarding > deve criar igreja sem filial se withBranch for false` (linha 115)
-
-**Sintoma:**
-```
-expected "spy" to not be called at all, but actually been called 1 times
-Received:
-  1st spy call:
-    Array [
-      Object {
-        "data": Object {
-          "churchId": "church-123",
-          "isMainBranch": true,
-          "name": "Sede",
-        },
-      },
-    ]
-```
-
-**Causa Raiz:**
-1. Teste espera que quando `withBranch: false`, `prisma.branch.create` não seja chamado
-2. Código em `churchService.ts` linha 47-48:
-   ```typescript
-   // Sempre cria branch principal (obrigatório para Member)
-   const branch = await tx.branch.create({...})
-   ```
-3. O comentário indica que a branch é SEMPRE criada, independente do parâmetro `withBranch`
-4. O parâmetro `withBranch` provavelmente foi removido ou não está sendo respeitado
-
-**Análise do Código:**
-```typescript
-// churchService.ts linha 30-54
-async createChurchWithMainBranch(data: CreateChurchData, user: UserData) {
-  // ...
-  const branch = await tx.branch.create({  // ← Sempre cria, não verifica withBranch
-    data: {
-      name: data.branchName || 'Sede',
-      churchId: church.id,
-      isMainBranch: true,
-    },
-  })
-}
-```
-
-**Opções de Correção:**
-1. **Corrigir o teste** (se o comportamento atual é o correto):
-   - Teste está esperando comportamento que não existe mais
-   - Branch sempre é criada porque é obrigatória para Member
-   
-2. **Corrigir o código** (se o parâmetro `withBranch` deveria ser respeitado):
-   - Adicionar verificação `if (data.withBranch !== false)` antes de criar branch
-   - Mas isso pode quebrar outras funcionalidades se branch é realmente obrigatória
-
-**Recomendação:**
-Verificar se `withBranch: false` é um caso de uso válido. Se branch é obrigatória para Member, então o teste está incorreto e deve ser ajustado. Se não é obrigatória, o código deve ser corrigido.
-
-**Classificação:** **PROJECT_CODE** - Comportamento do código diferente do esperado pelo teste
-
-**Confiança:** Alta - Código claramente sempre cria branch, independente do parâmetro
+1) Standardize API mocking to one shared instance. Avoid mixing inline `vi.mock('@/api/api')` objects with `mockApiResponse/resetApiMocks` from `web/src/test/mockApi.ts`.
+2) Align fixtures with component contracts. Extend `fixtures.devotional()` to include `author`, `passage`, `likes`, and `liked` defaults required by `DevotionalDetails`.
+3) Keep tests synced with UI labels and field IDs (Register and EditTransaction). Update test selectors to match current inputs.
+4) For tests expecting loading states, either add explicit loading logic to the component or update tests to match actual behavior.
+5) Add a quick syntax check (single-file vitest run) after large manual edits to avoid duplicate blocks or stray braces.
 
 ---
 
-## 📚 Seção de Aprendizado
+## Learning / Preventive rules
 
-### Lições Aprendidas
+- Lesson: Mocking the same module in different ways creates disconnected mock instances.
+  Prevention: Use a single API mock path and centralize `mockApiResponse/resetApiMocks` usage; do not define inline API mocks in test files.
 
-#### Lição 18: Mudanças no schema do Prisma devem ser propagadas imediatamente para todos os testes unitários
+- Lesson: Fixtures must satisfy all required component fields.
+  Prevention: Add required defaults to fixtures (e.g., devotional.author, passage, likes, liked) and assert in tests when overriding.
 
-**Contexto:**
-Quando o schema do Prisma muda (ex: `User.name` → `User.firstName`/`User.lastName`), os testes unitários que mockam a estrutura do Prisma também precisam ser atualizados.
+- Lesson: Tests often fail after UI label/field changes.
+  Prevention: Add a checklist step to update test selectors whenever a form changes labels or IDs.
 
-**Erro Comum:**
-- Atualizar código de produção mas esquecer de atualizar testes unitários
-- Testes continuam esperando estrutura antiga do schema
+- Lesson: Loading states should be tested only when implemented.
+  Prevention: Require a code comment or component prop indicating loading UX before adding loading assertions.
 
-**Prevenção:**
-1. Sempre que o schema mudar, buscar por todos os testes que usam campos afetados:
-   ```bash
-   grep -r "name:" backend/tests/unit/ | grep -i "user\|createdBy"
-   ```
-2. Atualizar TODOS os mocks relacionados no mesmo commit da mudança do schema
-3. Adicionar checklist no processo de migração de schema:
-   - [ ] Atualizar código de produção
-   - [ ] Atualizar testes de integração
-   - [ ] Atualizar testes unitários (incluindo mocks)
-   - [ ] Atualizar factories/test helpers
-   - [ ] Verificar se todos os testes passam
-
-#### Lição 19: Mocks devem cobrir TODOS os caminhos de código, incluindo fluxos de erro
-
-**Contexto:**
-Mesmo quando um teste espera que uma função lance erro, o código pode executar outras operações antes do erro ser lançado (ex: buscar branches para contar antes de verificar plano).
-
-**Erro Comum:**
-- Mockar apenas o fluxo de sucesso
-- Esquecer de mockar operações que acontecem mesmo em fluxos de erro
-
-**Prevenção:**
-1. Ao testar erros, rastrear o código até o ponto do erro:
-   - Identificar todas as chamadas de Prisma/API antes do erro
-   - Mockar TODAS as chamadas, mesmo as que acontecem antes do erro
-2. Usar stack trace do erro para identificar chamadas não mockadas:
-   ```
-   Cannot read properties of undefined (reading 'findMany')
-   ```
-   Indica que `prisma.branch.findMany` está sendo chamado mas não está mockado
-3. Adicionar comentários no teste indicando TODAS as chamadas mockadas:
-   ```typescript
-   // Arrange
-   // Mock necessário porque código busca branches mesmo quando lança erro de plano
-   prisma.branch.findMany.mockResolvedValue([])
-   ```
-
-#### Lição 20: Prisma remove campos `undefined` automaticamente do objeto `data`
-
-**Contexto:**
-Prisma não envia campos com valor `undefined` para o banco de dados. Eles são removidos automaticamente antes da query.
-
-**Erro Comum:**
-- Testes esperam campos `undefined` explicitamente no objeto `data`
-- Testes falham porque Prisma remove esses campos
-
-**Prevenção:**
-1. Nunca incluir campos `undefined` nas expectativas de `prisma.create()` ou `prisma.update()`
-2. Incluir apenas campos que têm valores definidos
-3. Se campo é opcional e não foi fornecido, simplesmente não incluí-lo na expectativa:
-   ```typescript
-   // ❌ Errado
-   data: {
-     title: "Test",
-     category: undefined,  // ← Remover
-   }
-   
-   // ✅ Correto
-   data: {
-     title: "Test",
-     // category não incluído se não foi fornecido
-   }
-   ```
-
-#### Lição 21: Testes devem refletir o comportamento REAL do código, não o comportamento esperado
-
-**Contexto:**
-Teste esperava que `withBranch: false` impedisse criação de branch, mas o código sempre cria branch.
-
-**Erro Comum:**
-- Teste baseado em comportamento esperado, não no comportamento real
-- Teste falha mesmo quando código está correto (segundo design atual)
-
-**Prevenção:**
-1. Antes de corrigir teste, verificar se o comportamento do código é intencional:
-   - Ler comentários no código (ex: "Sempre cria branch principal")
-   - Verificar outros testes que usam a mesma função
-   - Verificar documentação/requirements
-2. Se comportamento é intencional, corrigir o teste
-3. Se comportamento não é intencional, corrigir o código E depois atualizar o teste
+- Lesson: Manual edits can introduce syntax errors.
+  Prevention: Run a single-file vitest/lint check immediately after manual edits to test files.
 
 ---
 
-## 🎯 Recomendações
-
-### Prioridade Alta (Corrigir Imediatamente)
-
-1. **Atualizar todos os mocks de `financeService.test.ts`** (9 testes)
-   - Substituir `name: true` por `firstName: true, lastName: true` em todos os `CreatedByUser.select`
-   - Remover campos `undefined` das expectativas de `create`
-   - Adicionar `date: expect.any(Date)` onde aplicável
-
-2. **Migrar `prisma.user.create()` diretos para `createTestUser()`** (4 testes)
-   - `admin/adminChurchService.test.ts`
-   - `admin/adminUserService.test.ts`
-   - `admin/adminDashboardService.test.ts` (2 ocorrências)
-
-3. **Adicionar mocks faltantes em `planLimits.test.ts`** (2 testes)
-   - Mockar `prisma.branch.findMany` mesmo no fluxo de erro
-
-### Prioridade Média (Investigar e Decidir)
-
-1. **Decidir comportamento de `withBranch` em `onboardingService.test.ts`** (1 teste)
-   - Se branch é sempre obrigatória: Ajustar teste para esperar criação
-   - Se `withBranch: false` deve ser respeitado: Ajustar código de produção
-
----
-
-## 📝 Checklist de Correção
-
-### Fase 1: Correções STANDARDIZATION (13 testes)
-
-- [ ] Atualizar `financeService.test.ts`:
-  - [ ] Linha 67: Substituir `name: true` por `firstName: true, lastName: true`
-  - [ ] Linha 266: Atualizar expectativa de `create` (remover `undefined`, adicionar `date`)
-  - [ ] Linha 325: Atualizar expectativa de `create` (remover `undefined`, adicionar `date`)
-  - [ ] Linha 412: Atualizar expectativa de `create` (remover `undefined`, adicionar `date`)
-  - [ ] Linha 471: Substituir `name: true` por `firstName: true, lastName: true`
-  - [ ] Linha 538: Substituir `name: true` por `firstName: true, lastName: true`
-  - [ ] Linha 675: Substituir `name: true` por `firstName: true, lastName: true`
-  - [ ] Linha 729: Substituir `name: true` por `firstName: true, lastName: true`
-  - [ ] Linha 787: Substituir `name: true` por `firstName: true, lastName: true`
-
-- [ ] Migrar `prisma.user.create()` para `createTestUser()`:
-  - [ ] `admin/adminChurchService.test.ts` linha 48
-  - [ ] `admin/adminUserService.test.ts` linha 47
-  - [ ] `admin/adminDashboardService.test.ts` linha 79
-  - [ ] `admin/adminDashboardService.test.ts` linha 161
-
-- [ ] Adicionar mocks em `planLimits.test.ts`:
-  - [ ] Linha 138: Adicionar `prisma.branch.findMany.mockResolvedValue([])`
-  - [ ] Linha 309: Adicionar `prisma.branch.count.mockResolvedValue(0)`
-
-### Fase 2: Correção PROJECT_CODE (1 teste)
-
-- [ ] Investigar comportamento esperado de `withBranch`:
-  - [ ] Verificar se branch é sempre obrigatória (consultar requirements)
-  - [ ] Verificar outros testes/usos de `createChurchWithMainBranch`
-  - [ ] Decidir: Ajustar teste OU ajustar código
-
-- [ ] Aplicar correção:
-  - [ ] Se branch sempre criada: Ajustar teste para esperar criação
-  - [ ] Se `withBranch` deve ser respeitado: Ajustar código de produção
-
----
-
-## 📊 Estatísticas Finais
-
-- **Total de Testes Failing:** 14
-- **Standards Violated:** 4 tipos diferentes
-- **Arquivos Afetados:** 5 arquivos
-- **Tempo Estimado de Correção:** 30-45 minutos
-
----
-
----
-
-## ✅ Fase de Correção - COMPLETADA
-
-**Data:** 2026-01-10  
-**Status:** Todas as correções aplicadas com sucesso
-
-### Correções Aplicadas
-
-#### ✅ Fase 1: Correções STANDARDIZATION (13 testes)
-
-**1. FinanceService.test.ts (9 testes) - ✅ Corrigido**
-- ✅ Substituído `name: true` por `firstName: true, lastName: true` em todos os `CreatedByUser.select` (9 ocorrências)
-- ✅ Removidos campos `undefined` das expectativas de `create` (3 testes)
-- ✅ Adicionado `date: expect.any(Date)` nas expectativas de `create` onde aplicável
-
-**2. Admin Tests (4 testes) - ✅ Corrigido**
-- ✅ `admin/adminChurchService.test.ts`: Migrado `prisma.user.create()` para `createTestUser()` + `createTestSubscription()`
-- ✅ `admin/adminUserService.test.ts`: Migrado 2 ocorrências de `prisma.user.create()` para `createTestUser()` (incluindo teste de `isBlocked`)
-- ✅ `admin/adminDashboardService.test.ts`: Migrado 2 ocorrências de `prisma.user.create()` para `createTestUser()` + `createTestSubscription()`
-- ✅ Adicionado suporte a `isBlocked` na interface `UserFactoryData` e factory `createTestUser()`
-
-**3. PlanLimits.test.ts (2 testes) - ✅ Corrigido**
-- ✅ Adicionado `prisma.subscription.findMany` ao mock do Prisma
-- ✅ Adicionado mock de `prisma.branch.findMany.mockResolvedValue([])` no teste de `checkPlanMembersLimit`
-- ✅ Adicionado mock de `prisma.branch.count.mockResolvedValue(0)` no teste de `checkPlanBranchesLimit`
-
-#### ✅ Fase 2: Correção PROJECT_CODE (1 teste)
-
-**1. OnboardingService.test.ts (1 teste) - ✅ Corrigido**
-- ✅ Teste ajustado para refletir comportamento real: branch sempre é criada (obrigatória para Member)
-- ✅ Teste renomeado para "deve criar igreja sempre com filial (branch obrigatória para Member)"
-- ✅ Expectativa atualizada: `prisma.branch.create` deve ser chamado, não deve NÃO ser chamado
-
-### Resultado Final
-
-- ✅ **14/14 testes** corrigidos com sucesso
-- ✅ **6 arquivos** modificados
-- ✅ **54 testes** passando após correções
-- ✅ **0 testes** falhando
-
-### Arquivos Modificados
-
-1. `backend/tests/unit/financeService.test.ts` - Atualizado mocks para usar `firstName`/`lastName` e remover `undefined`
-2. `backend/tests/unit/planLimits.test.ts` - Adicionado mocks faltantes
-3. `backend/tests/unit/onboardingService.test.ts` - Ajustado teste para refletir comportamento real
-4. `backend/tests/unit/admin/adminChurchService.test.ts` - Migrado para factories
-5. `backend/tests/unit/admin/adminUserService.test.ts` - Migrado para factories
-6. `backend/tests/unit/admin/adminDashboardService.test.ts` - Migrado para factories
-7. `backend/tests/utils/testFactories.ts` - Adicionado suporte a `isBlocked` na interface e factory
-
----
-
-**Última atualização:** 2026-01-10  
-**Status:** ✅ Todas as correções aplicadas e validadas
+End of report

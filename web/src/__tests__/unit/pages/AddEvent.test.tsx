@@ -6,9 +6,14 @@ import { fixtures } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/helpers'
 import { mockApiResponse, mockApiError } from '@/test/mockApi'
 
-vi.mock('@/api/api')
-const mockToastSuccess = vi.fn()
-const mockToastError = vi.fn()
+vi.mock('@/api/api', async () => {
+  const { apiMock } = await import('@/test/apiMock')
+  return { default: apiMock }
+})
+const { mockToastSuccess, mockToastError } = vi.hoisted(() => ({
+  mockToastSuccess: vi.fn(),
+  mockToastError: vi.fn(),
+}))
 vi.mock('react-hot-toast', () => ({
   default: {
     success: mockToastSuccess,
@@ -174,8 +179,3 @@ describe('AddEvent - Unit Tests', () => {
   })
 })
 
-
-    // Assert
-    expect(mockNavigate).toHaveBeenCalledWith('/app/events')
-  })
-})

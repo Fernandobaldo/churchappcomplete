@@ -196,7 +196,11 @@ app.put(
     async (request, reply) => {
       try {
         const { id } = eventIdParamSchema.params.parse(request.params)
+        const rawBody = request.body as any
         const data = updateEventSchema.body.parse(request.body)
+
+        // Verificar se imageUrl foi explicitamente enviado como null (para remover)
+        const imageUrlWasExplicitlyNull = rawBody && 'imageUrl' in rawBody && rawBody.imageUrl === null
 
         const existing = await prisma.event.findUnique({
           where: { id },
@@ -263,19 +267,30 @@ app.put(
         }
       }
 
+      // Preparar objeto de atualização
+      const updateData: any = {
+        title: data.title,
+        startDate: parsedStartDate && isValid(parsedStartDate) ? parsedStartDate : undefined,
+        endDate: parsedEndDate && isValid(parsedEndDate) ? parsedEndDate : undefined,
+        time: data.time,
+        location: data.location,
+        description: data.description,
+        hasDonation: data.hasDonation ?? false,
+        donationReason: data.hasDonation ? data.donationReason : null,
+        donationLink: data.hasDonation ? data.donationLink : null,
+      }
+
+      // Tratar imageUrl: se foi explicitamente null, definir como null; se foi enviado, usar o valor; caso contrário, não incluir
+      if (imageUrlWasExplicitlyNull) {
+        updateData.imageUrl = null
+      } else if (data.imageUrl !== undefined) {
+        updateData.imageUrl = data.imageUrl
+      }
+      // Se imageUrl não foi enviado (undefined), não incluir no update (mantém o valor atual)
+
       const updated = await prisma.event.update({
         where: { id },
-        data: {
-          title: data.title,
-          startDate: parsedStartDate && isValid(parsedStartDate) ? parsedStartDate : undefined,
-          endDate: parsedEndDate && isValid(parsedEndDate) ? parsedEndDate : undefined,
-          time: data.time,
-          location: data.location,
-          description: data.description,
-          hasDonation: data.hasDonation ?? false,
-          donationReason: data.hasDonation ? data.donationReason : null,
-          donationLink: data.hasDonation ? data.donationLink : null,
-        },
+        data: updateData,
       })
 
         return reply.send(updated)

@@ -11,7 +11,7 @@ if (!process.env.DATABASE_URL) {
     dotenv.config({ path: '.env.test' });
 }
 export async function publicRegisterUserService(data) {
-    const { name, email, password } = data;
+    const { firstName, lastName, email, password, phone, document } = data;
     // Verifica se o email já está em uso
     const emailAlreadyUsed = await prisma.user.findUnique({ where: { email } });
     if (emailAlreadyUsed) {
@@ -33,9 +33,12 @@ export async function publicRegisterUserService(data) {
     // Cria o usuário e associa o plano
     const user = await prisma.user.create({
         data: {
-            name,
+            firstName,
+            lastName,
             email,
             password: hashedPassword,
+            phone,
+            document,
             Subscription: {
                 create: {
                     planId: freePlan.id,
@@ -44,12 +47,12 @@ export async function publicRegisterUserService(data) {
             },
         },
     });
-    // Gera o token JWT com type: 'user' (sem Member ainda)
-    // Omite campos de Member (não inclui no payload) quando não há Member associado
+    // Gera o token JWT - combinar firstName e lastName para o campo name (compatibilidade)
+    const fullName = `${firstName} ${lastName}`.trim();
     const token = jwt.sign({
         sub: user.id,
         email: user.email,
-        name: user.name,
+        name: fullName, // Usar nome completo para compatibilidade com JWT
         type: 'user',
         // Não inclui memberId, role, branchId, churchId quando não há Member
         // Isso indica que o onboarding não foi completado

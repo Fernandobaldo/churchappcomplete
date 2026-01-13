@@ -17,6 +17,7 @@ export default function MemberRegistrationScreen() {
     const [type, setType] = useState('')
     const [typeOptions, setTypeOptions] = useState([])
     const [refreshing, setRefreshing] = useState(false)
+    const [saving, setSaving] = useState(false)
 
 
     // Tenta pegar do parâmetro ou do usuário logado
@@ -64,6 +65,11 @@ export default function MemberRegistrationScreen() {
 }, [])
 
     const handleRegister = async () => {
+        // Proteção contra double-click
+        if (saving) {
+            return
+        }
+
         if (!branchId) {
             Alert.alert(
                 'Erro',
@@ -92,12 +98,17 @@ export default function MemberRegistrationScreen() {
             return
         }
 
+        setSaving(true)
+
         try {
             await api.post('/register', {
                 ...form,
                 branchId,
             })
-            navigation.goBack()
+            // Verifica se é possível voltar antes de navegar
+            if (navigation.canGoBack()) {
+                navigation.goBack()
+            }
             Toast.show({
                 type: 'success',
                 text1: 'Perfil cadastrado!',
@@ -111,6 +122,8 @@ export default function MemberRegistrationScreen() {
                 text1: 'Erro ao cadastrar',
                 text2: errorMessage,
             })
+        } finally {
+            setSaving(false)
         }
     }
 
@@ -130,6 +143,7 @@ export default function MemberRegistrationScreen() {
                 fields={fields}
                 onSubmit={handleRegister}
                 submitLabel="Cadastrar membro"
+                loading={saving}
             />
         </FormScreenLayout>
     )

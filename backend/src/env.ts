@@ -26,15 +26,12 @@ export const env = {
   DATABASE_URL: process.env.DATABASE_URL || '',
   
   // Payment Gateway
-  PAYMENT_GATEWAY: (process.env.PAYMENT_GATEWAY || 'mercadopago') as 'mercadopago' | 'asaas' | 'pagseguro' | 'stripe',
+  PAYMENT_GATEWAY: (process.env.PAYMENT_GATEWAY || 'stripe') as 'asaas' | 'pagseguro' | 'stripe',
   
-  // MercadoPago
-  MERCADOPAGO_ACCESS_TOKEN: process.env.MERCADOPAGO_ACCESS_TOKEN || '',
-  MERCADOPAGO_PUBLIC_KEY: process.env.MERCADOPAGO_PUBLIC_KEY || '',
-  MERCADOPAGO_WEBHOOK_SECRET: process.env.MERCADOPAGO_WEBHOOK_SECRET || '',
-  MERCADOPAGO_ENVIRONMENT: (process.env.MERCADOPAGO_ENVIRONMENT || 'sandbox') as 'sandbox' | 'production',
-  MERCADOPAGO_BACK_URL: process.env.MERCADOPAGO_BACK_URL || 'https://conectachurch.com/',
-  MERCADOPAGO_WEBHOOK_URL: process.env.MERCADOPAGO_WEBHOOK_URL || '',
+  // Stripe (adicionar conforme necessário)
+  STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || '',
+  STRIPE_PUBLIC_KEY: process.env.STRIPE_PUBLIC_KEY || '',
+  STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET || '',
   
   // CORS
   CORS_ORIGINS: process.env.CORS_ORIGINS || '',
@@ -43,24 +40,22 @@ export const env = {
    * Valida configuração do gateway de pagamento
    */
   validatePaymentGateway() {
-    if (this.PAYMENT_GATEWAY === 'mercadopago') {
-      if (!this.MERCADOPAGO_ACCESS_TOKEN) {
-        if (!this.isTest) {
-          console.warn('⚠️ MERCADOPAGO_ACCESS_TOKEN não configurado')
+    if (this.PAYMENT_GATEWAY === 'stripe') {
+      if (!this.isTest) {
+        if (!this.STRIPE_SECRET_KEY) {
+          console.warn('⚠️ STRIPE_SECRET_KEY não configurado')
+          return false
         }
-        return false
-      }
-      
-      if (this.isProduction && this.MERCADOPAGO_ENVIRONMENT === 'sandbox') {
-        console.warn('⚠️ ATENÇÃO: Ambiente de produção usando credenciais de sandbox!')
-        return false
-      }
-      
-      if (!this.isProduction && this.MERCADOPAGO_ENVIRONMENT === 'production') {
-        console.warn('⚠️ ATENÇÃO: Ambiente de desenvolvimento usando credenciais de produção!')
-        return false
+        if (!this.STRIPE_PUBLIC_KEY) {
+          console.warn('⚠️ STRIPE_PUBLIC_KEY não configurado')
+          return false
+        }
+        if (!this.STRIPE_WEBHOOK_SECRET) {
+          console.warn('⚠️ STRIPE_WEBHOOK_SECRET não configurado (webhooks não funcionarão)')
+        }
       }
     }
+    // Outros gateways podem ser adicionados aqui quando implementados
     
     return true
   },

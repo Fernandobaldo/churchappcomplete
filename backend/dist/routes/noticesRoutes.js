@@ -79,4 +79,51 @@ export async function noticesRoutes(app) {
             },
         },
     }, controller.markAsRead.bind(controller));
+    app.delete('/:id', {
+        preHandler: [
+            authenticate,
+            checkBranchId(),
+            checkRole(['ADMINGERAL', 'ADMINFILIAL', 'COORDINATOR']),
+            checkPermission(['members_manage']), // Usando members_manage como permissão para deletar avisos
+        ],
+        schema: {
+            description: 'Exclui um aviso',
+            tags: ['Avisos'],
+            summary: 'Excluir aviso',
+            security: [{ bearerAuth: [] }],
+            params: {
+                type: 'object',
+                required: ['id'],
+                properties: {
+                    id: {
+                        type: 'string',
+                        description: 'ID do aviso',
+                    },
+                },
+            },
+            response: {
+                200: {
+                    description: 'Aviso excluído com sucesso',
+                    type: 'object',
+                    properties: {
+                        message: { type: 'string' },
+                    },
+                },
+                404: {
+                    description: 'Aviso não encontrado',
+                    type: 'object',
+                    properties: {
+                        message: { type: 'string' },
+                    },
+                },
+                403: {
+                    description: 'Sem permissão para excluir este aviso',
+                    type: 'object',
+                    properties: {
+                        message: { type: 'string' },
+                    },
+                },
+            },
+        },
+    }, controller.delete.bind(controller));
 }

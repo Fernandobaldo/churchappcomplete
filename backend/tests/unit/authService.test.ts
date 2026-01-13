@@ -11,20 +11,39 @@ vi.mock('bcryptjs', () => ({
   compare: vi.fn(),
 }))
 
-// Mock do prisma
-vi.mock('../../src/lib/prisma', () => ({
-  prisma: {
-    user: {
-      findUnique: vi.fn(),
-      findMany: vi.fn().mockResolvedValue([]),
-    },
-    member: {
-      findFirst: vi.fn(),
-      findUnique: vi.fn(),
-      findMany: vi.fn().mockResolvedValue([]),
-    },
-    $connect: vi.fn().mockResolvedValue(undefined),
+// Mock do prisma usando mock centralizado (definindo inline para evitar problemas de hoisting)
+const prismaMock = vi.hoisted(() => ({
+  user: {
+    findUnique: vi.fn(),
+    findFirst: vi.fn(),
+    findMany: vi.fn().mockResolvedValue([]),
+    create: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
   },
+  member: {
+    findUnique: vi.fn(),
+    findFirst: vi.fn(),
+    findMany: vi.fn().mockResolvedValue([]),
+    create: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+  },
+  onboardingProgress: {
+    findUnique: vi.fn(),
+    findFirst: vi.fn(),
+    findMany: vi.fn().mockResolvedValue([]),
+    create: vi.fn(),
+    update: vi.fn(),
+    upsert: vi.fn(),
+    delete: vi.fn(),
+  },
+  $connect: vi.fn().mockResolvedValue(undefined),
+  $disconnect: vi.fn().mockResolvedValue(undefined),
+}))
+
+vi.mock('../../src/lib/prisma', () => ({
+  prisma: prismaMock,
 }))
 
 const authService = new AuthService()
@@ -65,6 +84,8 @@ describe('AuthService - Novo Modelo User + Member', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    // Configurar mock padrão para onboardingProgress
+    prismaMock.onboardingProgress.findUnique.mockResolvedValue({ completed: false })
   })
 
   describe('validateCredentials', () => {

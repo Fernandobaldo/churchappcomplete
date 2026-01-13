@@ -5,7 +5,10 @@ import Start from '@/pages/onboarding/Start'
 import { renderWithProviders } from '@/test/helpers'
 import { mockApiResponse, resetApiMocks } from '@/test/mockApi'
 
-vi.mock('@/api/api')
+vi.mock('@/api/api', async () => {
+  const { apiMock } = await import('@/test/apiMock')
+  return { default: apiMock }
+})
 const mockNavigate = vi.fn()
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom')

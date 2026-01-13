@@ -19,8 +19,8 @@
  * ```
  */
 
-import api from '../api/api'
 import { vi } from 'vitest'
+import { apiMock } from './apiMock'
 
 /**
  * Mock API response
@@ -72,7 +72,7 @@ export function mockApiResponse(
     headers?: Record<string, string>
   }
 ) {
-  const mockFn = api[method] as any
+  const mockFn = apiMock[method] as any
 
   if (url) {
     // Registrar mock no registry
@@ -108,7 +108,7 @@ export function mockApiError(
     data?: any
   }
 ) {
-  const mockFn = api[method] as any
+  const mockFn = apiMock[method] as any
 
   if (url) {
     mockFn.mockImplementation((requestUrl: string) => {
@@ -137,10 +137,10 @@ export function mockApiError(
  */
 export function resetApiMocks() {
   vi.clearAllMocks()
-  ;(api.get as any).mockReset()
-  ;(api.post as any).mockReset()
-  ;(api.put as any).mockReset()
-  ;(api.delete as any).mockReset()
+  ;(apiMock.get as any).mockReset()
+  ;(apiMock.post as any).mockReset()
+  ;(apiMock.put as any).mockReset()
+  ;(apiMock.delete as any).mockReset()
 
   // Limpar registry de mocks
   mockRegistry.get.clear()
@@ -149,16 +149,17 @@ export function resetApiMocks() {
   mockRegistry.delete.clear()
 
   // Configurar mock padrão que consulta o registry (permite que mocks customizados sejam adicionados depois)
-  ;(api.get as any).mockImplementation(createMockImplementation('get'))
-  ;(api.post as any).mockImplementation(createMockImplementation('post'))
-  ;(api.put as any).mockImplementation(createMockImplementation('put'))
-  ;(api.delete as any).mockImplementation(createMockImplementation('delete'))
+  ;(apiMock.get as any).mockImplementation(createMockImplementation('get'))
+  ;(apiMock.post as any).mockImplementation(createMockImplementation('post'))
+  ;(apiMock.put as any).mockImplementation(createMockImplementation('put'))
+  ;(apiMock.delete as any).mockImplementation(createMockImplementation('delete'))
 }
 
 /**
  * Get API mock function for manual control
  */
 export function getApiMock(method: 'get' | 'post' | 'put' | 'delete'): any {
-  return api[method]
+  return apiMock[method]
 }
 
+export { apiMock }

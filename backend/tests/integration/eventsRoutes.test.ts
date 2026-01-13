@@ -561,6 +561,50 @@ describe('Events Routes - Integration Tests', () => {
       expect(eventInDb?.branchId).toBe(branchId)
       expect(eventInDb?.description).toBe('Teste de side-effect')
     })
+
+    // Teste 8: Proteção contra requisições simultâneas (double-click)
+    it('deve criar evento mesmo se requisições simultâneas forem enviadas (backend permite, frontend deve prevenir)', async () => {
+      // Given: Dados válidos de evento
+      const eventData = {
+        title: 'Evento Simultâneo',
+        description: 'Descrição do evento',
+        location: 'Local do evento',
+        startDate: new Date('2025-03-01T10:00:00Z').toISOString(),
+        endDate: new Date('2025-03-01T12:00:00Z').toISOString(),
+        time: '10:00',
+        hasDonation: false,
+      }
+
+      // When: Enviar requisições simultâneas (simula double-click)
+      const [response1, response2] = await Promise.all([
+        request(app.server)
+          .post('/events')
+          .set('Authorization', `Bearer ${adminToken}`)
+          .send(eventData),
+        request(app.server)
+          .post('/events')
+          .set('Authorization', `Bearer ${adminToken}`)
+          .send(eventData),
+      ])
+
+      // Then: Backend cria ambos eventos (não há validação de duplicação)
+      // Este teste documenta o comportamento atual: backend permite duplicação
+      // A prevenção deve ser feita no frontend (testado nos testes mobile)
+      expect(response1.status).toBe(201)
+      expect(response2.status).toBe(201)
+      
+      // Verifica que ambos foram criados
+      const events = await prisma.event.findMany({
+        where: {
+          title: 'Evento Simultâneo',
+          branchId: branchId,
+        },
+      })
+      
+      // Ambos eventos foram criados (comportamento atual - sem validação de duplicação)
+      expect(events.length).toBe(2)
+      expect(events[0].id).not.toBe(events[1].id)
+    })
   })
 
   describe('PUT /events/:id', () => {
@@ -621,7 +665,7 @@ describe('Events Routes - Integration Tests', () => {
     // Teste 3: 401 Unauthenticated
     it('deve retornar 401 se usuário não autenticado', async () => {
       // Given: Requisição sem token
-      const fakeId = 'cmic00000000000000000000000'
+      const fakeId = 'cmic00000000000000000000000000'
       const updateData = {
         title: 'Evento Atualizado',
       }
@@ -633,6 +677,120 @@ describe('Events Routes - Integration Tests', () => {
 
       // Then: Retorna 401
       expect(response.status).toBe(401)
+    })
+
+    // Teste 4: 200/201 Success - Atualizar imageUrl
+    it('deve atualizar imageUrl do evento com sucesso', async () => {
+      // Given: Evento existente com imageUrl
+      const event = await prisma.event.create({
+        data: {
+          title: 'Evento com Banner',
+          description: 'Descrição',
+          location: 'Local',
+          startDate: new Date('2025-02-01T10:00:00Z'),
+          endDate: new Date('2025-02-01T12:00:00Z'),
+          time: '10:00',
+          imageUrl: '/uploads/event-images/old-banner.jpg',
+          branchId: branchId,
+        },
+      })
+
+      const updateData = {
+        title: 'Evento Atualizado',
+        imageUrl: '/uploads/event-images/new-banner.jpg',
+      }
+
+      // When: PUT /events/:id com novo imageUrl
+      const response = await request(app.server)
+        .put(`/events/${event.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(updateData)
+
+      // Then: Retorna 200 com imageUrl atualizado
+      expect(response.status).toBe(200)
+      expect(response.body).toHaveProperty('imageUrl', '/uploads/event-images/new-banner.jpg')
+      
+      // Verificar no banco
+      const eventInDb = await prisma.event.findUnique({
+        where: { id: event.id },
+      })
+      expect(eventInDb?.imageUrl).toBe('/uploads/event-images/new-banner.jpg')
+    })
+
+    // Teste 5: 200/201 Success - Remover imageUrl (null)
+    it('deve permitir remover imageUrl definindo como null', async () => {
+      // Given: Evento existente com imageUrl
+      const event = await prisma.event.create({
+        data: {
+          title: 'Evento com Banner',
+          description: 'Descrição',
+          location: 'Local',
+          startDate: new Date('2025-02-01T10:00:00Z'),
+          endDate: new Date('2025-02-01T12:00:00Z'),
+          time: '10:00',
+          imageUrl: '/uploads/event-images/banner.jpg',
+          branchId: branchId,
+        },
+      })
+
+      const updateData = {
+        title: 'Evento Sem Banner',
+        imageUrl: null,
+      }
+
+      // When: PUT /events/:id com imageUrl null
+      const response = await request(app.server)
+        .put(`/events/${event.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(updateData)
+
+      // Then: Retorna 200 com imageUrl null
+      expect(response.status).toBe(200)
+      expect(response.body).toHaveProperty('imageUrl', null)
+      
+      // Verificar no banco
+      const eventInDb = await prisma.event.findUnique({
+        where: { id: event.id },
+      })
+      expect(eventInDb?.imageUrl).toBeNull()
+    })
+
+    // Teste 6: DB side-effect assertions - Verificar que outros campos não são afetados
+    it('deve atualizar apenas imageUrl sem afetar outros campos', async () => {
+      // Given: Evento existente
+      const event = await prisma.event.create({
+        data: {
+          title: 'Evento Original',
+          description: 'Descrição original',
+          location: 'Local original',
+          startDate: new Date('2025-02-01T10:00:00Z'),
+          endDate: new Date('2025-02-01T12:00:00Z'),
+          time: '10:00',
+          imageUrl: '/uploads/event-images/old.jpg',
+          branchId: branchId,
+        },
+      })
+
+      const updateData = {
+        imageUrl: '/uploads/event-images/new.jpg',
+      }
+
+      // When: PUT /events/:id apenas com imageUrl
+      const response = await request(app.server)
+        .put(`/events/${event.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(updateData)
+
+      expect(response.status).toBe(200)
+
+      // Then: Apenas imageUrl foi atualizado, outros campos permanecem
+      const eventInDb = await prisma.event.findUnique({
+        where: { id: event.id },
+      })
+      expect(eventInDb?.imageUrl).toBe('/uploads/event-images/new.jpg')
+      expect(eventInDb?.title).toBe('Evento Original')
+      expect(eventInDb?.description).toBe('Descrição original')
+      expect(eventInDb?.location).toBe('Local original')
     })
   })
 })

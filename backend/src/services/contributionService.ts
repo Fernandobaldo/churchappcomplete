@@ -156,4 +156,16 @@ export class ContributionService {
       },
     })
   }
+
+  async delete(id: string) {
+    // Primeiro, remove todos os métodos de pagamento associados
+    await prisma.contributionPaymentMethod.deleteMany({
+      where: { contributionId: id },
+    })
+
+    // Depois, remove a contribuição
+    return prisma.contribution.delete({
+      where: { id },
+    })
+  }
 }

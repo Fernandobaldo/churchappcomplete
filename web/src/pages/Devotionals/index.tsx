@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, BookOpen, User, Heart } from 'lucide-react'
-import api from '../../api/api'
+import api from '@/api/api'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
 import ptBR from 'date-fns/locale/pt-BR'
@@ -104,4 +104,3 @@ export default function Devotionals() {
     </div>
   )
 }
-

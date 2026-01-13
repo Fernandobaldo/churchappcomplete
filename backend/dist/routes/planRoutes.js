@@ -2,6 +2,9 @@ import { createPlanHandler, listPlansHandler } from '../controllers/planControll
 import { authenticate } from '../middlewares/authenticate';
 import { authorize } from '../middlewares/authorize';
 export async function planRoutes(app) {
-    app.post('/plans', { preHandler: [authenticate, authorize(['SAAS_ADMIN'])] }, createPlanHandler);
-    app.get('/plans', { preHandler: [authenticate] }, listPlansHandler);
+    // Rota pública para listar planos (cliente selecionar)
+    // Será /plans quando registrado com prefixo /plans
+    app.get('/', listPlansHandler);
+    // Rota autenticada para criar planos (admin)
+    app.post('/', { preHandler: [authenticate, authorize(['SAAS_ADMIN'])] }, createPlanHandler);
 }

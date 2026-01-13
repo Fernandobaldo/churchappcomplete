@@ -474,8 +474,8 @@ describe('ServiceScheduleService', () => {
         data: {
           title: 'Culto Dominical Atualizado',
           time: '11:00',
-          description: 'Nova descrição',
-          location: 'Novo local',
+          description: 'Nova descrição', // updateMany aceita valores diretamente
+          location: 'Novo local', // updateMany aceita valores diretamente
         },
       })
 
@@ -568,8 +568,8 @@ describe('ServiceScheduleService', () => {
         data: {
           title: 'Culto Dominical Atualizado',
           time: '11:00',
-          description: null,
-          location: null,
+          description: null, // updateMany aceita null diretamente
+          location: null, // updateMany aceita null diretamente
         },
       })
     })

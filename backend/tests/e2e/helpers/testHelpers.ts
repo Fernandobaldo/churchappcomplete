@@ -12,18 +12,56 @@ export interface AuthenticatedRequest {
 
 /**
  * Registra um novo usuário via endpoint público
+ * 
+ * Aceita formato novo (firstName, lastName, phone, document) ou formato antigo (name) para retrocompatibilidade.
+ * Se receber `name`, divide em firstName/lastName.
+ * Gera valores padrão para phone e document se não fornecidos.
  */
 export async function registerUser(
   app: FastifyInstance,
-  userData: { name: string; email: string; password: string }
+  userData: 
+    | { firstName: string; lastName: string; email: string; password: string; phone?: string; document?: string }
+    | { name: string; email: string; password: string; phone?: string; document?: string }
 ) {
+  // Normalizar dados: converter name para firstName/lastName se necessário
+  let firstName: string
+  let lastName: string
+  let phone: string
+  let document: string
+
+  if ('name' in userData) {
+    // Formato antigo: dividir name em firstName e lastName
+    const nameParts = userData.name.trim().split(/\s+/)
+    firstName = nameParts[0] || 'Usuário'
+    lastName = nameParts.slice(1).join(' ') || 'Teste'
+  } else {
+    // Formato novo: usar firstName e lastName diretamente
+    firstName = userData.firstName
+    lastName = userData.lastName
+  }
+
+  // Gerar valores padrão para phone e document se não fornecidos
+  phone = userData.phone || `11999999999`
+  document = userData.document || `12345678901` // CPF padrão para testes (11 dígitos)
+
+  // Preparar payload com campos obrigatórios
+  const payload = {
+    firstName,
+    lastName,
+    email: userData.email,
+    password: userData.password,
+    phone,
+    document,
+  }
+
   const response = await request(app.server)
     .post('/public/register')
-    .send(userData)
+    .send(payload)
 
   if (response.status !== 201) {
     throw new Error(
-      `Falha ao registrar usuário: ${response.status} - ${JSON.stringify(response.body)}`
+      `Falha ao registrar usuário: ${response.status} - ${JSON.stringify(response.body)}\n` +
+      `Payload enviado: ${JSON.stringify(payload, null, 2)}`
     )
   }
 
@@ -97,8 +135,8 @@ export async function createEvent(
   token: string,
   eventData: {
     title: string
-    startDate: string // formato: dd/MM/yyyy
-    endDate: string // formato: dd/MM/yyyy
+    startDate: string // formato: dd-MM-yyyy (com hífen, não barra)
+    endDate: string // formato: dd-MM-yyyy (com hífen, não barra)
     time?: string
     location?: string
     description?: string
@@ -374,4 +412,3 @@ export async function getResourceById(
 
   return response.body
 }
-

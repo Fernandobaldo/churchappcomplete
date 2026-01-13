@@ -1,6 +1,6 @@
 import { useNavigate, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
-import { ArrowLeft, Calendar, Plus, X, CreditCard } from 'lucide-react'
+import { ArrowLeft, Calendar, Plus, X, CreditCard, Trash2 } from 'lucide-react'
 import api from '../../api/api'
 import toast from 'react-hot-toast'
 import { useState, useEffect } from 'react'
@@ -73,7 +73,7 @@ export default function EditContribution() {
       }
     } catch (error: any) {
       toast.error('Erro ao carregar campanha')
-      navigate('/app/contributions')
+      navigate('/app/contributions', { replace: true })
     } finally {
       setLoading(false)
     }
@@ -139,6 +139,18 @@ export default function EditContribution() {
   const removePaymentMethod = (id: string) => {
     const current = paymentMethods || []
     setValue('paymentMethods', current.filter(m => m.id !== id))
+  }
+
+  const handleDelete = async () => {
+    if (!confirm('Tem certeza que deseja excluir esta campanha? Esta ação não pode ser desfeita.')) return
+
+    try {
+      await api.delete(`/contributions/${id}`)
+      toast.success('Campanha excluída com sucesso!')
+      navigate('/app/contributions', { replace: true })
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Erro ao excluir campanha')
+    }
   }
 
   const onSubmit = async (data: ContributionForm) => {
@@ -327,6 +339,17 @@ export default function EditContribution() {
             </button>
           </div>
         </form>
+
+        <div className="mt-6 pt-6 border-t border-gray-200">
+          <button
+            type="button"
+            onClick={handleDelete}
+            className="btn-secondary flex items-center gap-2 text-red-600 hover:bg-red-50 w-full"
+          >
+            <Trash2 className="w-4 h-4" />
+            Excluir Campanha
+          </button>
+        </div>
       </div>
 
       {/* Modal para adicionar forma de pagamento */}

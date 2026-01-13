@@ -6,8 +6,13 @@ import { fixtures } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/helpers'
 import { mockApiResponse, mockApiError } from '@/test/mockApi'
 
-vi.mock('@/api/api')
-const mockToastError = vi.fn()
+vi.mock('@/api/api', async () => {
+  const { apiMock } = await import('@/test/apiMock')
+  return { default: apiMock }
+})
+const { mockToastError } = vi.hoisted(() => ({
+  mockToastError: vi.fn(),
+}))
 vi.mock('react-hot-toast', () => ({
   default: {
     error: mockToastError,
@@ -180,26 +185,4 @@ describe('Members - Unit Tests', () => {
   })
 })
 
-
-  // TESTE 5: ERROR STATE - Exibe erro quando falha ao carregar membros
-  // ============================================================================
-  it('deve exibir erro quando falha ao carregar membros', async () => {
-    // Arrange
-    const mockUser = fixtures.user()
-    mockApiError('get', '/members', { message: 'Erro na API' })
-
-    // Act
-    renderWithProviders(<Members />, {
-      authState: {
-        user: mockUser,
-        token: 'token',
-      },
-    })
-
-    // Assert
-    await waitFor(() => {
-      expect(mockToastError).toHaveBeenCalledWith('Erro ao carregar membros')
-    })
-  })
-})
 

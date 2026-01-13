@@ -122,36 +122,3 @@ describe('Sidebar - Unit Tests', () => {
 })
 
 
-
-
-    // Assert
-    const dashboardLink = screen.getByText('Dashboard').closest('a')
-    expect(dashboardLink).toHaveClass('bg-primary', 'text-white')
-  })
-
-  // ============================================================================
-  // TESTE 5: NAVIGATION PATHS - Verifica paths corretos com prefixo /app
-  // ============================================================================
-  it('deve ter paths corretos com prefixo /app', () => {
-    // Arrange
-    const mockUser = fixtures.user({ role: 'ADMINGERAL' })
-
-    // Act
-    renderWithProviders(<Sidebar />, {
-      authState: {
-        user: mockUser,
-        token: 'token',
-      },
-    })
-
-    // Assert
-    expect(screen.getByText('Dashboard').closest('a')).toHaveAttribute('href', '/app/dashboard')
-    expect(screen.getByText('Eventos').closest('a')).toHaveAttribute('href', '/app/events')
-    expect(screen.getByText('Contribuições').closest('a')).toHaveAttribute('href', '/app/contributions')
-    expect(screen.getByText('Devocionais').closest('a')).toHaveAttribute('href', '/app/devotionals')
-    expect(screen.getByText('Membros').closest('a')).toHaveAttribute('href', '/app/members')
-    expect(screen.getByText('Perfil').closest('a')).toHaveAttribute('href', '/app/profile')
-  })
-})
-
-

@@ -5,37 +5,51 @@ import { useAuthStore } from '../stores/authStore'
 import { resetToLogin } from '../navigation/navigationRef'
 
 // Configuração da API base
-// Prioridade: variável de ambiente EXPO_PUBLIC_API_URL > app.config.js extra > fallback localhost
+// Prioridade: variável de ambiente EXPO_PUBLIC_API_URL > app.config.js extra > fallback
 const getBaseURL = (): string => {
   // 1. Verificar variável de ambiente EXPO_PUBLIC_API_URL (mais alta prioridade)
-  if (process.env.EXPO_PUBLIC_API_URL) {
-    return process.env.EXPO_PUBLIC_API_URL
+  // O Expo SDK 54+ expõe automaticamente variáveis EXPO_PUBLIC_* para process.env
+  const envApiUrl = process.env.EXPO_PUBLIC_API_URL
+  if (envApiUrl) {
+    console.log('✅ [API] Usando EXPO_PUBLIC_API_URL:', envApiUrl)
+    return envApiUrl
   }
 
-  // 2. Verificar configuração do app.config.js
+  // 2. Verificar configuração do app.config.js via Constants
   const configApiUrl = Constants.expoConfig?.extra?.apiUrl
   if (configApiUrl) {
+    console.log('✅ [API] Usando apiUrl do app.config.js:', configApiUrl)
     return configApiUrl
   }
 
-  // 3. Fallback para desenvolvimento local
-  // Para desenvolvimento, use variável de ambiente ou configure no app.config.js
-  // Para dispositivo físico, use o IP da sua máquina (ex: 'http://192.168.1.7:3333')
+  // 3. Fallback baseado na plataforma
+  let fallbackUrl = 'http://localhost:3333'
   if (Platform.OS === 'android') {
     // Emulador Android usa este IP especial para localhost
-    return 'http://10.0.2.2:3333'
+    fallbackUrl = 'http://10.0.2.2:3333'
   }
   
-  // iOS Simulator e outras plataformas
-  return 'http://localhost:3333'
+  console.warn('⚠️ [API] Usando fallback:', fallbackUrl)
+  console.warn('⚠️ [API] Configure EXPO_PUBLIC_API_URL no arquivo .env para evitar usar fallback')
+  return fallbackUrl
 }
 
 // Obter URL base
 const baseURL = getBaseURL()
 
+// Log de debug completo (apenas em desenvolvimento)
+if (__DEV__) {
+  console.log('🔍 [API DEBUG] ====================')
+  console.log('🔍 [API DEBUG] URL Base configurada:', baseURL)
+  console.log('🔍 [API DEBUG] EXPO_PUBLIC_API_URL:', process.env.EXPO_PUBLIC_API_URL || '(não definido)')
+  console.log('🔍 [API DEBUG] Constants.expoConfig?.extra?.apiUrl:', Constants.expoConfig?.extra?.apiUrl || '(não definido)')
+  console.log('🔍 [API DEBUG] Platform.OS:', Platform.OS)
+  console.log('🔍 [API DEBUG] ====================')
+}
+
 const api = axios.create({
   baseURL: baseURL,
-  timeout: 30000, // 30 segundos de timeout (aumentado para debug)
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
@@ -60,6 +74,11 @@ api.interceptors.request.use(
     const token = useAuthStore.getState().token
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
+    }
+    
+    // Log da requisição em desenvolvimento
+    if (__DEV__) {
+      console.log(`📤 [API] ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`)
     }
     
     return config
@@ -89,28 +108,30 @@ api.interceptors.response.use(
   (error) => {
     // Tratamento de erros de rede
     if (error.message === 'Network Error' || error.code === 'ERR_NETWORK') {
-      console.error('Erro de rede: Verifique se o servidor está rodando e acessível')
+      console.error('❌ [API] Erro de rede: Verifique se o servidor está rodando e acessível')
+      console.error('❌ [API] URL tentada:', error.config?.baseURL + error.config?.url)
     }
     
     // Tratamento de erros de timeout
     if (error.code === 'ECONNABORTED') {
-      console.error('Timeout: A requisição demorou muito para responder')
+      console.error('❌ [API] Timeout: A requisição demorou muito para responder')
+      console.error('❌ [API] URL tentada:', error.config?.baseURL + error.config?.url)
+      console.error('❌ [API] Verifique se a URL está correta e o servidor está acessível')
     }
     
     // Tratamento de erros de autenticação
     if (error.response?.status === 401) {
-      // Token inválido ou expirado - redirecionar para Login
-      // Não logar erros 401 no console (credenciais inválidas são esperadas)
       resetToLogin()
       return Promise.reject(error)
     }
     
-    // Log detalhado do erro para debug (exceto 401 que já foi tratado)
-    if (process.env.NODE_ENV === 'development') {
-      console.error('Erro na requisição:', {
+    // Log detalhado do erro para debug
+    if (__DEV__) {
+      console.error('❌ [API] Erro na requisição:', {
         message: error.message,
         code: error.code,
         status: error.response?.status,
+        url: error.config?.baseURL + error.config?.url,
         data: error.response?.data,
       })
     }

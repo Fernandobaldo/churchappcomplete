@@ -9,7 +9,7 @@ import { prisma } from '../../lib/prisma'
  */
 export async function webhookHandler(request: FastifyRequest, reply: FastifyReply) {
   try {
-    const gatewayProvider = (request.params as any).provider || 'mercadopago'
+    const gatewayProvider = (request.params as any).provider || 'stripe'
     const headers = request.headers as Record<string, string>
     const payload = request.body as any
 
@@ -17,7 +17,8 @@ export async function webhookHandler(request: FastifyRequest, reply: FastifyRepl
     const gateway = PaymentGatewayService.getGateway()
 
     // Validar assinatura do webhook
-    const signature = headers['x-signature'] || headers['x-request-id'] || ''
+    // Stripe usa 'stripe-signature', outros gateways podem usar 'x-signature' ou 'x-request-id'
+    const signature = headers['stripe-signature'] || headers['x-signature'] || headers['x-request-id'] || ''
     const rawBody = typeof payload === 'string' ? payload : JSON.stringify(payload)
 
     if (!gateway.verifyWebhookSignature(rawBody, signature)) {

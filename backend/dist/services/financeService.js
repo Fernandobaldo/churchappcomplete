@@ -34,7 +34,8 @@ export class FinanceService {
                 CreatedByUser: {
                     select: {
                         id: true,
-                        name: true,
+                        firstName: true,
+                        lastName: true,
                         email: true,
                     },
                 },
@@ -127,7 +128,8 @@ export class FinanceService {
                 CreatedByUser: {
                     select: {
                         id: true,
-                        name: true,
+                        firstName: true,
+                        lastName: true,
                         email: true,
                     },
                 },
@@ -161,27 +163,42 @@ export class FinanceService {
         });
     }
     async create(data) {
+        // Construir objeto de dados removendo campos undefined
+        const transactionData = {
+            amount: data.amount,
+            type: data.type,
+            branchId: data.branchId,
+            date: data.date || new Date()
+        };
+        // Adicionar campos opcionais apenas se estiverem definidos
+        if (data.title !== undefined)
+            transactionData.title = data.title;
+        if (data.category !== undefined)
+            transactionData.category = data.category;
+        if (data.entryType)
+            transactionData.entryType = data.entryType;
+        if (data.exitType)
+            transactionData.exitType = data.exitType;
+        if (data.exitTypeOther)
+            transactionData.exitTypeOther = data.exitTypeOther;
+        if (data.contributionId)
+            transactionData.contributionId = data.contributionId;
+        if (data.tithePayerMemberId)
+            transactionData.tithePayerMemberId = data.tithePayerMemberId;
+        if (data.tithePayerName)
+            transactionData.tithePayerName = data.tithePayerName;
+        if (data.isTithePayerMember !== undefined)
+            transactionData.isTithePayerMember = data.isTithePayerMember;
+        if (data.createdBy)
+            transactionData.createdBy = data.createdBy;
         return prisma.transaction.create({
-            data: {
-                title: data.title,
-                amount: data.amount,
-                type: data.type,
-                category: data.category,
-                entryType: data.entryType,
-                exitType: data.exitType,
-                exitTypeOther: data.exitTypeOther,
-                contributionId: data.contributionId,
-                tithePayerMemberId: data.tithePayerMemberId,
-                tithePayerName: data.tithePayerName,
-                isTithePayerMember: data.isTithePayerMember,
-                createdBy: data.createdBy,
-                branchId: data.branchId
-            },
+            data: transactionData,
             include: {
                 CreatedByUser: {
                     select: {
                         id: true,
-                        name: true,
+                        firstName: true,
+                        lastName: true,
                         email: true,
                     },
                 },
@@ -216,7 +233,8 @@ export class FinanceService {
                 CreatedByUser: {
                     select: {
                         id: true,
-                        name: true,
+                        firstName: true,
+                        lastName: true,
                         email: true,
                     },
                 },

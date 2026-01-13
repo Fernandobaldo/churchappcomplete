@@ -184,19 +184,35 @@ export default function ContributionsScreen() {
                         style={styles.card}
                     >
                         <View style={{ flex: 1 }}>
-                            <View style={styles.titleRow}>
-                                <Text style={styles.title}>{item.title}</Text>
-                                <View style={[
-                                    styles.statusBadge,
-                                    item.isActive !== false ? styles.statusBadgeActive : styles.statusBadgeInactive
-                                ]}>
-                                    <Text style={[
-                                        styles.statusText,
-                                        item.isActive !== false ? styles.statusTextActive : styles.statusTextInactive
-                                    ]}>
-                                        {item.isActive !== false ? 'Ativa' : 'Inativa'}
+                            <View style={styles.cardHeader}>
+                                <View style={styles.titleRow}>
+                                    <Text style={styles.title} numberOfLines={1} ellipsizeMode="tail">
+                                        {item.title}
                                     </Text>
+                                    <View style={[
+                                        styles.statusBadge,
+                                        item.isActive !== false ? styles.statusBadgeActive : styles.statusBadgeInactive
+                                    ]}>
+                                        <Text style={[
+                                            styles.statusText,
+                                            item.isActive !== false ? styles.statusTextActive : styles.statusTextInactive
+                                        ]}>
+                                            {item.isActive !== false ? 'Ativa' : 'Inativa'}
+                                        </Text>
+                                    </View>
                                 </View>
+                                {canManageContributions && (
+                                    <TouchableOpacity
+                                        onPress={(e) => {
+                                            e.stopPropagation()
+                                            ;(navigation as any).navigate('EditContributionScreen', { id: item.id })
+                                        }}
+                                        activeOpacity={0.7}
+                                        style={styles.editButton}
+                                    >
+                                        <Ionicons name="create-outline" size={20} color={colors.gradients.primary[1]} />
+                                    </TouchableOpacity>
+                                )}
                             </View>
                             {item.description && (
                                 <Text style={styles.description}>{item.description}</Text>
@@ -260,12 +276,25 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
     },
+    cardHeader: {
+        width: '100%',
+        position: 'relative',
+        marginBottom: 8,
+        minHeight: 28,
+    },
     titleRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginBottom: 8,
         gap: 12,
+        paddingRight: 32,
+    },
+    editButton: {
+        position: 'absolute',
+        top: 0,
+        right: 0,
+        padding: 4,
+        zIndex: 10,
     },
     title: {
         fontSize: 20,
@@ -273,6 +302,7 @@ const styles = StyleSheet.create({
         lineHeight: 28,
         color: colors.text.primary,
         flex: 1,
+        minWidth: 0,
     },
     statusBadge: {
         paddingHorizontal: 10,

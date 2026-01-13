@@ -38,4 +38,9 @@ export class NoticeService {
             }
         });
     }
+    async delete(id) {
+        return prisma.notice.delete({
+            where: { id },
+        });
+    }
 }

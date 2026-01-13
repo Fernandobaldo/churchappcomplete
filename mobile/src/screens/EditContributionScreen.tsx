@@ -10,6 +10,7 @@ import {
     ActivityIndicator,
     KeyboardAvoidingView,
     Platform,
+    Alert,
 } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import FormScreenLayout from '../components/layouts/FormScreenLayout'
@@ -18,10 +19,12 @@ import TextInputField from '../components/TextInputField'
 import GlassCard from '../components/GlassCard'
 import { colors } from '../theme/colors'
 import api from '../api/api'
-import { useNavigation, useRoute } from '@react-navigation/native'
+import { useNavigation, useRoute, CommonActions } from '@react-navigation/native'
 import Toast from 'react-native-toast-message'
 import DateTimePickerComponent from '../components/DateTimePicker'
 import { format } from 'date-fns'
+import { contributionsService } from '../services/contributions.service'
+import FontAwesome5 from '@expo/vector-icons/FontAwesome5'
 
 interface PaymentMethod {
     id: string
@@ -106,6 +109,55 @@ export default function EditContributionScreen() {
 
     const handleRetry = async () => {
         await fetchContribution()
+    }
+
+    const handleDelete = async () => {
+        Alert.alert(
+            'Excluir Contribuição',
+            'Tem certeza que deseja excluir esta contribuição? Esta ação não pode ser desfeita.',
+            [
+                {
+                    text: 'Cancelar',
+                    style: 'cancel',
+                },
+                {
+                    text: 'Excluir',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await contributionsService.delete(id)
+                            Toast.show({
+                                type: 'success',
+                                text1: 'Contribuição excluída!',
+                                text2: 'A contribuição foi excluída com sucesso.',
+                            })
+                            // Reset para Main (TabNavigator) com tab Contribuições selecionada
+                            // Isso limpa o histórico e mantém o navbar visível
+                            navigation.dispatch(
+                                CommonActions.reset({
+                                    index: 0,
+                                    routes: [
+                                        {
+                                            name: 'Main',
+                                            state: {
+                                                routes: [{ name: 'Contribuições' }],
+                                            },
+                                        },
+                                    ],
+                                })
+                            )
+                        } catch (error: any) {
+                            Toast.show({
+                                type: 'error',
+                                text1: 'Erro ao excluir contribuição',
+                                text2: error?.response?.data?.message || 'Houve um erro ao excluir a contribuição.',
+                            })
+                            console.error('Erro ao excluir contribuição:', error)
+                        }
+                    },
+                },
+            ]
+        )
     }
 
     const handleSave = async () => {
@@ -469,6 +521,17 @@ export default function EditContributionScreen() {
                 </View>
             </KeyboardAvoidingView>
         </Modal>
+            
+            <View style={styles.deleteContainer}>
+                <TouchableOpacity
+                    style={styles.deleteButton}
+                    onPress={handleDelete}
+                    activeOpacity={0.8}
+                >
+                    <FontAwesome5 name="trash" size={16} color="#fff" />
+                    <Text style={styles.deleteButtonText}>Excluir Contribuição</Text>
+                </TouchableOpacity>
+            </View>
         </FormScreenLayout>
     )
 }
@@ -687,6 +750,26 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
         lineHeight: 24,
+    },
+    deleteContainer: {
+        marginTop: 24,
+        paddingHorizontal: 16,
+        marginBottom: 24,
+    },
+    deleteButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#DC2626',
+        paddingVertical: 14,
+        paddingHorizontal: 20,
+        borderRadius: 12,
+        gap: 8,
+    },
+    deleteButtonText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '600',
     },
 })
 

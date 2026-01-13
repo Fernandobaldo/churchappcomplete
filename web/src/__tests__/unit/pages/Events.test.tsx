@@ -7,9 +7,14 @@ import { fixtures } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/helpers'
 import { mockApiResponse, mockApiError } from '@/test/mockApi'
 
-vi.mock('@/api/api')
-const mockToastError = vi.fn()
-const mockToastSuccess = vi.fn()
+vi.mock('@/api/api', async () => {
+  const { apiMock } = await import('@/test/apiMock')
+  return { default: apiMock }
+})
+const { mockToastSuccess, mockToastError } = vi.hoisted(() => ({
+  mockToastSuccess: vi.fn(),
+  mockToastError: vi.fn(),
+}))
 vi.mock('react-hot-toast', () => ({
   default: {
     success: mockToastSuccess,
@@ -210,35 +215,3 @@ describe('Events - Unit Tests', () => {
   })
 })
 
-
-    const eventCard = screen.getByText('Culto de Domingo').closest('.card')
-    if (eventCard) {
-      await user.click(eventCard)
-    }
-
-    // Assert
-    expect(mockNavigate).toHaveBeenCalledWith('/app/events/event-1')
-  })
-
-  // ============================================================================
-  // TESTE 6: ERROR STATE - Exibe erro quando falha ao carregar eventos
-  // ============================================================================
-  it('deve exibir erro quando falha ao carregar eventos', async () => {
-    // Arrange
-    const mockUser = fixtures.user()
-    mockApiError('get', '/events', { message: 'Erro ao carregar' })
-
-    // Act
-    renderWithProviders(<Events />, {
-      authState: {
-        user: mockUser,
-        token: 'token',
-      },
-    })
-
-    // Assert
-    await waitFor(() => {
-      expect(mockToastError).toHaveBeenCalledWith('Erro ao carregar eventos')
-    })
-  })
-})

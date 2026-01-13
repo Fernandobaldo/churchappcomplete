@@ -17,6 +17,7 @@ export default function AddDevotionalScreen() {
         content: '',
         date: new Date(),
     })
+    const [saving, setSaving] = useState(false)
 
     const booksOptions = useMemo(() => 
         Object.keys(bookTranslation).map((book) => ({
@@ -71,6 +72,11 @@ export default function AddDevotionalScreen() {
     ], [booksOptions])
 
     const handleSave = async () => {
+        // Proteção contra double-click
+        if (saving) {
+            return
+        }
+
         if (!form.title || !form.selectedBook || !form.chapter || !form.verse) {
             Toast.show({
                 type: 'error',
@@ -79,6 +85,8 @@ export default function AddDevotionalScreen() {
             })
             return
         }
+
+        setSaving(true)
 
         const passage = `${form.selectedBook} ${form.chapter}:${form.verse}`
 
@@ -95,7 +103,10 @@ export default function AddDevotionalScreen() {
                 text2: 'Seu devocional foi adicionado com sucesso. 🙏',
             })
 
-            navigation.goBack()
+            // Verifica se é possível voltar antes de navegar
+            if (navigation.canGoBack()) {
+                navigation.goBack()
+            }
         } catch (error) {
             console.error('Erro ao salvar devocional:', error)
             Toast.show({
@@ -103,6 +114,8 @@ export default function AddDevotionalScreen() {
                 text1: 'Erro',
                 text2: 'Ocorreu um erro ao salvar o devocional.',
             })
+        } finally {
+            setSaving(false)
         }
     }
 
@@ -118,6 +131,7 @@ export default function AddDevotionalScreen() {
                 fields={fields}
                 onSubmit={handleSave}
                 submitLabel="Salvar"
+                loading={saving}
             />
         </FormScreenLayout>
     )

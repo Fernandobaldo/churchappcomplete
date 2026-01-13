@@ -210,8 +210,48 @@ describe('LoginScreen - Unit Tests', () => {
   
   // Teste 5: Primary interaction
   it('deve chamar handleSubmit ao clicar em entrar', () => { ... })
+  
+  // Teste 6: Delete operation (quando aplicável - telas Edit*/Details com botão delete)
+  it('deve excluir recurso com sucesso', async () => {
+    // Arrange
+    window.confirm = vi.fn(() => true)
+    mockApiResponse('delete', '/resource/1', {})
+    
+    // Act
+    const deleteButton = screen.getByText('Excluir')
+    await user.click(deleteButton)
+    
+    // Assert
+    await waitFor(() => {
+      expect(mockToastSuccess).toHaveBeenCalledWith('Recurso excluído com sucesso!')
+      expect(mockNavigate).toHaveBeenCalled()
+    })
+  })
+})
+
+describe('EditEvent - Unit Tests', () => {
+  // Teste 1-5: (testes padrão acima)
+  
+  // Teste 6: Delete operation (quando aplicável)
+  it('deve excluir evento com sucesso', async () => {
+    // Arrange
+    window.confirm = vi.fn(() => true)
+    mockApiResponse('delete', '/events/1', {})
+    
+    // Act
+    const deleteButton = screen.getByText('Excluir Evento')
+    await user.click(deleteButton)
+    
+    // Assert
+    await waitFor(() => {
+      expect(mockToastSuccess).toHaveBeenCalledWith('Evento excluído com sucesso!')
+      expect(mockNavigate).toHaveBeenCalledWith('/app/events')
+    })
+  })
 })
 ```
+
+**Nota:** O teste de delete (teste 6) é obrigatório apenas para telas Edit*/Details que possuem botão delete. Telas que não possuem delete (ex: Login, Register) não precisam deste teste.
 
 ---
 
@@ -1273,7 +1313,7 @@ Antes de considerar um teste completo, verificar:
 - [ ] Imports corretos (factories/helpers, não criação direta)
 
 **Conteúdo:**
-- [ ] Número mínimo de testes implementado (6 unit backend, 5 unit UI, 7 integration backend, 6 integration UI)
+- [ ] Número mínimo de testes implementado (6 unit backend, 5 unit UI (6 se tela Edit*/Details com delete), 7 integration backend, 6 integration UI)
 - [ ] Padrão AAA (unit) ou Given/When/Then (integration/E2E) seguido
 - [ ] Usa factories/builders (não cria entidades diretamente)
 - [ ] Usa helpers (não duplica código)

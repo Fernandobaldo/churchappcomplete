@@ -21,6 +21,7 @@ import FormScreenLayout from '../components/layouts/FormScreenLayout'
 import TextInputField from '../components/TextInputField'
 import { colors } from '../theme/colors'
 import GlassCard from '../components/GlassCard'
+import api from '../api/api'
 
 interface Position {
   id: string
@@ -144,7 +145,7 @@ export default function EditProfileScreen() {
       if (!user?.memberId || isInitialLoad) return
 
       try {
-        const profileResponse = await api.get('/members/me')
+        const { data: profile } = await api.get('/members/me')
 
         // Preparar dados do formulário
         const birthDateDisplayValue = profile.birthDate ? formatDateToDisplay(profile.birthDate) : ''

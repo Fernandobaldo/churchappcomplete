@@ -21,6 +21,7 @@ import api from '../api/api'
 import { useNavigation } from '@react-navigation/native'
 import Toast from 'react-native-toast-message'
 import DateTimePickerComponent from '../components/DateTimePicker'
+import { parse, isValid } from 'date-fns'
 
 interface PaymentMethod {
     id: string
@@ -62,6 +63,11 @@ export default function AddContributionScreen() {
     ], [])
 
     const handleSave = async () => {
+        // Proteção contra double-click
+        if (isLoading) {
+            return
+        }
+
         if (!form.title) {
             Toast.show({
                 type: 'error',
@@ -112,7 +118,10 @@ export default function AddContributionScreen() {
                 text2: 'Campanha criada com sucesso!',
             })
 
-            navigation.goBack()
+            // Verifica se é possível voltar antes de navegar
+            if (navigation.canGoBack()) {
+                navigation.goBack()
+            }
         } catch (error: any) {
             console.error('Erro ao salvar campanha:', error)
             Toast.show({
@@ -186,7 +195,16 @@ export default function AddContributionScreen() {
                     label="Data de Término"
                     value={form.endDate || undefined}
                     onChange={(value) => {
-                        const dateValue = value instanceof Date ? value : (value ? new Date(value) : null)
+                        let dateValue: Date | null = null
+                        if (value instanceof Date) {
+                            dateValue = value
+                        } else if (typeof value === 'string') {
+                            // DateTimePicker retorna string 'dd/MM/yyyy' quando mode === 'date'
+                            const parsed = parse(value, 'dd/MM/yyyy', new Date())
+                            if (isValid(parsed)) {
+                                dateValue = parsed
+                            }
+                        }
                         setForm((prev: any) => ({ ...prev, endDate: dateValue }))
                     }}
                     mode="date"
