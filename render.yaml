@@ -18,19 +18,13 @@ services:
       - key: CORS_ORIGINS
         sync: false  # Configure manualmente com a URL do frontend
       - key: PAYMENT_GATEWAY
-        value: mercadopago
-      - key: MERCADOPAGO_ENVIRONMENT
-        value: sandbox
-      - key: MERCADOPAGO_ACCESS_TOKEN
+        value: stripe
+      - key: STRIPE_SECRET_KEY
         sync: false  # Configure manualmente no Render Dashboard
-      - key: MERCADOPAGO_PUBLIC_KEY
+      - key: STRIPE_PUBLIC_KEY
         sync: false  # Configure manualmente no Render Dashboard
-      - key: MERCADOPAGO_WEBHOOK_SECRET
+      - key: STRIPE_WEBHOOK_SECRET
         sync: false  # Configure manualmente no Render Dashboard
-      - key: MERCADOPAGO_BACK_URL
-        sync: false  # Configure manualmente com a URL do frontend
-      - key: MERCADOPAGO_WEBHOOK_URL
-        sync: false  # Configure manualmente com a URL do backend
       - key: SMTP_HOST
         value: smtp.gmail.com
       - key: SMTP_PORT

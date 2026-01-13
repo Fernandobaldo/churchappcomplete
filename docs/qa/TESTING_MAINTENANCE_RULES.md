@@ -1384,3 +1384,96 @@ As seguintes regras devem ser seguidas:
 - [ ] Use the shared `apiMock` (`web/src/test/apiMock.ts`) in `vi.mock('@/api/api', ...)` so mockApiResponse applies to the same instance.
 - [ ] If a vi.mock factory needs imported values, use an async factory (dynamic import) or vi.hoisted to avoid TDZ.
 
+---
+
+## 🛡️ Regression Guardrails
+
+### Contrato Null/Undefined para Atualizações
+
+**Regra Obrigatória:** Todos os serviços que atualizam campos nullable devem seguir este contrato:
+
+- **`undefined`** = não atualizar o campo (campo ausente do `data`)
+- **`null`** = limpar o campo (persistir NULL no banco)
+- **`string`** = definir valor (persistir string no banco)
+
+**Implementação Obrigatória:**
+
+Para campos nullable em `updateMany` do Prisma, use a sintaxe `{ set: value }`:
+
+```typescript
+// ✅ CORRETO: Usa { set: value } para campos nullable
+const updateData: {
+  title: string
+  time: string
+  description?: { set: string | null }
+  location?: { set: string | null }
+} = {
+  title: newSchedule.title,
+  time: newSchedule.time,
+}
+
+// undefined = não atualizar (campo ausente)
+// null = limpar campo ({ set: null })
+// string = definir valor ({ set: 'valor' })
+if (newSchedule.description !== undefined) {
+  updateData.description = { set: newSchedule.description }
+}
+
+if (newSchedule.location !== undefined) {
+  updateData.location = { set: newSchedule.location }
+}
+```
+
+**Checklist:**
+- [ ] Campos nullable usam `{ set: value }` no `updateMany`
+- [ ] `undefined` não inclui o campo no `data`
+- [ ] `null` usa `{ set: null }` explicitamente
+- [ ] `string` usa `{ set: 'valor' }` explicitamente
+- [ ] Testes verificam que `null` persiste como NULL no banco
+- [ ] Testes verificam que `undefined` não atualiza o campo
+
+---
+
+### Centralização de Prisma Mock
+
+**Regra Obrigatória:** Todos os testes unitários que mockam o Prisma devem usar o mock centralizado.
+
+**Localização:** `backend/tests/mocks/prismaMock.ts`
+
+**Uso Obrigatório:**
+
+```typescript
+// ✅ CORRETO: Usa mock centralizado com vi.hoisted
+const { createPrismaMock } = vi.hoisted(() => {
+  const { createPrismaMock: createMock } = require('../mocks/prismaMock')
+  return { createPrismaMock: createMock }
+})
+
+const prismaMock = createPrismaMock()
+
+vi.mock('../../src/lib/prisma', () => ({
+  prisma: prismaMock,
+}))
+
+// No beforeEach, configurar mocks padrão se necessário
+beforeEach(() => {
+  vi.clearAllMocks()
+  prismaMock.onboardingProgress.findUnique.mockResolvedValue({ completed: false })
+})
+```
+
+**Benefícios:**
+- ✅ Consistência entre todos os testes
+- ✅ Facilita manutenção (adicionar modelo uma vez, todos se beneficiam)
+- ✅ Evita mocks incompletos (ex: falta `onboardingProgress`)
+- ✅ Garante que novos modelos sejam automaticamente disponíveis
+
+**Checklist:**
+- [ ] Todos os testes unitários usam `createPrismaMock()` de `tests/mocks/prismaMock.ts`
+- [ ] Nenhum mock inline do Prisma em arquivos de teste
+- [ ] Novos modelos adicionados ao `prismaMock.ts` quando necessário
+- [ ] `vi.hoisted()` usado para evitar problemas de hoisting
+- [ ] Mock padrão configurado no `beforeEach` quando necessário
+
+---
+

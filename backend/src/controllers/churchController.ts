@@ -92,7 +92,7 @@ export class ChurchController {
           const { Role } = await import('@prisma/client')
           const { ALL_PERMISSION_TYPES } = await import('../constants/permissions')
           
-          existingMember = await prisma.member.create({
+          const newMember = await prisma.member.create({
             data: {
               name: getUserFullName(dbUser),
               email: dbUser.email,
@@ -100,12 +100,21 @@ export class ChurchController {
               branchId: mainBranch.id,
               userId: dbUser.id,
             },
+            include: {
+              Branch: {
+                include: {
+                  Church: true,
+                },
+              },
+            },
           })
+
+          existingMember = newMember
 
           // Criar permissões
           await prisma.permission.createMany({
             data: ALL_PERMISSION_TYPES.map((type) => ({
-              memberId: existingMember.id,
+              memberId: newMember.id,
               type,
             })),
             skipDuplicates: true,
@@ -446,7 +455,7 @@ export class ChurchController {
             const { Role } = await import('@prisma/client')
             const { ALL_PERMISSION_TYPES } = await import('../constants/permissions')
             
-            existingMember = await prisma.member.create({
+            const newMember = await prisma.member.create({
               data: {
                 name: getUserFullName(dbUser),
                 email: dbUser.email,
@@ -454,12 +463,21 @@ export class ChurchController {
                 branchId: mainBranch.id,
                 userId: dbUser.id,
               },
+              include: {
+                Branch: {
+                  include: {
+                    Church: true,
+                  },
+                },
+              },
             })
+
+            existingMember = newMember
 
             // Criar permissões
             await prisma.permission.createMany({
               data: ALL_PERMISSION_TYPES.map((type) => ({
-                memberId: existingMember.id,
+                memberId: newMember.id,
                 type,
               })),
               skipDuplicates: true,

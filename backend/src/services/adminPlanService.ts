@@ -77,8 +77,7 @@ export class AdminPlanService {
     }
 
     // Criar plano no banco
-    // NOTA: Não criamos PreApproval Plan no Mercado Pago aqui
-    // O PreApproval Plan será criado apenas quando o cliente fizer checkout
+    // Produtos e preços serão criados no gateway quando necessário (no checkout)
     const gatewayProvider = env.PAYMENT_GATEWAY
     
     const plan = await prisma.plan.create({
@@ -90,10 +89,10 @@ export class AdminPlanService {
         maxMembers: data.maxMembers,
         billingInterval: data.billingInterval || 'month',
         gatewayProvider: gatewayProvider as any,
-        // Criar IDs fictícios para referência interna (não são usados no Mercado Pago)
+        // IDs serão gerados quando o produto/preço for criado no gateway
         gatewayProductId: `prod_${data.name.toLowerCase().replace(/\s+/g, '_')}`,
         gatewayPriceId: `price_${data.name.toLowerCase().replace(/\s+/g, '_')}_${Math.round(data.price * 100)}_${data.billingInterval || 'month'}`,
-        syncStatus: 'synced', // 'synced' porque não precisa sincronizar com gateway (será criado no checkout)
+        syncStatus: 'synced', // 'synced' porque será criado no checkout
       },
     })
 

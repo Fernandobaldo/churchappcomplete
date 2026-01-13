@@ -31,9 +31,18 @@ export const env = {
      */
     validatePaymentGateway() {
         if (this.PAYMENT_GATEWAY === 'stripe') {
-            if (!this.STRIPE_SECRET_KEY && !this.isTest) {
-                console.warn('⚠️ STRIPE_SECRET_KEY não configurado');
-                return false;
+            if (!this.isTest) {
+                if (!this.STRIPE_SECRET_KEY) {
+                    console.warn('⚠️ STRIPE_SECRET_KEY não configurado');
+                    return false;
+                }
+                if (!this.STRIPE_PUBLIC_KEY) {
+                    console.warn('⚠️ STRIPE_PUBLIC_KEY não configurado');
+                    return false;
+                }
+                if (!this.STRIPE_WEBHOOK_SECRET) {
+                    console.warn('⚠️ STRIPE_WEBHOOK_SECRET não configurado (webhooks não funcionarão)');
+                }
             }
         }
         // Outros gateways podem ser adicionados aqui quando implementados

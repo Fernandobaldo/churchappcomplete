@@ -146,7 +146,7 @@ export async function validateInviteLink(token) {
         const normalizedExpiresAt = normalizeExpirationDate(inviteLink.expiresAt);
         // Link expira apenas quando now > expiresAt (estritamente maior)
         // Isso significa que se expiresAt = hoje 23:59:59.999, ainda é válido até esse momento
-        if (now > normalizedExpiresAt) {
+        if (normalizedExpiresAt && now > normalizedExpiresAt) {
             return {
                 valid: false,
                 error: 'Este link de convite expirou',

@@ -151,10 +151,9 @@ export async function createCheckoutHandler(request: FastifyRequest, reply: Fast
     }
 
     // Criar assinatura no gateway
-    // Passar dados do plano diretamente (PreApproval Plan será criado aqui)
     const gatewaySubscription = await gateway.createSubscription({
       customerId: customer.id,
-      customerEmail: user.email, // Email do cliente (obrigatório para Mercado Pago)
+      customerEmail: user.email,
       planId: plan.id,
       planData: {
         amount: plan.price, // Valor em reais

@@ -154,17 +154,19 @@ export class ServiceScheduleService {
             return 0;
         }
         // Prepara os dados de atualização
+        // Contrato: undefined = não atualizar, null = limpar campo, string = definir valor
+        // Para updateMany, Prisma aceita null diretamente (não precisa de { set: null })
         const updateData = {
             title: newSchedule.title,
             time: newSchedule.time,
         };
         // Atualiza description apenas se foi fornecido no novo schedule
-        // Permite null explicitamente (null !== undefined)
+        // undefined = não atualizar, null = limpar campo, string = definir valor
         if (newSchedule.description !== undefined) {
             updateData.description = newSchedule.description;
         }
         // Atualiza location se foi fornecido no novo schedule
-        // Permite null explicitamente (null !== undefined)
+        // undefined = não atualizar, null = limpar campo, string = definir valor
         if (newSchedule.location !== undefined) {
             updateData.location = newSchedule.location;
         }
