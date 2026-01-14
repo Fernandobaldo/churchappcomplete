@@ -21,6 +21,7 @@ import {
   getAllMembersHandler,
   getMemberByIdHandler,
   getAllPlansHandler,
+  getPlanFeaturesHandler,
   getPlanByIdHandler,
   createPlanHandler,
   updatePlanHandler,
@@ -168,6 +169,11 @@ export async function adminRoutes(app: FastifyInstance) {
   app.get('/admin/plans', {
     preHandler: [adminAuthenticate],
     handler: getAllPlansHandler,
+  })
+
+  app.get('/admin/plans/features', {
+    preHandler: [adminAuthenticate, requireAdminRole(['SUPERADMIN'])],
+    handler: getPlanFeaturesHandler,
   })
 
   app.get('/admin/plans/:id', {

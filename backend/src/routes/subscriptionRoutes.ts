@@ -6,6 +6,7 @@ changePlanHandler
 } from '../controllers/subscriptionController';
 import { authenticate } from '../middlewares/authenticate';
 import { authorize } from '../middlewares/authorize';
+import { getEntitlementsHandler } from '../controllers/entitlementsController';
 
 export async function subscriptionRoutes(app: FastifyInstance) {
   // Rota para obter assinatura do usuário autenticado
@@ -35,5 +36,12 @@ export async function subscriptionRoutes(app: FastifyInstance) {
     '/',
     { preHandler: [authenticate, authorize(['SAAS_ADMIN'])] },
     listAllSubscriptionsHandler
+  );
+
+  // Rota para obter entitlements (features e limites do plano atual)
+  app.get(
+    '/entitlements',
+    { preHandler: [authenticate] },
+    getEntitlementsHandler
   );
 }

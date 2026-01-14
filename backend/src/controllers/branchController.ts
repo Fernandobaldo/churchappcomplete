@@ -7,6 +7,8 @@ import {
   deleteBranchById,
 } from '../services/branchService';
 import { AuditLogger } from '../utils/auditHelper';
+import { getMemberFromUserId } from '../utils/authorization';
+import { prisma } from '../lib/prisma';
 
 export async function createBranchHandler(request: FastifyRequest, reply: FastifyReply) {
   try {
@@ -100,22 +102,83 @@ export async function createBranchHandler(request: FastifyRequest, reply: Fastif
 }
 
 export async function listBranchesHandler(request: FastifyRequest, reply: FastifyReply) {
-  const branches = await getAllBranches();
-  return reply.send(branches);
+  try {
+    const user = request.user;
+    
+    if (!user) {
+      return reply.status(401).send({ error: 'Autenticação necessária' });
+    }
+
+    // Obter churchId do usuário para filtrar filiais
+    let userChurchId: string | null = null;
+
+    if (user.memberId) {
+      const member = await getMemberFromUserId(user.userId || user.id || '');
+      if (member?.Branch?.Church) {
+        userChurchId = member.Branch.Church.id;
+      }
+    } else if (user.userId || user.id) {
+      // Se não tem member, buscar igreja criada pelo usuário
+      const church = await prisma.church.findFirst({
+        where: { createdByUserId: user.userId || user.id },
+        select: { id: true },
+      });
+      if (church) {
+        userChurchId = church.id;
+      }
+    }
+
+    if (!userChurchId) {
+      return reply.status(400).send({ error: 'Usuário não está associado a uma igreja' });
+    }
+
+    // Filtrar filiais por churchId
+    const branches = await prisma.branch.findMany({
+      where: { churchId: userChurchId },
+    });
+
+    return reply.send(branches);
+  } catch (error: any) {
+    console.error('❌ Erro ao listar filiais:', error);
+    return reply.status(500).send({ error: 'Erro ao listar filiais', details: error.message });
+  }
 }
 
 export async function deleteBranchHandler(request: FastifyRequest, reply: FastifyReply) {
-  const { id } = request.params as { id: string };
+  try {
+    const { id } = request.params as { id: string };
+    const user = request.user;
 
-  const branch = await getBranchById(id);
-  if (!branch) {
-    return reply.status(404).send({ error: 'Filial não encontrada.' });
+    if (!user) {
+      return reply.status(401).send({ error: 'Autenticação necessária' });
+    }
+
+    const branch = await getBranchById(id);
+    if (!branch) {
+      return reply.status(404).send({ error: 'Filial não encontrada.' });
+    }
+
+    if (branch.isMainBranch) {
+      return reply.status(400).send({ error: 'Não é permitido deletar a sede da igreja.' });
+    }
+
+    // Validação de tenant: verificar se o usuário tem acesso à igreja desta filial
+    if (user.memberId) {
+      const member = await getMemberFromUserId(user.userId || user.id || '');
+      if (!member || !member.Branch || !member.Branch.Church) {
+        return reply.status(403).send({ error: 'Você não tem acesso a esta filial.' });
+      }
+      if (branch.churchId !== member.Branch.Church.id) {
+        return reply.status(403).send({ error: 'Você não tem acesso a esta filial.' });
+      }
+    } else {
+      return reply.status(403).send({ error: 'Você não tem acesso a esta filial.' });
+    }
+
+    await deleteBranchById(id);
+    return reply.status(200).send({ message: 'Filial deletada com sucesso.' });
+  } catch (error: any) {
+    console.error('❌ Erro ao deletar filial:', error);
+    return reply.status(500).send({ error: 'Erro ao deletar filial', details: error.message });
   }
-
-  if (branch.isMainBranch) {
-    return reply.status(400).send({ error: 'Não é permitido deletar a sede da igreja.' });
-  }
-
-  await deleteBranchById(id);
-  return reply.status(200).send({ message: 'Filial deletada com sucesso.' });
 }

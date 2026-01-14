@@ -170,6 +170,10 @@ export const plansApi = {
     const response = await adminApi.get('/admin/plans')
     return response.data
   },
+  getFeatures: async () => {
+    const response = await adminApi.get('/admin/plans/features')
+    return response.data
+  },
   getById: async (id: string) => {
     const response = await adminApi.get(`/admin/plans/${id}`)
     return response.data

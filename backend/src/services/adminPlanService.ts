@@ -4,6 +4,7 @@ import { PaymentGatewayService } from './payment/PaymentGatewayService'
 import { logAudit } from '../utils/auditHelper'
 import { FastifyRequest } from 'fastify'
 import { env } from '../env'
+import { validateAndNormalizeFeatures, PlanFeatureId } from '../constants/planFeatures'
 
 interface PlanData {
   name: string
@@ -76,6 +77,17 @@ export class AdminPlanService {
       throw new Error(`Já existe um plano com o nome "${data.name}". Escolha um nome diferente.`)
     }
 
+    // Validate and normalize features BEFORE creating plan
+    // This ensures only valid, canonical feature IDs are stored
+    const { valid: validatedFeatures, invalid } = validateAndNormalizeFeatures(data.features)
+    
+    if (invalid.length > 0) {
+      throw new Error(
+        `Invalid feature IDs: ${invalid.join(', ')}. ` +
+        `All features must be from the canonical feature catalog.`
+      )
+    }
+
     // Criar plano no banco
     // Produtos e preços serão criados no gateway quando necessário (no checkout)
     const gatewayProvider = env.PAYMENT_GATEWAY
@@ -84,7 +96,7 @@ export class AdminPlanService {
       data: {
         name: data.name,
         price: data.price,
-        features: data.features,
+        features: validatedFeatures, // Use normalized, validated features
         maxBranches: data.maxBranches,
         maxMembers: data.maxMembers,
         billingInterval: data.billingInterval || 'month',
@@ -139,7 +151,26 @@ export class AdminPlanService {
     const updateData: any = {}
     if (data.name !== undefined) updateData.name = data.name
     if (data.price !== undefined) updateData.price = data.price
-    if (data.features !== undefined) updateData.features = data.features
+    
+    // Validate and normalize features if provided
+    if (data.features !== undefined) {
+      // Allow empty array (can be used to disable all features temporarily)
+      if (data.features.length > 0) {
+        const { valid: validatedFeatures, invalid } = validateAndNormalizeFeatures(data.features)
+        
+        if (invalid.length > 0) {
+          throw new Error(
+            `Invalid feature IDs: ${invalid.join(', ')}. ` +
+            `All features must be from the canonical feature catalog.`
+          )
+        }
+        
+        updateData.features = validatedFeatures
+      } else {
+        updateData.features = []
+      }
+    }
+    
     if (data.maxBranches !== undefined) updateData.maxBranches = data.maxBranches
     if (data.maxMembers !== undefined) updateData.maxMembers = data.maxMembers
     if (data.isActive !== undefined) updateData.isActive = data.isActive
@@ -269,6 +300,21 @@ export class AdminPlanService {
   }
 
   async deactivatePlan(id: string, adminUserId: string, request?: FastifyRequest) {
+    // Check if plan has active subscriptions
+    const activeSubscriptionsCount = await prisma.subscription.count({
+      where: {
+        planId: id,
+        status: SubscriptionStatus.active,
+      },
+    })
+
+    if (activeSubscriptionsCount > 0) {
+      throw new Error(
+        `Não é possível desativar este plano. Existem ${activeSubscriptionsCount} assinatura(s) ativa(s). ` +
+        `Desative as assinaturas antes de desativar o plano.`
+      )
+    }
+
     const plan = await prisma.plan.update({
       where: { id },
       data: { isActive: false },

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { plansApi } from '../../api/adminApi'
 import { FeatureToggle } from '../../components/FeatureToggle'
@@ -30,9 +30,10 @@ export function PlanForm() {
   const loadData = async () => {
     try {
       setLoading(true)
-      const response = await plansApi.getAll()
-      // Backend retorna { plans, availableFeatures }
-      const features = response.availableFeatures || []
+      
+      // Load canonical feature catalog from dedicated endpoint
+      const featuresResponse = await plansApi.getFeatures()
+      const features = featuresResponse.features || []
       setAvailableFeatures(features)
 
       if (isEditing && id) {
@@ -65,6 +66,17 @@ export function PlanForm() {
     if (checked) {
       setSelectedFeatures([...selectedFeatures, featureId])
     } else {
+      // If editing and removing a feature, show warning
+      if (isEditing && selectedFeatures.includes(featureId)) {
+        const feature = availableFeatures.find(f => f.id === featureId)
+        const confirmed = window.confirm(
+          `Tem certeza que deseja remover a feature "${feature?.label || featureId}"?\n\n` +
+          `Usuários com assinaturas ativas neste plano perderão acesso a esta funcionalidade imediatamente.`
+        )
+        if (!confirmed) {
+          return // Cancel removal
+        }
+      }
       setSelectedFeatures(selectedFeatures.filter((id) => id !== featureId))
     }
   }
@@ -108,7 +120,20 @@ export function PlanForm() {
       }
       navigate('/admin/plans-subscriptions')
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Erro ao salvar plano')
+      // Handle feature validation errors with friendly messages
+      if (error.response?.status === 400 && error.response?.data?.error) {
+        const errorMessage = error.response.data.error
+        if (errorMessage.includes('Features inválidas') || errorMessage.includes('Invalid feature')) {
+          toast.error(
+            'Uma ou mais features selecionadas são inválidas. Por favor, recarregue a página e tente novamente.',
+            { duration: 5000 }
+          )
+        } else {
+          toast.error(errorMessage)
+        }
+      } else {
+        toast.error(error.response?.data?.error || 'Erro ao salvar plano')
+      }
       console.error(error)
     } finally {
       setSaving(false)
@@ -240,20 +265,96 @@ export function PlanForm() {
             </div>
           )}
 
+          {/* Plan Preview Section */}
+          <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">Preview do Plano</h3>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Nome:</span>
+                <span className="font-medium text-gray-900">{formData.name || '(sem nome)'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Preço:</span>
+                <span className="font-medium text-gray-900">
+                  R$ {formData.price.toFixed(2).replace('.', ',')}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Features selecionadas:</span>
+                <span className="font-medium text-gray-900">{selectedFeatures.length}</span>
+              </div>
+              {selectedFeatures.length > 0 && (
+                <div className="mt-2 pt-2 border-t border-gray-300">
+                  <div className="text-gray-600 mb-1">Features:</div>
+                  <div className="flex flex-wrap gap-1">
+                    {selectedFeatures.map((featureId) => {
+                      const feature = availableFeatures.find(f => f.id === featureId)
+                      return (
+                        <span
+                          key={featureId}
+                          className="px-2 py-0.5 text-xs bg-blue-100 text-blue-800 rounded"
+                        >
+                          {feature?.label || featureId}
+                        </span>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-3">
               Features Incluídas *
             </label>
-            <div className="space-y-2">
-              {availableFeatures.map((feature) => (
-                <FeatureToggle
-                  key={feature.id}
-                  feature={feature}
-                  checked={selectedFeatures.includes(feature.id)}
-                  onChange={(checked) => handleFeatureToggle(feature.id, checked)}
-                />
-              ))}
-            </div>
+            
+            {/* Group features by category */}
+            {(() => {
+              const basicFeatures = availableFeatures.filter(f => f.category === 'basic' || !f.category)
+              const premiumFeatures = availableFeatures.filter(f => f.category === 'premium')
+              
+              return (
+                <div className="space-y-6">
+                  {basicFeatures.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-700 mb-3">
+                        Features Básicas
+                      </h4>
+                      <div className="space-y-2">
+                        {basicFeatures.map((feature) => (
+                          <FeatureToggle
+                            key={feature.id}
+                            feature={feature}
+                            checked={selectedFeatures.includes(feature.id)}
+                            onChange={(checked) => handleFeatureToggle(feature.id, checked)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {premiumFeatures.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-700 mb-3">
+                        Features Premium
+                      </h4>
+                      <div className="space-y-2">
+                        {premiumFeatures.map((feature) => (
+                          <FeatureToggle
+                            key={feature.id}
+                            feature={feature}
+                            checked={selectedFeatures.includes(feature.id)}
+                            onChange={(checked) => handleFeatureToggle(feature.id, checked)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
+            
             {availableFeatures.length === 0 && (
               <p className="text-sm text-gray-500">Carregando features...</p>
             )}

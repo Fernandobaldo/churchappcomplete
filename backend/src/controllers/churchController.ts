@@ -309,10 +309,34 @@ export class ChurchController {
   async getById(request: FastifyRequest, reply: FastifyReply) {
     try {
       const { id } = z.object({ id: z.string().cuid() }).parse(request.params)
+      const user = request.user
+
+      if (!user) {
+        return reply.code(401).send({ message: 'Usuário não autenticado.' })
+      }
+
       const church = await this.service.getChurchById(id)
 
       if (!church) {
         return reply.code(404).send({ message: 'Igreja não encontrada.' })
+      }
+
+      // Validação de tenant: verificar se o usuário tem acesso a esta igreja
+      if (user.memberId) {
+        const member = await getMemberFromUserId(user.userId || user.id)
+        if (!member || !member.Branch || !member.Branch.Church) {
+          return reply.code(403).send({ message: 'Você não tem acesso a esta igreja.' })
+        }
+        if (church.id !== member.Branch.Church.id) {
+          return reply.code(403).send({ message: 'Você não tem acesso a esta igreja.' })
+        }
+      } else if (user.userId || user.id) {
+        // Se não tem member, verificar se é o criador da igreja
+        if (church.createdByUserId !== (user.userId || user.id)) {
+          return reply.code(403).send({ message: 'Você não tem acesso a esta igreja.' })
+        }
+      } else {
+        return reply.code(403).send({ message: 'Você não tem acesso a esta igreja.' })
       }
 
       return reply.send(church)

@@ -4,6 +4,7 @@ import { prisma } from '../../lib/prisma'
 import { AuditLogger } from '../../utils/auditHelper'
 import { Role } from '@prisma/client'
 import { RESTRICTED_PERMISSIONS } from '../../constants/permissions'
+import { getMemberFromUserId } from '../../utils/authorization'
 
 // 🔍 Listar todas as permissões
 export async function getAllPermissionsController(request: FastifyRequest, reply: FastifyReply) {
@@ -53,13 +54,53 @@ export async function assignPermissionsController(request: FastifyRequest, reply
   // Validação: Verificar se membro com role MEMBER está tentando receber permissões restritas
   const member = await prisma.member.findUnique({
     where: { id },
-    select: { id: true, role: true },
+    select: { 
+      id: true, 
+      role: true,
+      branchId: true,
+      Branch: {
+        select: {
+          churchId: true,
+        },
+      },
+    },
   })
 
   if (!member) {
     return reply.code(404).send({
       message: 'Membro não encontrado',
     })
+  }
+
+  // Validação de tenant: verificar se o membro alvo pertence ao mesmo tenant do usuário
+  const user = request.user
+  if (!user || !user.memberId) {
+    return reply.code(401).send({
+      message: 'Autenticação necessária',
+    })
+  }
+
+  const currentMember = await getMemberFromUserId(user.userId || user.id || '')
+  if (!currentMember || !currentMember.Branch || !currentMember.Branch.Church) {
+    return reply.code(403).send({
+      message: 'Você não tem acesso a este membro',
+    })
+  }
+
+  // ADMINGERAL pode atribuir permissões a qualquer membro da igreja
+  if (currentMember.role === 'ADMINGERAL') {
+    if (member.Branch?.churchId !== currentMember.Branch.Church.id) {
+      return reply.code(403).send({
+        message: 'Você não tem acesso a este membro',
+      })
+    }
+  } else {
+    // Outros roles só podem atribuir permissões a membros da mesma filial
+    if (member.branchId !== currentMember.branchId) {
+      return reply.code(403).send({
+        message: 'Você só pode atribuir permissões a membros da sua filial',
+      })
+    }
   }
 
   // Permissões que requerem pelo menos role COORDINATOR

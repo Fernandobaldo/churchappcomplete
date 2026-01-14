@@ -1,4 +1,5 @@
 import { FastifyRequest, FastifyReply } from 'fastify'
+import { z } from 'zod'
 import { AdminDashboardService } from '../services/adminDashboardService'
 import { AdminUserService } from '../services/adminUserService'
 import { AdminChurchService } from '../services/adminChurchService'
@@ -7,10 +8,20 @@ import { AdminPlanService } from '../services/adminPlanService'
 import { AdminSubscriptionService } from '../services/adminSubscriptionService'
 import { AdminAuditService } from '../services/adminAuditService'
 import { AdminConfigService } from '../services/adminConfigService'
-import { z } from 'zod'
 import { AdminRole } from '@prisma/client'
 
-// Instâncias dos serviços
+// Helper to get admin user ID from request
+function getAdminUserId(req: FastifyRequest): string {
+  const adminUser = (req as any).adminUser
+  return adminUser?.id || adminUser?.adminUserId || 'unknown'
+}
+
+function getAdminRole(req: FastifyRequest): AdminRole {
+  const adminUser = (req as any).adminUser
+  return adminUser?.adminRole || AdminRole.SUPPORT
+}
+
+// Initialize services
 const dashboardService = new AdminDashboardService()
 const userService = new AdminUserService()
 const churchService = new AdminChurchService()
@@ -20,28 +31,14 @@ const subscriptionService = new AdminSubscriptionService()
 const auditService = new AdminAuditService()
 const configService = new AdminConfigService()
 
-// Helper para obter adminUserId do request
-function getAdminUserId(request: FastifyRequest): string {
-  return request.adminUser?.adminUserId || request.adminUser?.id || ''
-}
-
 // ==================== DASHBOARD ====================
 
-export async function getDashboardStatsHandler(
-  req: FastifyRequest,
-  reply: FastifyReply
-) {
+export async function getDashboardStatsHandler(req: FastifyRequest, reply: FastifyReply) {
   try {
     const stats = await dashboardService.getDashboardStats()
     return reply.send(stats)
   } catch (error: any) {
-    console.error('❌ Erro ao buscar estatísticas do dashboard:', error)
-    console.error('Stack:', error.stack)
-    return reply.status(500).send({ 
-      error: 'Erro ao buscar estatísticas do dashboard',
-      message: error.message,
-      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
-    })
+    return reply.status(500).send({ error: error.message })
   }
 }
 
@@ -49,16 +46,25 @@ export async function getDashboardStatsHandler(
 
 export async function getAllUsersHandler(req: FastifyRequest, reply: FastifyReply) {
   try {
-    const query = req.query as any
-    const page = Number(query.page) || 1
-    const limit = Number(query.limit) || 50
-    const status = query.status as 'active' | 'blocked' | undefined
-    const planId = query.planId as string | undefined
-    const search = query.search as string | undefined
-
+    const querySchema = z.object({
+      page: z.coerce.number().int().positive().optional(),
+      limit: z.coerce.number().int().positive().max(100).optional(),
+      status: z.enum(['active', 'blocked']).optional(),
+      planId: z.string().optional(),
+      search: z.string().optional(),
+    })
+    const query = querySchema.parse(req.query)
+    
     const result = await userService.getAllUsers(
-      { status, planId, search },
-      { page, limit }
+      {
+        status: query.status,
+        planId: query.planId,
+        search: query.search,
+      },
+      {
+        page: query.page,
+        limit: query.limit,
+      }
     )
     return reply.send(result)
   } catch (error: any) {
@@ -101,55 +107,61 @@ export async function unblockUserHandler(req: FastifyRequest, reply: FastifyRepl
   }
 }
 
-export async function sendPasswordResetHandler(
-  req: FastifyRequest,
-  reply: FastifyReply
-) {
+export async function sendPasswordResetHandler(req: FastifyRequest, reply: FastifyReply) {
   try {
     const { id } = req.params as { id: string }
     const adminUserId = getAdminUserId(req)
     const result = await userService.sendPasswordReset(id, adminUserId)
     return reply.send(result)
   } catch (error: any) {
+    if (error.message?.includes('não encontrado')) {
+      return reply.status(404).send({ error: error.message })
+    }
     return reply.status(500).send({ error: error.message })
   }
 }
 
-export async function impersonateUserHandler(
-  req: FastifyRequest,
-  reply: FastifyReply
-) {
+export async function impersonateUserHandler(req: FastifyRequest, reply: FastifyReply) {
   try {
     const { id } = req.params as { id: string }
     const adminUserId = getAdminUserId(req)
-    const adminRole = req.adminUser?.adminRole as AdminRole
-    if (!adminRole) {
-      return reply.status(401).send({ error: 'Não autenticado' })
-    }
+    const adminRole = getAdminRole(req)
     const result = await userService.impersonateUser(id, adminUserId, adminRole)
     return reply.send(result)
   } catch (error: any) {
+    if (error.message?.includes('não encontrado')) {
+      return reply.status(404).send({ error: error.message })
+    }
+    if (error.message?.includes('permissão')) {
+      return reply.status(403).send({ error: error.message })
+    }
     return reply.status(500).send({ error: error.message })
   }
 }
 
 // ==================== CHURCHES ====================
 
-export async function getAllChurchesHandler(
-  req: FastifyRequest,
-  reply: FastifyReply
-) {
+export async function getAllChurchesHandler(req: FastifyRequest, reply: FastifyReply) {
   try {
-    const query = req.query as any
-    const page = Number(query.page) || 1
-    const limit = Number(query.limit) || 50
-    const name = query.name as string | undefined
-    const planId = query.planId as string | undefined
-    const status = query.status as 'active' | 'suspended' | undefined
-
+    const querySchema = z.object({
+      page: z.coerce.number().int().positive().optional(),
+      limit: z.coerce.number().int().positive().max(100).optional(),
+      name: z.string().optional(),
+      planId: z.string().optional(),
+      status: z.enum(['active', 'suspended']).optional(),
+    })
+    const query = querySchema.parse(req.query)
+    
     const result = await churchService.getAllChurches(
-      { name, planId, status },
-      { page, limit }
+      {
+        name: query.name,
+        planId: query.planId,
+        status: query.status,
+      },
+      {
+        page: query.page,
+        limit: query.limit,
+      }
     )
     return reply.send(result)
   } catch (error: any) {
@@ -157,10 +169,7 @@ export async function getAllChurchesHandler(
   }
 }
 
-export async function getChurchByIdHandler(
-  req: FastifyRequest,
-  reply: FastifyReply
-) {
+export async function getChurchByIdHandler(req: FastifyRequest, reply: FastifyReply) {
   try {
     const { id } = req.params as { id: string }
     const church = await churchService.getChurchById(id)
@@ -173,67 +182,64 @@ export async function getChurchByIdHandler(
   }
 }
 
-export async function getChurchBranchesHandler(
-  req: FastifyRequest,
-  reply: FastifyReply
-) {
+export async function getChurchBranchesHandler(req: FastifyRequest, reply: FastifyReply) {
   try {
     const { id } = req.params as { id: string }
     const branches = await churchService.getChurchBranches(id)
-    return reply.send(branches)
+    return reply.send({ branches })
   } catch (error: any) {
     return reply.status(500).send({ error: error.message })
   }
 }
 
-export async function getChurchMembersHandler(
-  req: FastifyRequest,
-  reply: FastifyReply
-) {
+export async function getChurchMembersHandler(req: FastifyRequest, reply: FastifyReply) {
   try {
     const { id } = req.params as { id: string }
-    const query = req.query as any
-    const page = Number(query.page) || 1
-    const limit = Number(query.limit) || 50
-    const result = await churchService.getChurchMembers(id, { page, limit })
+    const querySchema = z.object({
+      page: z.coerce.number().int().positive().optional(),
+      limit: z.coerce.number().int().positive().max(100).optional(),
+    })
+    const query = querySchema.parse(req.query)
+    
+    const result = await churchService.getChurchMembers(id, {
+      page: query.page,
+      limit: query.limit,
+    })
     return reply.send(result)
   } catch (error: any) {
     return reply.status(500).send({ error: error.message })
   }
 }
 
-export async function suspendChurchHandler(
-  req: FastifyRequest,
-  reply: FastifyReply
-) {
+export async function suspendChurchHandler(req: FastifyRequest, reply: FastifyReply) {
   try {
     const { id } = req.params as { id: string }
     const adminUserId = getAdminUserId(req)
     await churchService.suspendChurch(id, adminUserId)
     return reply.send({ message: 'Igreja suspensa com sucesso' })
   } catch (error: any) {
+    if (error.message?.includes('não encontrada')) {
+      return reply.status(404).send({ error: error.message })
+    }
     return reply.status(500).send({ error: error.message })
   }
 }
 
-export async function reactivateChurchHandler(
-  req: FastifyRequest,
-  reply: FastifyReply
-) {
+export async function reactivateChurchHandler(req: FastifyRequest, reply: FastifyReply) {
   try {
     const { id } = req.params as { id: string }
     const adminUserId = getAdminUserId(req)
     await churchService.reactivateChurch(id, adminUserId)
     return reply.send({ message: 'Igreja reativada com sucesso' })
   } catch (error: any) {
+    if (error.message?.includes('não encontrada')) {
+      return reply.status(404).send({ error: error.message })
+    }
     return reply.status(500).send({ error: error.message })
   }
 }
 
-export async function changeChurchPlanHandler(
-  req: FastifyRequest,
-  reply: FastifyReply
-) {
+export async function changeChurchPlanHandler(req: FastifyRequest, reply: FastifyReply) {
   try {
     const { id } = req.params as { id: string }
     const bodySchema = z.object({
@@ -242,27 +248,52 @@ export async function changeChurchPlanHandler(
     const { planId } = bodySchema.parse(req.body)
     const adminUserId = getAdminUserId(req)
     await churchService.changeChurchPlan(id, planId, adminUserId)
-    return reply.send({ message: 'Plano alterado com sucesso' })
+    return reply.send({ message: 'Plano da igreja alterado com sucesso' })
   } catch (error: any) {
+    if (error.message?.includes('não encontrada')) {
+      return reply.status(404).send({ error: error.message })
+    }
     return reply.status(500).send({ error: error.message })
   }
 }
 
-export async function impersonateChurchOwnerHandler(
-  req: FastifyRequest,
-  reply: FastifyReply
-) {
+export async function impersonateChurchOwnerHandler(req: FastifyRequest, reply: FastifyReply) {
   try {
     const { id } = req.params as { id: string }
     const adminUserId = getAdminUserId(req)
-    const adminRole = req.adminUser?.adminRole as AdminRole
-    if (!adminRole) {
-      return reply.status(401).send({ error: 'Não autenticado' })
+    const adminRole = getAdminRole(req)
+    const result = await churchService.impersonateChurchOwner(id, adminUserId, adminRole)
+    return reply.send(result)
+  } catch (error: any) {
+    if (error.message?.includes('não encontrada')) {
+      return reply.status(404).send({ error: error.message })
     }
-    const result = await churchService.impersonateChurchOwner(
-      id,
-      adminUserId,
-      adminRole
+    if (error.message?.includes('permissão')) {
+      return reply.status(403).send({ error: error.message })
+    }
+    return reply.status(500).send({ error: error.message })
+  }
+}
+
+// ==================== MEMBERS ====================
+
+export async function getAllMembersHandler(req: FastifyRequest, reply: FastifyReply) {
+  try {
+    const querySchema = z.object({
+      page: z.coerce.number().int().positive().optional(),
+      limit: z.coerce.number().int().positive().max(100).optional(),
+      search: z.string().optional(),
+    })
+    const query = querySchema.parse(req.query)
+    
+    const result = await memberService.getAllMembers(
+      {
+        search: query.search,
+      },
+      {
+        page: query.page,
+        limit: query.limit,
+      }
     )
     return reply.send(result)
   } catch (error: any) {
@@ -270,28 +301,7 @@ export async function impersonateChurchOwnerHandler(
   }
 }
 
-// ==================== MEMBERS ====================
-
-export async function getAllMembersHandler(
-  req: FastifyRequest,
-  reply: FastifyReply
-) {
-  try {
-    const query = req.query as any
-    const page = Number(query.page) || 1
-    const limit = Number(query.limit) || 50
-    const search = query.search as string | undefined
-    const result = await memberService.getAllMembers({ search }, { page, limit })
-    return reply.send(result)
-  } catch (error: any) {
-    return reply.status(500).send({ error: error.message })
-  }
-}
-
-export async function getMemberByIdHandler(
-  req: FastifyRequest,
-  reply: FastifyReply
-) {
+export async function getMemberByIdHandler(req: FastifyRequest, reply: FastifyReply) {
   try {
     const { id } = req.params as { id: string }
     const member = await memberService.getMemberById(id)
@@ -313,6 +323,21 @@ export async function getAllPlansHandler(req: FastifyRequest, reply: FastifyRepl
     return reply.send({
       plans,
       availableFeatures: AVAILABLE_PLAN_FEATURES,
+    })
+  } catch (error: any) {
+    return reply.status(500).send({ error: error.message })
+  }
+}
+
+/**
+ * GET /admin/plans/features
+ * Returns the canonical feature catalog (only for SUPERADMIN)
+ */
+export async function getPlanFeaturesHandler(req: FastifyRequest, reply: FastifyReply) {
+  try {
+    const { AVAILABLE_PLAN_FEATURES } = await import('../constants/planFeatures')
+    return reply.send({
+      features: AVAILABLE_PLAN_FEATURES,
     })
   } catch (error: any) {
     return reply.status(500).send({ error: error.message })
@@ -382,50 +407,30 @@ export async function updatePlanHandler(req: FastifyRequest, reply: FastifyReply
       maxBranches: z.number().optional(),
       maxMembers: z.number().optional(),
       isActive: z.boolean().optional(),
+      billingInterval: z.string().optional(),
     })
-    
-    // Validar schema
-    const parseResult = bodySchema.safeParse(req.body)
-    if (!parseResult.success) {
-      return reply.status(400).send({
-        error: 'Dados inválidos',
-        details: parseResult.error.errors,
-      })
-    }
-    
-    const data = parseResult.data
+    const data = bodySchema.parse(req.body)
     
     // Validar features se fornecidas
-    if (data.features !== undefined) {
-      // Se array vazio, permitir (pode ser usado para desativar todas as features temporariamente)
-      if (data.features.length > 0) {
-        const { AVAILABLE_PLAN_FEATURES } = await import('../constants/planFeatures')
-        const validFeatureIds = AVAILABLE_PLAN_FEATURES.map((f) => f.id)
-        const invalidFeatures = data.features.filter((f) => !validFeatureIds.includes(f as any))
-        if (invalidFeatures.length > 0) {
-          return reply.status(400).send({
-            error: `Features inválidas: ${invalidFeatures.join(', ')}`,
-          })
-        }
+    if (data.features !== undefined && data.features.length > 0) {
+      const { AVAILABLE_PLAN_FEATURES } = await import('../constants/planFeatures')
+      const validFeatureIds = AVAILABLE_PLAN_FEATURES.map((f) => f.id)
+      const invalidFeatures = data.features.filter((f) => !validFeatureIds.includes(f as any))
+      if (invalidFeatures.length > 0) {
+        return reply.status(400).send({
+          error: `Features inválidas: ${invalidFeatures.join(', ')}`,
+        })
       }
     }
     
     const adminUserId = getAdminUserId(req)
-    const plan = await planService.updatePlan(id, data, adminUserId)
+    const plan = await planService.updatePlan(id, data, adminUserId, req)
     return reply.send(plan)
   } catch (error: any) {
-    // Se for erro do Prisma (plano não encontrado)
-    if (error.code === 'P2025') {
-      return reply.status(404).send({
-        error: 'Plano não encontrado',
-      })
+    if (error.message?.includes('não encontrado')) {
+      return reply.status(404).send({ error: error.message })
     }
-    // Log do erro para debug
-    console.error('Erro ao atualizar plano:', error)
-    return reply.status(500).send({ 
-      error: error.message || 'Erro ao atualizar plano',
-      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
-    })
+    return reply.status(500).send({ error: error.message })
   }
 }
 
@@ -433,9 +438,12 @@ export async function activatePlanHandler(req: FastifyRequest, reply: FastifyRep
   try {
     const { id } = req.params as { id: string }
     const adminUserId = getAdminUserId(req)
-    const plan = await planService.activatePlan(id, adminUserId)
+    const plan = await planService.activatePlan(id, adminUserId, req)
     return reply.send(plan)
   } catch (error: any) {
+    if (error.message?.includes('não encontrado')) {
+      return reply.status(404).send({ error: error.message })
+    }
     return reply.status(500).send({ error: error.message })
   }
 }
@@ -444,28 +452,41 @@ export async function deactivatePlanHandler(req: FastifyRequest, reply: FastifyR
   try {
     const { id } = req.params as { id: string }
     const adminUserId = getAdminUserId(req)
-    const plan = await planService.deactivatePlan(id, adminUserId)
+    const plan = await planService.deactivatePlan(id, adminUserId, req)
     return reply.send(plan)
   } catch (error: any) {
+    // Retornar 409 se houver subscriptions ativas
+    if (error.message?.includes('assinatura') || error.message?.includes('subscription')) {
+      return reply.status(409).send({ error: error.message })
+    }
+    if (error.message?.includes('não encontrado')) {
+      return reply.status(404).send({ error: error.message })
+    }
     return reply.status(500).send({ error: error.message })
   }
 }
 
 // ==================== SUBSCRIPTIONS ====================
 
-export async function getAllSubscriptionsHandler(
-  req: FastifyRequest,
-  reply: FastifyReply
-) {
+export async function getAllSubscriptionsHandler(req: FastifyRequest, reply: FastifyReply) {
   try {
-    const query = req.query as any
-    const page = Number(query.page) || 1
-    const limit = Number(query.limit) || 50
-    const status = query.status as string | undefined
-    const planId = query.planId as string | undefined
+    const querySchema = z.object({
+      page: z.coerce.number().int().positive().optional(),
+      limit: z.coerce.number().int().positive().max(100).optional(),
+      status: z.string().optional(),
+      planId: z.string().optional(),
+    })
+    const query = querySchema.parse(req.query)
+    
     const result = await subscriptionService.getAllSubscriptions(
-      { status, planId },
-      { page, limit }
+      {
+        status: query.status,
+        planId: query.planId,
+      },
+      {
+        page: query.page,
+        limit: query.limit,
+      }
     )
     return reply.send(result)
   } catch (error: any) {
@@ -473,10 +494,7 @@ export async function getAllSubscriptionsHandler(
   }
 }
 
-export async function getSubscriptionByIdHandler(
-  req: FastifyRequest,
-  reply: FastifyReply
-) {
+export async function getSubscriptionByIdHandler(req: FastifyRequest, reply: FastifyReply) {
   try {
     const { id } = req.params as { id: string }
     const subscription = await subscriptionService.getSubscriptionById(id)
@@ -489,23 +507,17 @@ export async function getSubscriptionByIdHandler(
   }
 }
 
-export async function getSubscriptionHistoryHandler(
-  req: FastifyRequest,
-  reply: FastifyReply
-) {
+export async function getSubscriptionHistoryHandler(req: FastifyRequest, reply: FastifyReply) {
   try {
     const { id } = req.params as { id: string }
     const history = await subscriptionService.getSubscriptionHistory(id)
-    return reply.send(history)
+    return reply.send({ history })
   } catch (error: any) {
     return reply.status(500).send({ error: error.message })
   }
 }
 
-export async function changeSubscriptionPlanHandler(
-  req: FastifyRequest,
-  reply: FastifyReply
-) {
+export async function changeSubscriptionPlanHandler(req: FastifyRequest, reply: FastifyReply) {
   try {
     const { id } = req.params as { id: string }
     const bodySchema = z.object({
@@ -513,101 +525,90 @@ export async function changeSubscriptionPlanHandler(
     })
     const { planId } = bodySchema.parse(req.body)
     const adminUserId = getAdminUserId(req)
-    const subscription = await subscriptionService.changeSubscriptionPlan(
-      id,
-      planId,
-      adminUserId
-    )
+    const subscription = await subscriptionService.changeSubscriptionPlan(id, planId, adminUserId)
     return reply.send(subscription)
   } catch (error: any) {
+    if (error.message?.includes('não encontrado') || error.message?.includes('não encontrada')) {
+      return reply.status(404).send({ error: error.message })
+    }
+    if (error.message?.includes('inativo')) {
+      return reply.status(400).send({ error: error.message })
+    }
     return reply.status(500).send({ error: error.message })
   }
 }
 
-export async function updateSubscriptionStatusHandler(
-  req: FastifyRequest,
-  reply: FastifyReply
-) {
+export async function updateSubscriptionStatusHandler(req: FastifyRequest, reply: FastifyReply) {
   try {
     const { id } = req.params as { id: string }
     const bodySchema = z.object({
-      status: z.string(),
+      status: z.enum(['pending', 'active', 'past_due', 'canceled', 'unpaid', 'trialing']),
     })
-    let { status } = bodySchema.parse(req.body)
-    
-    // Normalizar status: frontend pode enviar 'cancelled', backend usa 'canceled'
-    if (status === 'cancelled') {
-      status = 'canceled'
+    const { status } = bodySchema.parse(req.body)
+    const adminUserId = getAdminUserId(req)
+    const subscription = await subscriptionService.updateSubscriptionStatus(id, status, adminUserId)
+    return reply.send(subscription)
+  } catch (error: any) {
+    if (error.message?.includes('não encontrada')) {
+      return reply.status(404).send({ error: error.message })
     }
-    
-    const adminUserId = getAdminUserId(req)
-    const subscription = await subscriptionService.updateSubscriptionStatus(
-      id,
-      status as any,
-      adminUserId
-    )
-    return reply.send(subscription)
-  } catch (error: any) {
     return reply.status(500).send({ error: error.message })
   }
 }
 
-export async function cancelSubscriptionHandler(
-  req: FastifyRequest,
-  reply: FastifyReply
-) {
+export async function cancelSubscriptionHandler(req: FastifyRequest, reply: FastifyReply) {
   try {
     const { id } = req.params as { id: string }
     const adminUserId = getAdminUserId(req)
-    const subscription = await subscriptionService.cancelSubscription(
-      id,
-      adminUserId
-    )
+    const subscription = await subscriptionService.cancelSubscription(id, adminUserId)
     return reply.send(subscription)
   } catch (error: any) {
+    if (error.message?.includes('não encontrada')) {
+      return reply.status(404).send({ error: error.message })
+    }
     return reply.status(500).send({ error: error.message })
   }
 }
 
-export async function reactivateSubscriptionHandler(
-  req: FastifyRequest,
-  reply: FastifyReply
-) {
+export async function reactivateSubscriptionHandler(req: FastifyRequest, reply: FastifyReply) {
   try {
     const { id } = req.params as { id: string }
     const adminUserId = getAdminUserId(req)
-    const subscription = await subscriptionService.reactivateSubscription(
-      id,
-      adminUserId
-    )
+    const subscription = await subscriptionService.reactivateSubscription(id, adminUserId)
     return reply.send(subscription)
   } catch (error: any) {
+    if (error.message?.includes('não encontrada')) {
+      return reply.status(404).send({ error: error.message })
+    }
     return reply.status(500).send({ error: error.message })
   }
 }
 
 // ==================== AUDIT ====================
 
-export async function getAuditLogsHandler(
-  req: FastifyRequest,
-  reply: FastifyReply
-) {
+export async function getAuditLogsHandler(req: FastifyRequest, reply: FastifyReply) {
   try {
-    const query = req.query as any
-    const page = Number(query.page) || 1
-    const limit = Number(query.limit) || 50
-    const adminUserId = query.adminUserId as string | undefined
-    const action = query.action as any
-    const startDate = query.startDate
-      ? new Date(query.startDate as string)
-      : undefined
-    const endDate = query.endDate
-      ? new Date(query.endDate as string)
-      : undefined
-
+    const querySchema = z.object({
+      page: z.coerce.number().int().positive().optional(),
+      limit: z.coerce.number().int().positive().max(100).optional(),
+      adminUserId: z.string().optional(),
+      action: z.string().optional(),
+      startDate: z.string().optional(),
+      endDate: z.string().optional(),
+    })
+    const query = querySchema.parse(req.query)
+    
     const result = await auditService.getAdminAuditLogs(
-      { adminUserId, action, startDate, endDate },
-      { page, limit }
+      {
+        adminUserId: query.adminUserId,
+        action: query.action as any,
+        startDate: query.startDate ? new Date(query.startDate) : undefined,
+        endDate: query.endDate ? new Date(query.endDate) : undefined,
+      },
+      {
+        page: query.page,
+        limit: query.limit,
+      }
     )
     return reply.send(result)
   } catch (error: any) {
@@ -617,10 +618,7 @@ export async function getAuditLogsHandler(
 
 // ==================== CONFIG ====================
 
-export async function getSystemConfigHandler(
-  req: FastifyRequest,
-  reply: FastifyReply
-) {
+export async function getSystemConfigHandler(req: FastifyRequest, reply: FastifyReply) {
   try {
     const config = await configService.getSystemConfig()
     return reply.send(config)
@@ -629,12 +627,10 @@ export async function getSystemConfigHandler(
   }
 }
 
-export async function updateSystemConfigHandler(
-  req: FastifyRequest,
-  reply: FastifyReply
-) {
+export async function updateSystemConfigHandler(req: FastifyRequest, reply: FastifyReply) {
   try {
-    const config = req.body as any
+    const bodySchema = z.object({}).passthrough() // Aceita qualquer objeto
+    const config = bodySchema.parse(req.body)
     const adminUserId = getAdminUserId(req)
     const result = await configService.updateSystemConfig(config, adminUserId)
     return reply.send(result)

@@ -5,12 +5,13 @@ import { checkRole } from '../middlewares/checkRole'
 import { checkBranchId } from '../middlewares/checkBranchId'
 import { createTransactionSchema } from '../schemas/financeSchemas'
 import { authenticate } from '../middlewares/authenticate'
+import { requireFeature } from '../middlewares/requireFeature'
 
 export async function financesRoutes(app: FastifyInstance) {
   const controller = new FinanceController()
 
   app.get('/', {
-    preHandler: [authenticate],
+    preHandler: [authenticate, requireFeature('finances')],
     schema: {
       description: 'Lista transações financeiras com resumo (total, entradas, saídas). Filtros opcionais: startDate, endDate, category, type, search',
       tags: ['Finanças'],
@@ -84,7 +85,7 @@ export async function financesRoutes(app: FastifyInstance) {
   }, controller.getAll.bind(controller))
 
   app.get('/:id', {
-    preHandler: [authenticate],
+    preHandler: [authenticate, requireFeature('finances')],
     schema: {
       description: 'Busca uma transação específica por ID',
       tags: ['Finanças'],
@@ -103,6 +104,7 @@ export async function financesRoutes(app: FastifyInstance) {
   app.post('/', {
     preHandler: [
       authenticate,
+      requireFeature('finances'), // Feature check BEFORE role/permission checks
       checkBranchId(),
       checkRole(['ADMINGERAL', 'ADMINFILIAL', 'COORDINATOR']),
       checkPermission(['finances_manage']),
@@ -114,6 +116,7 @@ export async function financesRoutes(app: FastifyInstance) {
   app.put('/:id', {
     preHandler: [
       authenticate,
+      requireFeature('finances'), // Feature check BEFORE role/permission checks
       checkBranchId(),
       checkRole(['ADMINGERAL', 'ADMINFILIAL', 'COORDINATOR']),
       checkPermission(['finances_manage']),
@@ -136,6 +139,7 @@ export async function financesRoutes(app: FastifyInstance) {
   app.delete('/:id', {
     preHandler: [
       authenticate,
+      requireFeature('finances'), // Feature check BEFORE role/permission checks
       checkBranchId(),
       checkRole(['ADMINGERAL', 'ADMINFILIAL', 'COORDINATOR']),
       checkPermission(['finances_manage']),

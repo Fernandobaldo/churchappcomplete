@@ -67,7 +67,13 @@ export function PlanDetails() {
       setShowDeactivateModal(false)
       loadPlan()
     } catch (error: any) {
-      toast.error('Erro ao desativar plano')
+      // Handle 409 conflict (active subscriptions exist)
+      if (error.response?.status === 409 || error.response?.status === 400) {
+        const errorMessage = error.response?.data?.error || error.response?.data?.message
+        toast.error(errorMessage || 'Não é possível desativar este plano pois existem assinaturas ativas')
+      } else {
+        toast.error('Erro ao desativar plano')
+      }
     } finally {
       setActionLoading(false)
     }
